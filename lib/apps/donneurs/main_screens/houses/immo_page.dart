@@ -2,8 +2,6 @@ import 'package:demarcheur_app/apps/donneurs/inner_screens/houses/house_detail.d
 import 'package:demarcheur_app/consts/color.dart';
 import 'package:demarcheur_app/models/house_model.dart';
 import 'package:demarcheur_app/providers/house_provider.dart';
-import 'package:demarcheur_app/widgets/sub_title.dart';
-import 'package:demarcheur_app/widgets/title_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:hugeicons/hugeicons.dart';
@@ -18,19 +16,20 @@ class ImmoPage extends StatefulWidget {
 }
 
 class _ImmoPageState extends State<ImmoPage> with TickerProviderStateMixin {
-  ConstColors color = ConstColors();
+  final ConstColors color = ConstColors();
   int currentIndex = 0;
   late AnimationController _animationController;
   late AnimationController _fabController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
   late Animation<double> _fabAnimation;
+  late TextEditingController _searcheController;
 
   @override
   void initState() {
     super.initState();
 
-    // Initialize animations
+    // Animations
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 1200),
       vsync: this,
@@ -44,7 +43,7 @@ class _ImmoPageState extends State<ImmoPage> with TickerProviderStateMixin {
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
     );
-
+    _searcheController = TextEditingController();
     _slideAnimation =
         Tween<Offset>(begin: const Offset(0, 0.2), end: Offset.zero).animate(
           CurvedAnimation(
@@ -57,15 +56,12 @@ class _ImmoPageState extends State<ImmoPage> with TickerProviderStateMixin {
       CurvedAnimation(parent: _fabController, curve: Curves.elasticOut),
     );
 
-    // Load data
-    Future.microtask(() {
-      final searchProvider = context.read<HouseProvider>();
-      searchProvider.loadHous().then((_) {
-        _animationController.forward();
-        Future.delayed(const Duration(milliseconds: 800), () {
-          _fabController.forward();
-        });
-      });
+    // Load data once
+    Future.microtask(() async {
+      final provider = context.read<HouseProvider>();
+      await provider.loadHous();
+      _animationController.forward();
+      Future.delayed(const Duration(milliseconds: 800), _fabController.forward);
     });
   }
 
@@ -73,6 +69,7 @@ class _ImmoPageState extends State<ImmoPage> with TickerProviderStateMixin {
   void dispose() {
     _animationController.dispose();
     _fabController.dispose();
+    _searcheController.dispose();
     super.dispose();
   }
 
@@ -81,32 +78,43 @@ class _ImmoPageState extends State<ImmoPage> with TickerProviderStateMixin {
     final provider = context.watch<HouseProvider>();
     final categories = provider.categories;
 
+    if (provider.isLoading) {
+      return Scaffold(
+        backgroundColor: Colors.grey.shade50,
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SpinKitPulse(color: color.primary, size: 60.0),
+              const SizedBox(height: 16),
+              Text(
+                'Chargement des offres...',
+                style: TextStyle(
+                  color: color.secondary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
         backgroundColor: Colors.grey.shade50,
-        floatingActionButton: ScaleTransition(
-          scale: _fabAnimation,
-          child: FloatingActionButton.extended(
-            onPressed: () {},
-            backgroundColor: color.primary,
-            foregroundColor: Colors.white,
-            elevation: 8,
-            icon: const Icon(Icons.search_rounded),
-            label: const Text(
-              'Recherche avancée',
-              style: TextStyle(fontWeight: FontWeight.w600),
-            ),
-          ),
-        ),
         body: CustomScrollView(
           physics: const BouncingScrollPhysics(),
           slivers: [
             _buildModernAppBar(),
+
+            // ✅ Wrap AnimatedBuilder in SliverToBoxAdapter
             SliverToBoxAdapter(
               child: AnimatedBuilder(
                 animation: _animationController,
-                builder: (context, child) {
+                builder: (context, _) {
                   return FadeTransition(
                     opacity: _fadeAnimation,
                     child: SlideTransition(
@@ -117,147 +125,135 @@ class _ImmoPageState extends State<ImmoPage> with TickerProviderStateMixin {
                 },
               ),
             ),
-            provider.isLoading
-                ? SliverFillRemaining(
-                    child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          SpinKitPulse(color: color.primary, size: 60.0),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Chargement des offres...',
-                            style: TextStyle(
-                              color: color.secondary,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
+
+            // ✅ Use SliverToBoxAdapter to contain non-sliver animations
+            SliverToBoxAdapter(
+              child: AnimatedBuilder(
+                animation: _animationController,
+                builder: (context, _) {
+                  return FadeTransition(
+                    opacity: _fadeAnimation,
+                    child: SlideTransition(
+                      position: _slideAnimation,
+                      child: _buildModernContentBox(), // ✅ fixed
                     ),
-                  )
-                : AnimatedBuilder(
-                    animation: _animationController,
-                    builder: (context, child) {
-                      return FadeTransition(
-                        opacity: _fadeAnimation,
-                        child: SlideTransition(
-                          position: _slideAnimation,
-                          child: _buildModernContent(),
-                        ),
-                      );
-                    },
-                  ),
+                  );
+                },
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
+  // --- APP BAR --------------------------------------------------
+
   Widget _buildModernAppBar() {
     return SliverAppBar(
       expandedHeight: 280,
-      floating: false,
       pinned: true,
-      automaticallyImplyLeading: false,
       backgroundColor: color.primary,
+      automaticallyImplyLeading: false,
       flexibleSpace: FlexibleSpaceBar(
-        background: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [color.primary, color.primary.withOpacity(0.8)],
+        background: Stack(
+          fit: StackFit.expand,
+          children: [
+            Image.network(
+              "https://www.shutterstock.com/image-photo/job-search-human-resources-recruitment-260nw-1292578582.jpg",
+              fit: BoxFit.cover,
+              color: Colors.black.withOpacity(0.4),
+              colorBlendMode: BlendMode.darken,
             ),
-          ),
-          child: Stack(
-            children: [
-              Container(
-                decoration: BoxDecoration(
-                  image: DecorationImage(
-                    fit: BoxFit.cover,
-                    image: NetworkImage(
-                      "https://www.shutterstock.com/image-photo/job-search-human-resources-recruitment-260nw-1292578582.jpg",
-                    ),
-                    colorFilter: ColorFilter.mode(
-                      Colors.black.withOpacity(0.4),
-                      BlendMode.darken,
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Colors.transparent, color.primary.withOpacity(0.7)],
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: 40,
+              left: 20,
+              right: 20,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Découvrez',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 32,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
-                ),
-              ),
-              Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.transparent,
-                      color.primary.withOpacity(0.7),
-                    ],
+                  Text(
+                    'Votre maison idéale',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.9),
+                      fontSize: 20,
+                      fontWeight: FontWeight.w400,
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 8),
+
+                  // Container(
+                  //   padding: const EdgeInsets.symmetric(
+                  //     horizontal: 12,
+                  //     vertical: 6,
+                  //   ),
+                  //   decoration: BoxDecoration(
+                  //     color: Colors.white.withOpacity(0.2),
+                  //     borderRadius: BorderRadius.circular(20),
+                  //     border: Border.all(color: Colors.white.withOpacity(0.3)),
+                  //   ),
+                  //   child: Text(
+                  //     '${context.watch<HouseProvider>().allhouses.length} propriétés disponibles',
+                  //     style: const TextStyle(
+                  //       color: Colors.white,
+                  //       fontSize: 12,
+                  //       fontWeight: FontWeight.w500,
+                  //     ),
+                  //   ),
+                  // ),
+                  _searchSection(),
+                ],
               ),
-              Positioned(
-                bottom: 40,
-                left: 20,
-                right: 20,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Découvrez',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 32,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                    Text(
-                      'Votre maison idéale',
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.9),
-                        fontSize: 20,
-                        fontWeight: FontWeight.w400,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: Colors.white.withOpacity(0.3),
-                        ),
-                      ),
-                      child: Text(
-                        '${context.watch<HouseProvider>().allhouses.length} propriétés disponibles',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 
+  Widget _searchSection() {
+    return TextFormField(
+      controller: _searcheController,
+      decoration: InputDecoration(
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 12,
+        ),
+        hintText: 'Rechercher une propriété...',
+        hintStyle: TextStyle(color: Colors.white.withOpacity(0.8)),
+        filled: true,
+        fillColor: Colors.white.withOpacity(0.2),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(30),
+          borderSide: BorderSide.none,
+        ),
+        prefixIcon: Icon(Icons.search, color: Colors.white.withOpacity(0.8)),
+      ),
+    );
+  }
+
+  // --- HEADER --------------------------------------------------
+
   Widget _buildHeaderSection(List<String> categories) {
-    return Container(
-      padding: const EdgeInsets.all(20),
+    return Padding(
+      padding: const EdgeInsets.all(10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -274,16 +270,13 @@ class _ImmoPageState extends State<ImmoPage> with TickerProviderStateMixin {
             height: 50,
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
-              physics: const BouncingScrollPhysics(),
               itemCount: categories.length,
-              itemBuilder: (context, index) {
-                return Padding(
-                  padding: EdgeInsets.only(
-                    right: index == categories.length - 1 ? 0 : 12,
-                  ),
-                  child: _buildModernCategoryButton(categories[index], index),
-                );
-              },
+              itemBuilder: (context, index) => Padding(
+                padding: EdgeInsets.only(
+                  right: index == categories.length - 1 ? 0 : 12,
+                ),
+                child: _buildModernCategoryButton(categories[index], index),
+              ),
             ),
           ),
           const SizedBox(height: 24),
@@ -300,11 +293,7 @@ class _ImmoPageState extends State<ImmoPage> with TickerProviderStateMixin {
               ),
               TextButton.icon(
                 onPressed: () {},
-                icon: Icon(
-                  Icons.arrow_forward_rounded,
-                  color: color.primary,
-                  size: 18,
-                ),
+                icon: Icon(Icons.arrow_forward_rounded, color: color.primary),
                 label: Text(
                   'Voir tout',
                   style: TextStyle(
@@ -321,16 +310,11 @@ class _ImmoPageState extends State<ImmoPage> with TickerProviderStateMixin {
   }
 
   Widget _buildModernCategoryButton(String title, int index) {
-    bool isSelected = currentIndex == index;
+    final bool isSelected = currentIndex == index;
     return GestureDetector(
-      onTap: () {
-        setState(() {
-          currentIndex = index;
-        });
-      },
+      onTap: () => setState(() => currentIndex = index),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         decoration: BoxDecoration(
           color: isSelected ? color.primary : Colors.white,
@@ -339,21 +323,15 @@ class _ImmoPageState extends State<ImmoPage> with TickerProviderStateMixin {
             color: isSelected ? color.primary : Colors.grey.shade300,
             width: isSelected ? 2 : 1,
           ),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: color.primary.withOpacity(0.3),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ]
-              : [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
+          boxShadow: [
+            BoxShadow(
+              color: (isSelected ? color.primary : Colors.black).withOpacity(
+                isSelected ? 0.3 : 0.05,
+              ),
+              blurRadius: isSelected ? 12 : 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Text(
           title,
@@ -367,53 +345,49 @@ class _ImmoPageState extends State<ImmoPage> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildModernContent() {
-    final houseProvider = context.watch<HouseProvider>();
-    final categories = houseProvider.categories;
-    final houses = houseProvider.allhouses;
-    final houseL = HouseProvider();
+  // --- ✅ FIXED CONTENT (non-sliver) ----------------------------
 
-    List<HouseModel> filteredHouses;
-    if (currentIndex == 0) {
-      filteredHouses = houses;
-    } else {
-      final selectedCategory = categories[currentIndex];
-      filteredHouses = houses
-          .where(
-            (house) =>
-                house.category.toLowerCase() == selectedCategory.toLowerCase(),
-          )
-          .toList();
-    }
+  Widget _buildModernContentBox() {
+    final provider = context.watch<HouseProvider>();
+    final categories = provider.categories;
+    final houses = provider.allhouses;
 
     if (houses.isEmpty) {
-      return SliverToBoxAdapter(
-        child: _buildEmptyState('Aucune offre disponible pour le moment.'),
-      );
+      return _buildEmptyState('Aucune offre disponible pour le moment.');
     }
+
+    final selectedCategory = currentIndex == 0
+        ? null
+        : categories[currentIndex];
+    final filteredHouses = selectedCategory == null
+        ? houses
+        : houses
+              .where(
+                (h) =>
+                    h.category.toLowerCase() == selectedCategory.toLowerCase(),
+              )
+              .toList();
 
     if (filteredHouses.isEmpty) {
-      return SliverToBoxAdapter(
-        child: _buildEmptyState('Aucune offre trouvée dans cette catégorie.'),
-      );
+      return _buildEmptyState('Aucune offre trouvée dans cette catégorie.');
     }
 
-    return SliverPadding(
+    return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      sliver: SliverList(
-        delegate: SliverChildBuilderDelegate((context, index) {
-          final house = filteredHouses[index];
-          return Padding(
+      child: Column(
+        children: List.generate(
+          filteredHouses.length,
+          (index) => Padding(
             padding: const EdgeInsets.only(bottom: 16),
-            child: _buildModernHouseCard(house, houseL),
-          );
-        }, childCount: filteredHouses.length),
+            child: _buildModernHouseCard(filteredHouses[index]),
+          ),
+        ),
       ),
     );
   }
 
   Widget _buildEmptyState(String message) {
-    return Container(
+    return SizedBox(
       height: 300,
       child: Center(
         child: Column(
@@ -436,13 +410,16 @@ class _ImmoPageState extends State<ImmoPage> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildModernHouseCard(HouseModel house, HouseProvider houseL) {
+  Widget _buildModernHouseCard(HouseModel house) {
     return GestureDetector(
       onTap: () {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => DetailHouse(house: house, houseLenth: houseL),
+            builder: (_) => DetailHouse(
+              house: house,
+              houseLenth: context.read<HouseProvider>(),
+            ),
           ),
         );
       },
@@ -453,7 +430,7 @@ class _ImmoPageState extends State<ImmoPage> with TickerProviderStateMixin {
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.08),
-              blurRadius: 20,
+              blurRadius: 8,
               offset: const Offset(0, 8),
             ),
           ],
@@ -461,36 +438,28 @@ class _ImmoPageState extends State<ImmoPage> with TickerProviderStateMixin {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Image Section
+            // image section
             Stack(
               children: [
-                Container(
-                  height: 220,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(20),
-                      topRight: Radius.circular(20),
-                    ),
-                    image: DecorationImage(
-                      fit: BoxFit.cover,
-                      image: NetworkImage(house.imageUrl.first),
-                    ),
+                ClipRRect(
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(20),
+                    topRight: Radius.circular(20),
                   ),
-                ),
-                Positioned(
-                  top: 16,
-                  right: 16,
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.9),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      Icons.favorite_border_rounded,
-                      color: color.primary,
-                      size: 20,
+                  child: Image.network(
+                    house.imageUrl.first,
+                    height: 220,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      height: 200,
+                      width: double.infinity,
+                      color: Colors.grey[200],
+                      child: Icon(
+                        Icons.home,
+                        size: 50,
+                        color: Colors.grey[400],
+                      ),
                     ),
                   ),
                 ),
@@ -520,94 +489,20 @@ class _ImmoPageState extends State<ImmoPage> with TickerProviderStateMixin {
                 ),
               ],
             ),
-
-            // Content Section
             Padding(
               padding: const EdgeInsets.all(20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          image: DecorationImage(
-                            fit: BoxFit.cover,
-                            image: NetworkImage(house.logo),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              house.companyName,
-                              style: TextStyle(
-                                color: color.primary,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            Text(
-                              house.countType,
-                              style: TextStyle(
-                                color: color.secondary,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.amber.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.star_rounded,
-                              color: Colors.amber,
-                              size: 16,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              house.rate.toString(),
-                              style: TextStyle(
-                                color: Colors.amber.shade700,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 16),
-
                   Text(
-                    'Type: ${house.type}',
+                    house.companyName,
                     style: TextStyle(
                       color: color.primary,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
                     ),
                   ),
-
-                  const SizedBox(height: 12),
-
+                  const SizedBox(height: 6),
                   Row(
                     children: [
                       HugeIcon(
@@ -622,60 +517,31 @@ class _ImmoPageState extends State<ImmoPage> with TickerProviderStateMixin {
                           style: TextStyle(
                             color: color.secondary,
                             fontSize: 14,
-                            fontWeight: FontWeight.w500,
                           ),
                         ),
                       ),
                     ],
                   ),
-
                   const SizedBox(height: 8),
-
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      HugeIcon(
-                        icon: HugeIcons.strokeRoundedClock01,
-                        size: 16,
-                        color: color.primary,
-                      ),
-                      const SizedBox(width: 6),
                       Text(
-                        house.postDate,
-                        style: TextStyle(color: color.tertiary, fontSize: 12),
+                        'Prix du loyer',
+                        style: TextStyle(
+                          color: color.secondary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      Text(
+                        "${NumberFormat().format(house.rent)} GNF/mois",
+                        style: TextStyle(
+                          color: color.primary,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
                       ),
                     ],
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: color.primary.withOpacity(0.05),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: color.primary.withOpacity(0.1)),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Prix du loyer',
-                          style: TextStyle(
-                            color: color.secondary,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        Text(
-                          "${NumberFormat().format(house.rent)} GNF/mois",
-                          style: TextStyle(
-                            color: color.primary,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ],
-                    ),
                   ),
                 ],
               ),

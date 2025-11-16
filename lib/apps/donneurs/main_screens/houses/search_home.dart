@@ -231,7 +231,6 @@ class _SearchHomeState extends State<SearchHome> with TickerProviderStateMixin {
 
   Widget _buildModernAppBar() {
     return SliverAppBar(
-      expandedHeight: 200,
       floating: false,
       pinned: true,
       backgroundColor: color.primary,
@@ -312,6 +311,7 @@ class _SearchHomeState extends State<SearchHome> with TickerProviderStateMixin {
                         fontWeight: FontWeight.w400,
                       ),
                     ),
+                    SizedBox(height: 10),
                   ],
                 ),
               ),
@@ -560,7 +560,7 @@ class _SearchHomeState extends State<SearchHome> with TickerProviderStateMixin {
                 size: 80,
                 color: Colors.grey.shade400,
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               Text(
                 'Aucun résultat trouvé',
                 style: TextStyle(
@@ -630,9 +630,19 @@ class _SearchHomeState extends State<SearchHome> with TickerProviderStateMixin {
                         topLeft: Radius.circular(16),
                         topRight: Radius.circular(16),
                       ),
-                      image: DecorationImage(
-                        fit: BoxFit.cover,
-                        image: NetworkImage(house.imageUrl.first),
+                    ),
+                    child: Image.network(
+                      house.imageUrl.first,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        height: 200,
+                        width: double.infinity,
+                        color: Colors.grey[200],
+                        child: Icon(
+                          Icons.home,
+                          size: 50,
+                          color: Colors.grey[400],
+                        ),
                       ),
                     ),
                   ),

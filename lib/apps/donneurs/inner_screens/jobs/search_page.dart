@@ -91,7 +91,7 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
-        backgroundColor: Colors.grey.shade50,
+        backgroundColor: const Color(0xFFF8FAFC),
         body: search.isLoading
             ? _buildLoadingState()
             : CustomScrollView(
@@ -385,7 +385,7 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
 
   Widget _buildJobResults(SearchProvider search) {
     if (search.filteredJobs.isEmpty) {
-      return SliverFillRemaining(
+      return SliverToBoxAdapter(
         child: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,

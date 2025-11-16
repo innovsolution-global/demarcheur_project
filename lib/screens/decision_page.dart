@@ -2,6 +2,7 @@ import 'package:demarcheur_app/apps/demandeurs/main_screens/register_page.dart';
 import 'package:demarcheur_app/apps/immo/immo_registration_page.dart';
 import 'package:demarcheur_app/auths/donneurs/donnor_register.dart';
 import 'package:demarcheur_app/auths/prestataire/prestataire_register_page.dart';
+import 'package:demarcheur_app/auths/prestataire/prestataire_register_page_redesigned.dart';
 import 'package:demarcheur_app/consts/color.dart';
 import 'package:demarcheur_app/widgets/btn.dart';
 import 'package:demarcheur_app/widgets/header_page.dart';
@@ -66,39 +67,33 @@ class _DecisionPageState extends State<DecisionPage> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Génération dynamique des options via RadioGroup (nouvelle API)
-                  RadioGroup<int>(
-                    groupValue: selectedIndex,
-                    onChanged: (value) {
-                      setState(() => selectedIndex = value);
-                    },
-                    child: Column(
-                      children: [
-                        ...List.generate(options.length, (index) {
-                          return RadioListTile<int>(
-                            activeColor: color.primary,
-                            value: index,
-                            title: Text(
-                              options[index]["title"]!,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: color.primary,
-                                fontSize: 18,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            subtitle: Text(
-                              options[index]["subtitle"]!,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(color: color.primary),
-                            ),
-                          );
-                        }),
-                      ],
-                    ),
-                  ),
+                  // Génération dynamique des options
+                  ...List.generate(options.length, (index) {
+                    return RadioListTile<int>(
+                      activeColor: color.primary,
+                      groupValue: selectedIndex,
+                      value: index,
+                      onChanged: (value) {
+                        setState(() => selectedIndex = value);
+                      },
+                      title: Text(
+                        options[index]["title"]!,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: color.primary,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      subtitle: Text(
+                        options[index]["subtitle"]!,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(color: color.secondary, fontSize: 14),
+                      ),
+                    );
+                  }),
                 ],
               ),
             ),
@@ -109,32 +104,50 @@ class _DecisionPageState extends State<DecisionPage> {
               child: Btn(
                 texte: "Suivant",
                 function: () {
-                  // final choice = options[selectedIndex!]["title"];
                   if (selectedIndex == null) {
-                    return null;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          "Veuillez sélectionner une option",
+                          style: TextStyle(color: color.bg),
+                        ),
+                        backgroundColor: color.error,
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    );
+                    return;
                   }
+
                   if (selectedIndex == 0) {
-                    return Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => DonnorRegister()),
-                    );
-                  } else if (selectedIndex == 1) {
-                    return Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => RegisterPage()),
-                    );
-                  } else if (selectedIndex == 2) {
-                    return Navigator.push(
+                    Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => ImmoRegistrationPage(),
+                        builder: (context) => const DonnorRegister(),
+                      ),
+                    );
+                  } else if (selectedIndex == 1) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const RegisterPage(),
+                      ),
+                    );
+                  } else if (selectedIndex == 2) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ImmoRegistrationPage(),
                       ),
                     );
                   } else {
-                    return Navigator.push(
+                    Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => PrestataireRegisterPage(),
+                        builder: (context) =>
+                            const PrestataireRegisterPageRedesigned(),
                       ),
                     );
                   }

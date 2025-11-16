@@ -33,79 +33,96 @@ class _ApplicationPageState extends State<ApplicationPage> {
     });
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final provider = context.watch<ApplicationProvider>();
-    final categories = provider.categories;
-    return InkWell(
-      onTap: () {
-        FocusScope.of(context).unfocus();
-      },
-      child: Scaffold(
-        backgroundColor: color.bg,
-
-        body: CustomScrollView(
-          slivers: [
-            SliverAppBar.large(
-              actionsPadding: EdgeInsets.all(20),
-
-              automaticallyImplyLeading: false,
-              iconTheme: IconThemeData(color: color.bg),
-              actionsIconTheme: IconThemeData(color: color.bg),
-              backgroundColor: Colors.transparent,
-              flexibleSpace: Container(
-                decoration: BoxDecoration(
-                  color: color.primary,
-                  image: DecorationImage(
-                    fit: BoxFit.cover,
-                    image: NetworkImage(
-                      "https://www.shutterstock.com/image-photo/job-search-human-resources-recruitment-260nw-1292578582.jpg",
-                    ),
-                  ),
-                ),
+  Widget _buildLoadingState() {
+    return Scaffold(
+      backgroundColor: Colors.grey.shade50,
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SpinKitPulse(color: color.primary, size: 60.0),
+            const SizedBox(height: 16),
+            Text(
+              'Recherche des offres...',
+              style: TextStyle(
+                color: color.secondary,
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
               ),
             ),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.all(10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-
-                  children: [
-                    SizedBox(height: 10),
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: List.generate(categories.length, (index) {
-                          return Row(
-                            children: [
-                              btnMenu(categories[index], index),
-                              if (index != categories.length - 1)
-                                const SizedBox(width: 10),
-                            ],
-                          );
-                        }),
-                      ),
-                    ),
-                    SizedBox(height: 16),
-                  ],
-                ),
-              ),
-            ),
-            provider.isLoading
-                ? const SliverFillRemaining(
-                    child: Center(
-                      child: SpinKitFadingCircle(
-                        color: Colors.blue,
-                        size: 60.0,
-                      ),
-                    ),
-                  )
-                : content(),
           ],
         ),
       ),
     );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = context.watch<ApplicationProvider>();
+    final categories = provider.categories;
+    return provider.isLoading
+        ? _buildLoadingState()
+        : InkWell(
+            onTap: () {
+              FocusScope.of(context).unfocus();
+            },
+            child: Scaffold(
+              backgroundColor: color.bg,
+
+              body: CustomScrollView(
+                slivers: [
+                  SliverAppBar.large(
+                    actionsPadding: EdgeInsets.all(20),
+                    automaticallyImplyLeading: false,
+                    iconTheme: IconThemeData(color: color.bg),
+                    actionsIconTheme: IconThemeData(color: color.bg),
+                    backgroundColor: Colors.transparent,
+                    flexibleSpace: Container(
+                      decoration: BoxDecoration(
+                        color: color.primary,
+                        image: DecorationImage(
+                          fit: BoxFit.cover,
+                          image: NetworkImage(
+                            "https://www.shutterstock.com/image-photo/job-search-human-resources-recruitment-260nw-1292578582.jpg",
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.all(10),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+
+                        children: [
+                          SizedBox(height: 10),
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: List.generate(categories.length, (
+                                index,
+                              ) {
+                                return Row(
+                                  children: [
+                                    btnMenu(categories[index], index),
+                                    if (index != categories.length - 1)
+                                      const SizedBox(width: 10),
+                                  ],
+                                );
+                              }),
+                            ),
+                          ),
+                          SizedBox(height: 16),
+                        ],
+                      ),
+                    ),
+                  ),
+                  content(),
+                ],
+              ),
+            ),
+          );
   }
 
   Widget btnMenu(String title, int index) {

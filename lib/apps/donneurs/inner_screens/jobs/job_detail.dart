@@ -125,11 +125,11 @@ class _JobDetailState extends State<JobDetail> with TickerProviderStateMixin {
 
   Widget _buildModernAppBar() {
     return SliverAppBar(
-      expandedHeight: 220,
+      expandedHeight: 230,
       floating: false,
       pinned: true,
       elevation: 0,
-      backgroundColor: Colors.transparent,
+      backgroundColor: color.primary,
       leading: Container(
         margin: const EdgeInsets.all(8),
         decoration: BoxDecoration(
@@ -152,47 +152,53 @@ class _JobDetailState extends State<JobDetail> with TickerProviderStateMixin {
           ),
         ),
       ),
-      actions: [
-        ScaleTransition(
-          scale: _scaleAnimation,
-          child: Container(
-            margin: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.9),
-              borderRadius: BorderRadius.circular(14),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 10,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: IconButton(
-              onPressed: () {
-                setState(() {
-                  isFavorite = !isFavorite;
-                });
-              },
-              icon: Icon(
-                isFavorite ? Icons.favorite : Icons.favorite_border,
-                color: isFavorite ? Colors.red : color.primary,
-                size: 22,
-              ),
-            ),
-          ),
-        ),
-      ],
+      // actions: [
+      //   ScaleTransition(
+      //     scale: _scaleAnimation,
+      //     child: Container(
+      //       margin: const EdgeInsets.all(8),
+      //       decoration: BoxDecoration(
+      //         color: Colors.white.withOpacity(0.9),
+      //         borderRadius: BorderRadius.circular(14),
+      //         boxShadow: [
+      //           BoxShadow(
+      //             color: Colors.black.withOpacity(0.1),
+      //             blurRadius: 10,
+      //             offset: const Offset(0, 2),
+      //           ),
+      //         ],
+      //       ),
+      //       child: IconButton(
+      //         onPressed: () {
+      //           setState(() {
+      //             isFavorite = !isFavorite;
+      //           });
+      //         },
+      //         icon: Icon(
+      //           isFavorite ? Icons.favorite : Icons.favorite_border,
+      //           color: isFavorite ? Colors.red : color.primary,
+      //           size: 22,
+      //         ),
+      //       ),
+      //     ),
+      //   ),
+      // ],
       flexibleSpace: FlexibleSpaceBar(
         background: Container(
           decoration: BoxDecoration(
+            image: const DecorationImage(
+              image: NetworkImage(
+                "https://www.shutterstock.com/image-photo/job-search-human-resources-recruitment-260nw-1292578582.jpg",
+              ),
+              fit: BoxFit.cover,
+            ),
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
                 color.primary,
                 color.primary.withOpacity(0.8),
-                const Color(0xFFF8FAFC),
+                color.primary.withOpacity(0.6),
               ],
               stops: const [0.0, 0.7, 1.0],
             ),
@@ -205,7 +211,7 @@ class _JobDetailState extends State<JobDetail> with TickerProviderStateMixin {
                 ),
               ),
               Positioned(
-                bottom: 40,
+                bottom: 25,
                 left: 24,
                 right: 24,
                 child: Column(
@@ -215,12 +221,12 @@ class _JobDetailState extends State<JobDetail> with TickerProviderStateMixin {
                       'Détails de l\'emploi',
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: 28,
+                        fontSize: 24,
                         fontWeight: FontWeight.w800,
                         letterSpacing: -0.5,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 4),
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 12,
@@ -442,7 +448,7 @@ class _JobDetailState extends State<JobDetail> with TickerProviderStateMixin {
                 'Informations sur le poste',
                 style: TextStyle(
                   color: color.primary,
-                  fontSize: 20,
+                  fontSize: 16,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -717,7 +723,7 @@ class _JobDetailState extends State<JobDetail> with TickerProviderStateMixin {
       isScrollControlled: true,
       builder: (context) {
         return Container(
-          height: MediaQuery.of(context).size.height * 0.4,
+          height: MediaQuery.of(context).size.height * 0.41,
           decoration: const BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.only(
@@ -732,12 +738,12 @@ class _JobDetailState extends State<JobDetail> with TickerProviderStateMixin {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
+                  color: color.primary,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.all(20),
                 child: Text(
                   'Partager cette offre',
                   style: TextStyle(
@@ -755,25 +761,37 @@ class _JobDetailState extends State<JobDetail> with TickerProviderStateMixin {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          _buildShareOption(
-                            Brands.whatsapp,
-                            'WhatsApp',
-                            Colors.green,
+                          GestureDetector(
+                            onTap: () => Navigator.pop(context),
+                            child: _buildShareOption(
+                              Brands.whatsapp,
+                              'WhatsApp',
+                              Colors.green,
+                            ),
                           ),
-                          _buildShareOption(
-                            Brands.twitterx_2,
-                            'X',
-                            Colors.black,
+                          GestureDetector(
+                            onTap: () => Navigator.pop(context),
+                            child: _buildShareOption(
+                              Brands.twitterx_2,
+                              'X',
+                              Colors.black,
+                            ),
                           ),
-                          _buildShareOption(
-                            Brands.facebook,
-                            'Facebook',
-                            Colors.blue,
+                          GestureDetector(
+                            onTap: () => Navigator.pop(context),
+                            child: _buildShareOption(
+                              Brands.facebook,
+                              'Facebook',
+                              Colors.blue,
+                            ),
                           ),
-                          _buildShareOption(
-                            Brands.instagram,
-                            'Instagram',
-                            Colors.purple,
+                          GestureDetector(
+                            onTap: () => Navigator.pop(context),
+                            child: _buildShareOption(
+                              Brands.instagram,
+                              'Instagram',
+                              Colors.purple,
+                            ),
                           ),
                         ],
                       ),
@@ -781,21 +799,37 @@ class _JobDetailState extends State<JobDetail> with TickerProviderStateMixin {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          _buildShareOption(
-                            Brands.tiktok,
-                            'TikTok',
-                            Colors.black,
+                          GestureDetector(
+                            onTap: () => Navigator.pop(context),
+                            child: _buildShareOption(
+                              Brands.tiktok,
+                              'TikTok',
+                              Colors.black,
+                            ),
                           ),
-                          _buildShareOption(Brands.gmail, 'Gmail', Colors.red),
-                          _buildShareOption(
-                            Brands.facebook_messenger,
-                            'Messenger',
-                            Colors.blue,
+                          GestureDetector(
+                            onTap: () => Navigator.pop(context),
+                            child: _buildShareOption(
+                              Brands.gmail,
+                              'Gmail',
+                              Colors.red,
+                            ),
                           ),
-                          _buildShareOption(
-                            Brands.messages,
-                            'Messages',
-                            Colors.green,
+                          GestureDetector(
+                            onTap: () => Navigator.pop(context),
+                            child: _buildShareOption(
+                              Brands.facebook_messenger,
+                              'Messenger',
+                              Colors.blue,
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () => Navigator.pop(context),
+                            child: _buildShareOption(
+                              Brands.messages,
+                              'Messages',
+                              Colors.green,
+                            ),
                           ),
                         ],
                       ),
@@ -811,33 +845,27 @@ class _JobDetailState extends State<JobDetail> with TickerProviderStateMixin {
   }
 
   Widget _buildShareOption(dynamic brand, String label, Color accentColor) {
-    return GestureDetector(
-      onTap: () {
-        Navigator.pop(context);
-        // Handle share action
-      },
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: accentColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: accentColor.withOpacity(0.3)),
-            ),
-            child: Brand(brand, size: 32),
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: accentColor.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: accentColor.withOpacity(0.3)),
           ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            style: TextStyle(
-              color: color.secondary,
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-            ),
+          child: Brand(brand, size: 32),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          label,
+          style: TextStyle(
+            color: color.secondary,
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

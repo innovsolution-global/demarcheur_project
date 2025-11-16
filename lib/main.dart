@@ -14,8 +14,11 @@ import 'package:demarcheur_app/providers/house_provider.dart';
 import 'package:demarcheur_app/providers/immo/immo_chat_provider.dart';
 import 'package:demarcheur_app/providers/presta/presta_provider.dart';
 import 'package:demarcheur_app/providers/chat/chat_provider.dart';
+import 'package:demarcheur_app/providers/presta/presta_user_provider.dart';
 import 'package:demarcheur_app/providers/search_provider.dart';
 import 'package:demarcheur_app/providers/user_provider.dart';
+import 'package:demarcheur_app/providers/donor_register_provider.dart';
+import 'package:demarcheur_app/providers/domain_pref_provider.dart';
 import 'package:demarcheur_app/services/auth_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -94,6 +97,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         ChangeNotifierProvider(create: (_) => PrestaProvider()),
         ChangeNotifierProvider(create: (_) => ChatProvider()),
         ChangeNotifierProvider(create: (_) => ImmoChatProvider()),
+        ChangeNotifierProvider(create: (_) => PrestaUserProvider()),
+        ChangeNotifierProvider(create: (_) => DonorRegisterProvider()),
+        ChangeNotifierProvider(create: (_) => DomainPrefProvider()),
       ],
       child: MaterialApp(
         title: 'Flutter Demo',
