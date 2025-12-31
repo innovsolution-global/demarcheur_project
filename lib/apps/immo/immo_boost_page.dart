@@ -24,6 +24,7 @@ class _ImmoBoostPageState extends State<ImmoBoostPage>
   late AnimationController _cardAnimationController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _slideAnimation;
+  late AnimationController _uploadController;
   late Animation<double> _cardAnimation;
 
   int _selectedPackageIndex = 1; // Default to Standard package
@@ -108,6 +109,7 @@ class _ImmoBoostPageState extends State<ImmoBoostPage>
   void initState() {
     super.initState();
     _initializeAnimations();
+    _uploadController.forward();
   }
 
   void _initializeAnimations() {
@@ -145,6 +147,7 @@ class _ImmoBoostPageState extends State<ImmoBoostPage>
   @override
   void dispose() {
     _animationController.dispose();
+    _uploadController.dispose();
     _cardAnimationController.dispose();
     super.dispose();
   }
@@ -167,57 +170,65 @@ class _ImmoBoostPageState extends State<ImmoBoostPage>
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.green.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.check_circle,
-                color: Colors.green,
-                size: 48,
-              ),
+      builder: (context) {
+        _uploadController.forward();
+        return ScaleTransition(
+          scale: _uploadController,
+          child: AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
             ),
-            const SizedBox(height: 16),
-            const Text(
-              'Boost Activé!',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Votre propriété est maintenant boostée et bénéficie d\'une visibilité maximale!',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey[600]),
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  Navigator.of(context).pop();
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _colors.primary,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.check_circle,
+                    color: Colors.green,
+                    size: 48,
                   ),
                 ),
-                child: const Text(
-                  'Parfait!',
-                  style: TextStyle(color: Colors.white),
+                const SizedBox(height: 16),
+                const Text(
+                  'Boost Activé!',
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                 ),
-              ),
+                const SizedBox(height: 8),
+                Text(
+                  'Votre propriété est maintenant boostée et bénéficie d\'une visibilité maximale!',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.grey[600]),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      Navigator.of(context).pop();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _colors.primary,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'Parfait!',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 

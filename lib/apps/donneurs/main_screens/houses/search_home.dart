@@ -1,7 +1,6 @@
 import 'package:demarcheur_app/consts/color.dart';
 import 'package:demarcheur_app/models/house_model.dart';
 import 'package:demarcheur_app/providers/house_provider.dart';
-import 'package:demarcheur_app/widgets/sub_title.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:hugeicons/hugeicons.dart';
@@ -200,7 +199,7 @@ class _SearchHomeState extends State<SearchHome> with TickerProviderStateMixin {
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
-        backgroundColor: Colors.grey.shade50,
+        backgroundColor: const Color(0xFFF8FAFC),
         body: CustomScrollView(
           physics: const BouncingScrollPhysics(),
           slivers: [
@@ -237,7 +236,7 @@ class _SearchHomeState extends State<SearchHome> with TickerProviderStateMixin {
       leading: Container(
         margin: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.2),
+          color: Colors.white.withValues(alpha: 0.2),
           borderRadius: BorderRadius.circular(12),
         ),
         child: IconButton(

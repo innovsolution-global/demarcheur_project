@@ -1,3 +1,3 @@
 class Config {
-  static String url = "";
+  static String baseUrl = "https://demarcheur-backend.onrender.com/api/v1";
 }

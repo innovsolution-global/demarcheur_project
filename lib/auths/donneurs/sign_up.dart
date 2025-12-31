@@ -185,13 +185,13 @@ class _SignupPageState extends State<SignupPage> {
                             width: double.infinity,
                             child: OutlinedButton(
                               onPressed: () {
-                                Navigator.push<void>(
-                                  context,
-                                  MaterialPageRoute<void>(
-                                    builder: (BuildContext context) =>
-                                        const DomainPrefPage(),
-                                  ),
-                                );
+                                // Navigator.push<void>(
+                                //   context,
+                                //   MaterialPageRoute<void>(
+                                //     builder: (BuildContext context) =>
+                                //         const DomainPrefPage(),
+                                //   ),
+                                // );
                               },
                               style: OutlinedButton.styleFrom(
                                 backgroundColor: color.primary,

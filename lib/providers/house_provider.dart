@@ -4,14 +4,46 @@ import 'package:flutter/material.dart';
 class HouseProvider extends ChangeNotifier {
   List<HouseModel> _allhouses = [];
   List<HouseModel> _housefiltered = [];
+  bool _viewAll = false;
+  bool get viewAll => _viewAll;
   bool _isLoading = false;
   List<HouseModel> get allhouses => _allhouses;
+  static const int _limit = 2;
+  List<HouseModel> get firstFiveHouses => _housefiltered.length > _limit
+      ? _housefiltered.take(_limit).toList()
+      : _housefiltered;
   List<HouseModel> get housefiltered => _housefiltered;
+
   bool get isLoading => _isLoading;
   void setHouseFiltered(List<HouseModel> houses) {
     _housefiltered = houses;
     notifyListeners();
   }
+
+  void toggleView() {
+    _viewAll = !_viewAll;
+    notifyListeners();
+  }
+
+  void searchHouse(String query) {
+    if (query.isEmpty) {
+      _housefiltered = _allhouses;
+    } else {
+      final q = query.toLowerCase();
+      _housefiltered = _allhouses
+          .where(
+            (job) =>
+                job.companyName.toLowerCase().contains(q) ||
+                job.location.toLowerCase().contains(q) ||
+                job.category.toLowerCase().contains(q),
+          )
+          .toList();
+    }
+
+    _viewAll = false; // reset view when new search
+    notifyListeners();
+  }
+
   Future<void> loadHous() async {
     _isLoading = true;
     notifyListeners();
@@ -211,5 +243,11 @@ class HouseProvider extends ChangeNotifier {
         .toList();
     uniqueCategories.sort(); // optional: sort alphabetically
     return ['Tout', ...uniqueCategories];
+  }
+
+  void clearSearch() {
+    _housefiltered = _allhouses;
+    _viewAll = false;
+    notifyListeners();
   }
 }

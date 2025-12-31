@@ -132,7 +132,7 @@ class _ImmoHomePageState extends State<ImmoHomePage>
           color: _color.primary,
           child: CustomScrollView(
             controller: _scrollController,
-            physics: const AlwaysScrollableScrollPhysics(),
+            physics: const BouncingScrollPhysics(),
             slivers: [
               _buildModernHeader(),
               _buildQuickStats(),

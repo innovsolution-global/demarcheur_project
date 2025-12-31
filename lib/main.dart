@@ -7,9 +7,13 @@ import 'package:demarcheur_app/apps/demandeurs/main_screens/dem_profile.dart';
 import 'package:demarcheur_app/apps/demandeurs/main_screens/vancy.dart';
 import 'package:demarcheur_app/apps/prestataires/prestataire_select_page.dart';
 import 'package:demarcheur_app/auths/donneurs/login_page.dart';
+import 'package:demarcheur_app/consts/color.dart';
 import 'package:demarcheur_app/providers/application_provider.dart';
 import 'package:demarcheur_app/providers/compa_profile_provider.dart';
 import 'package:demarcheur_app/providers/dem_job_provider.dart';
+import 'package:demarcheur_app/providers/dem_user_provider.dart';
+import 'package:demarcheur_app/providers/donnor_user_provider.dart';
+import 'package:demarcheur_app/providers/enterprise_provider.dart';
 import 'package:demarcheur_app/providers/house_provider.dart';
 import 'package:demarcheur_app/providers/immo/immo_chat_provider.dart';
 import 'package:demarcheur_app/providers/presta/presta_provider.dart';
@@ -19,6 +23,8 @@ import 'package:demarcheur_app/providers/search_provider.dart';
 import 'package:demarcheur_app/providers/user_provider.dart';
 import 'package:demarcheur_app/providers/donor_register_provider.dart';
 import 'package:demarcheur_app/providers/domain_pref_provider.dart';
+import 'package:demarcheur_app/providers/settings_provider.dart';
+import 'package:demarcheur_app/services/auth_provider.dart';
 import 'package:demarcheur_app/services/auth_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -100,40 +106,45 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         ChangeNotifierProvider(create: (_) => PrestaUserProvider()),
         ChangeNotifierProvider(create: (_) => DonorRegisterProvider()),
         ChangeNotifierProvider(create: (_) => DomainPrefProvider()),
+        ChangeNotifierProvider(create: (_) => SettingsProvider()),
+        ChangeNotifierProvider(create: (_) => DemUserProvider()),
+        ChangeNotifierProvider(create: (_) => DonnorUserProvider()),
+        ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider(create: (_) => EnterpriseProvider()),
       ],
-      child: MaterialApp(
-        title: 'Flutter Demo',
-        debugShowCheckedModeBanner: false,
-        initialRoute: "/",
-        routes: {
-          //"/": (context) => InitializeWidget(),
-          "/demhome": (context) => DemHomePage(),
-          "/boost": (context) => BoostPage(),
-          "/demonboarding": (context) => DemOnboardingPage(),
-          "/demmsg": (context) => DemMessage(),
-          "/dempro": (context) => DemProfile(),
-          "/vancy": (context) => Vancy(),
-          "/prestataire": (context) => PrestataireSelectPage(),
+      child: Consumer<SettingsProvider>(
+        builder: (context, settings, child) {
+          return MaterialApp(
+            title: 'Demarcheur App',
+            debugShowCheckedModeBanner: false,
+            initialRoute: "/",
+            locale: settings.locale,
+            themeMode: settings.themeMode,
+            routes: {
+              //"/": (context) => InitializeWidget(),
+              "/demhome": (context) => DemHomePage(),
+              "/boost": (context) => BoostPage(),
+              "/demonboarding": (context) => DemOnboardingPage(),
+              "/demmsg": (context) => DemMessage(),
+              "/dempro": (context) => DemProfile(),
+              "/vancy": (context) => Vancy(),
+              "/prestataire": (context) => PrestataireSelectPage(),
+            },
+            theme: ThemeData(
+              colorScheme: ColorScheme.fromSeed(
+                seedColor: ConstColors().primary,
+              ),
+              useMaterial3: true,
+            ),
+            darkTheme: ThemeData.dark().copyWith(
+              colorScheme: ColorScheme.fromSeed(
+                seedColor: ConstColors().primary,
+                brightness: Brightness.dark,
+              ),
+            ),
+            home: const LoginPage(),
+          );
         },
-        theme: ThemeData(
-          // This is the theme of your application.
-          //
-          // TRY THIS: Try running your application with "flutter run". You'll see
-          // the application has a purple toolbar. Then, without quitting the app,
-          // try changing the seedColor in the colorScheme below to Colors.green
-          // and then invoke "hot reload" (save your changes or press the "hot
-          // reload" button in a Flutter-supported IDE, or press "r" if you used
-          // the command line to start the app).
-          //
-          // Notice that the counter didn't reset back to zero; the application
-          // state is not lost during the reload. To reset the state, use hot
-          // restart instead.
-          //
-          // This works for code too, not just values: Most code changes can be
-          // tested with just a hot reload.
-          colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        ),
-        home: const LoginPage(),
       ),
     );
   }

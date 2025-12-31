@@ -1,4 +1,3 @@
-import 'package:demarcheur_app/apps/demandeurs/main_screens/dem_home_page.dart';
 import 'package:demarcheur_app/apps/demandeurs/main_screens/dem_message.dart';
 import 'package:demarcheur_app/apps/demandeurs/main_screens/dem_profile.dart';
 import 'package:demarcheur_app/apps/demandeurs/main_screens/vancy.dart';
@@ -27,7 +26,7 @@ class _DemOnboardingPageState extends State<DemOnboardingPage> {
   }
 
   int currentPage = 0;
-  final List pages = [DemHomePage(), Vancy(), DemMessage(), DemProfile()];
+  final List pages = [Vancy(), DemMessage(), DemProfile()];
   void selectedPage(int value) {
     setState(() {
       currentPage = value;
@@ -81,16 +80,6 @@ class _DemOnboardingPageState extends State<DemOnboardingPage> {
 
                       padding: EdgeInsets.all(10),
                       borderRadius: BorderRadius.circular(16),
-                    ),
-                    GButton(
-                      active: true,
-                      iconColor: color.primary,
-                      iconActiveColor: color.primary,
-                      icon: Icons.work,
-                      text: "Demande",
-                      borderRadius: BorderRadius.circular(16),
-
-                      padding: EdgeInsets.all(10),
                     ),
                     GButton(
                       active: true,

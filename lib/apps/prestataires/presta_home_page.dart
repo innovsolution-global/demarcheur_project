@@ -4,8 +4,6 @@ import 'package:demarcheur_app/apps/prestataires/presta_list.dart';
 import 'package:demarcheur_app/consts/color.dart';
 import 'package:demarcheur_app/models/presta/presta_model.dart';
 import 'package:demarcheur_app/providers/presta/presta_provider.dart';
-import 'package:demarcheur_app/widgets/sub_title.dart';
-import 'package:demarcheur_app/widgets/title_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:provider/provider.dart';
@@ -18,31 +16,17 @@ class PrestaHomePage extends StatefulWidget {
 }
 
 class _PrestaHomePageState extends State<PrestaHomePage> {
-  ConstColors color = ConstColors();
-  int isSelected = 0;
+  final ConstColors colors = ConstColors();
   final TextEditingController _searchController = TextEditingController();
-
-  // Controller and header offset for SliverAppBar animation
-  final ScrollController _scrollController = ScrollController();
-  double _headerHeight = 0;
+  int _selectedCategoryIndex = 0;
 
   @override
   void initState() {
     super.initState();
-    // Load local mock data when screen starts
     Future.microtask(() {
-      //final jobProvider = context.read<JobProvider>();
-      final searchProvider = context.read<PrestaProvider>();
-
-      searchProvider.loadVancies().then((_) {
-        searchProvider.setJobs(searchProvider.allJobs);
-      });
-    });
-
-    // Update header height on scroll to animate AppBar title opacity
-    _scrollController.addListener(() {
-      setState(() {
-        _headerHeight = _scrollController.offset;
+      final provider = context.read<PrestaProvider>();
+      provider.loadVancies().then((_) {
+        provider.setJobs(provider.allJobs);
       });
     });
   }
@@ -50,568 +34,546 @@ class _PrestaHomePageState extends State<PrestaHomePage> {
   @override
   void dispose() {
     _searchController.dispose();
-    _scrollController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<PrestaProvider>();
-    final categories = provider.categories;
 
     return Scaffold(
-      backgroundColor: color.bg,
+      backgroundColor: const Color(0xFFF8FAFC),
       body: CustomScrollView(
-        controller: _scrollController,
+        physics: const BouncingScrollPhysics(),
         slivers: [
-          // 🟦 Modern AppBar with gradient overlay and search
-          SliverAppBar(
-            automaticallyImplyLeading: false,
-            pinned: true,
-            title: Text(
-              "Accueil",
-              style: TextStyle(
-                color: Colors.white.withOpacity(
-                  _headerHeight > 220 ? 1.0 : 0.0,
-                ),
-              ),
-            ),
-            expandedHeight: 220,
-            backgroundColor: color.primary,
-            foregroundColor: color.bg,
-            flexibleSpace: FlexibleSpaceBar(
-              background: Stack(
-                fit: StackFit.expand,
-                children: [
-                  const Image(
-                    fit: BoxFit.cover,
-                    image: NetworkImage(
-                      "https://images.unsplash.com/photo-1519389950473-47ba0277781c?q=80&w=2069&auto=format&fit=crop",
-                    ),
-                  ),
-                  Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.black.withOpacity(0.2),
-                          Colors.black.withOpacity(0.5),
-                        ],
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    left: 16,
-                    right: 16,
-                    bottom: 16,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          "Trouvez un boulot qui vous convient",
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 22,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        _SearchBar(
-                          controller: _searchController,
-                          hintText: "Rechercher un service, une ville...",
-                          onChanged: (_) => setState(() {}),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // 🟩 Category menu + header section
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(10.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 12),
-                  _CategoryChips(
-                    categories: categories,
-                    isSelected: isSelected,
-                    onSelect: (index) {
-                      setState(() => isSelected = index);
-                    },
-                    primary: color.primary,
-                    background: color.bg,
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      SubTitle(
-                        text: "Recommandé pour vous",
-                        fontsize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      InkWell(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const PrestaList(),
-                            ),
-                          );
-                        },
-                        child: SubTitle(
-                          text: "Tout voir",
-                          fontsize: 16,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-          content(),
+          _buildHeader(),
+          SliverToBoxAdapter(child: _buildSearchBar()),
+          _buildStatsSection(),
+          _buildCategorySection(provider.categories),
+          _buildSectionTitle("Opportunités récentes", () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const PrestaList()),
+            );
+          }),
+          _buildJobList(provider),
+          const SliverToBoxAdapter(child: SizedBox(height: 80)),
         ],
       ),
     );
   }
 
-  Widget menu(String label, int index) {
-    bool isTap = isSelected == index;
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          isSelected = index;
-        });
-      },
-      child: Container(
-        width: label == "Tout" ? 80 : 150,
-        height: 42,
-
-        padding: EdgeInsets.all(6),
-        decoration: BoxDecoration(
-          color: isTap ? color.primary : color.bg,
-          border: Border.all(color: isTap ? Colors.transparent : color.primary),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(4.0),
-            child: Text(
-              overflow: TextOverflow.ellipsis,
-              label,
-              style: TextStyle(
-                color: isTap ? color.bg : color.primary,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
+  Widget _buildHeader() {
+    return SliverAppBar(
+      expandedHeight: 240,
+      automaticallyImplyLeading: false,
+      pinned: true,
+      elevation: 0,
+      backgroundColor: colors.primary,
+      flexibleSpace: FlexibleSpaceBar(
+        background: Stack(
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                image: DecorationImage(
+                  fit: BoxFit.cover,
+                  image: NetworkImage(
+                    "https://www.shutterstock.com/image-photo/job-search-human-resources-recruitment-260nw-1292578582.jpg",
+                  ),
+                ),
               ),
             ),
+            //Positioned(bottom: 50, child: _buildSearchBar()),
+            Positioned(
+              bottom: 30,
+              child: Text(
+                "Prêt pour de nouvelles missions ?",
+                style: TextStyle(
+                  color: colors.bg,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchBar() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 15,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: TextField(
+        controller: _searchController,
+        onChanged: (value) => setState(() {}),
+        decoration: InputDecoration(
+          hintText: "Rechercher une mission...",
+          hintStyle: TextStyle(color: colors.secondary.withOpacity(0.5)),
+          prefixIcon: Icon(Icons.search),
+          suffixIcon: Container(
+            margin: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: colors.primary,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const HugeIcon(
+              icon: HugeIcons.strokeRoundedFilterHorizontal,
+              color: Colors.white,
+              size: 16,
+            ),
+          ),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 14,
           ),
         ),
       ),
     );
   }
 
-  Widget content() {
-    final searchProvider = context.watch<PrestaProvider>();
-    final categories = searchProvider.categories;
-    final jobs = searchProvider.allJobs;
+  Widget _buildStatsSection() {
+    return SliverToBoxAdapter(
+      child: Container(
+        height: 100,
+        margin: const EdgeInsets.symmetric(vertical: 20),
+        child: ListView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          physics: const BouncingScrollPhysics(),
+          children: [
+            _buildStatCard(
+              "Revenus",
+              "2.5M GNF",
+              HugeIcons.strokeRoundedWallet01,
+              Colors.green,
+            ),
+            const SizedBox(width: 12),
+            _buildStatCard(
+              "Missions",
+              "12",
+              HugeIcons.strokeRoundedTask01,
+              Colors.blue,
+            ),
+            const SizedBox(width: 12),
+            _buildStatCard(
+              "Note",
+              "4.9",
+              HugeIcons.strokeRoundedStar,
+              Colors.orange,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatCard(
+    String label,
+    String value,
+    List<List<dynamic>> icon,
+    Color color,
+  ) {
+    return Container(
+      width: 140,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              HugeIcon(icon: icon, color: color, size: 20),
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  color: color,
+                  size: 8,
+                ),
+              ),
+            ],
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                value,
+                style: TextStyle(
+                  color: colors.primary,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              Text(
+                label,
+                style: TextStyle(
+                  color: colors.secondary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCategorySection(List<String> categories) {
+    return SliverToBoxAdapter(
+      child: SizedBox(
+        height: 40,
+        child: ListView.builder(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          physics: const BouncingScrollPhysics(),
+          itemCount: categories.length,
+          itemBuilder: (context, index) {
+            final isSelected = _selectedCategoryIndex == index;
+            return GestureDetector(
+              onTap: () => setState(() => _selectedCategoryIndex = index),
+              child: Container(
+                margin: const EdgeInsets.only(right: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: isSelected ? colors.primary : Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isSelected ? colors.primary : Colors.grey.shade200,
+                  ),
+                  boxShadow: isSelected
+                      ? [
+                          BoxShadow(
+                            color: colors.primary.withOpacity(0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
+                          ),
+                        ]
+                      : [],
+                ),
+                child: Center(
+                  child: Text(
+                    categories[index],
+                    style: TextStyle(
+                      color: isSelected ? Colors.white : colors.secondary,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionTitle(String title, VoidCallback onTap) {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              title,
+              style: TextStyle(
+                color: colors.primary,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            GestureDetector(
+              onTap: onTap,
+              child: Text(
+                "Voir tout",
+                style: TextStyle(
+                  color: colors.primary,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildJobList(PrestaProvider provider) {
+    final jobs = provider.allJobs;
+    // Filter logic here if needed based on _selectedCategoryIndex and _searchController
     List<PrestaModel> filteredJobs = jobs;
-    if (isSelected != 0 && isSelected < categories.length) {
-      final selectedCategory = categories[isSelected];
-      filteredJobs = jobs
-          .where(
-            (job) =>
-                job.categorie.toLowerCase() == selectedCategory.toLowerCase(),
-          )
+
+    if (_selectedCategoryIndex != 0 &&
+        _selectedCategoryIndex < provider.categories.length) {
+      final category = provider.categories[_selectedCategoryIndex];
+      filteredJobs = filteredJobs
+          .where((job) => job.categorie == category)
           .toList();
     }
-    final query = _searchController.text.trim().toLowerCase();
+
+    final query = _searchController.text.toLowerCase();
     if (query.isNotEmpty) {
       filteredJobs = filteredJobs
           .where(
             (job) =>
                 job.title.toLowerCase().contains(query) ||
-                job.companyName.toLowerCase().contains(query) ||
-                job.location.toLowerCase().contains(query),
+                job.companyName.toLowerCase().contains(query),
           )
           .toList();
     }
 
-    // ✅ Define categories (must match your menu order)
-    //final categories = jobs[isSelected].category;
-
-    // ✅ Filter jobs based on the selected category
-    //List<JobModel> filteredJobs;
-    // (consolidated above)
-
     if (filteredJobs.isEmpty) {
       return SliverToBoxAdapter(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                HugeIcon(
-                  icon: HugeIcons.strokeRoundedSearch01,
-                  color: color.tertiary,
-                  size: 36,
+        child: Center(
+          child: Column(
+            children: [
+              const SizedBox(height: 40),
+              HugeIcon(
+                icon: HugeIcons.strokeRoundedSearch01,
+                size: 48,
+                color: colors.tertiary,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                "Aucune mission trouvée",
+                style: TextStyle(
+                  color: colors.secondary,
+                  fontWeight: FontWeight.w600,
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  "Aucun résultat",
-                  style: TextStyle(
-                    color: color.primary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  "Essayez d'autres mots-clés ou catégories",
-                  style: TextStyle(color: color.tertiary),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       );
     }
 
-    // ✅ Build the job list dynamically
     return SliverList(
       delegate: SliverChildBuilderDelegate((context, index) {
         final job = filteredJobs[index];
-        return GestureDetector(
+        return _ModernJobCard(job: job, colors: colors);
+      }, childCount: filteredJobs.length),
+    );
+  }
+}
+
+class _ModernJobCard extends StatelessWidget {
+  final PrestaModel job;
+  final ConstColors colors;
+
+  const _ModernJobCard({required this.job, required this.colors});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 15,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
           onTap: () {
             Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => PrestaDetail(presta: job)),
             );
           },
-          child: _JobCard(
-            color: color,
-            title: job.title,
-            company: job.companyName,
-            location: job.location,
-            imageUrl: job.imageUrl.first,
-            status: job.status,
-            postDate: job.postDate,
-            onContact: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => ChatPage(presta: job)),
-              );
-            },
-          ),
-        );
-      }, childCount: filteredJobs.length),
-    );
-  }
-}
-
-class _SearchBar extends StatelessWidget {
-  final TextEditingController controller;
-  final String hintText;
-  final ValueChanged<String>? onChanged;
-  const _SearchBar({
-    required this.controller,
-    required this.hintText,
-    this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      elevation: 2,
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(12),
-      child: TextField(
-        controller: controller,
-        onChanged: onChanged,
-        decoration: InputDecoration(
-          hintText: hintText,
-          hintStyle: const TextStyle(color: Color(0xFF9AA0A6)),
-          prefixIcon: const Icon(Icons.search, color: Color(0xFF5F6368)),
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 12,
-            vertical: 12,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _CategoryChips extends StatelessWidget {
-  final List<String> categories;
-  final int isSelected;
-  final ValueChanged<int> onSelect;
-  final Color primary;
-  final Color background;
-  const _CategoryChips({
-    required this.categories,
-    required this.isSelected,
-    required this.onSelect,
-    required this.primary,
-    required this.background,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: List.generate(categories.length, (index) {
-          final selected = isSelected == index;
-          return Padding(
-            padding: EdgeInsets.only(
-              right: index == categories.length - 1 ? 0 : 8,
-            ),
-            child: ChoiceChip(
-              label: Text(categories[index]),
-              selected: selected,
-              onSelected: (_) => onSelect(index),
-              selectedColor: primary,
-              backgroundColor: background,
-              labelStyle: TextStyle(
-                color: selected ? background : primary,
-                fontWeight: FontWeight.w600,
-              ),
-              shape: StadiumBorder(
-                side: BorderSide(
-                  color: selected ? Colors.transparent : primary,
+          borderRadius: BorderRadius.circular(24),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 60,
+                      height: 60,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        image: DecorationImage(
+                          image: NetworkImage(
+                            job.imageUrl.isNotEmpty ? job.imageUrl[0] : "",
+                          ),
+                          fit: BoxFit.cover,
+                          onError: (exception, stackTrace) {
+                            // Handle image load error silently or log it
+                          },
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            job.title,
+                            style: TextStyle(
+                              color: colors.primary,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            job.companyName,
+                            style: TextStyle(
+                              color: colors.secondary,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              _buildTag(
+                                job.location,
+                                HugeIcons.strokeRoundedLocation01,
+                              ),
+                              const SizedBox(width: 8),
+                              _buildTag(
+                                job.salary,
+                                HugeIcons.strokeRoundedMoney03,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(Icons.bookmark_border_rounded, color: colors.tertiary),
+                  ],
                 ),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            ),
-          );
-        }),
-      ),
-    );
-  }
-}
-
-class _JobCard extends StatelessWidget {
-  final ConstColors color;
-  final String title;
-  final String company;
-  final String location;
-  final String imageUrl;
-  final String status;
-  final String postDate;
-  final VoidCallback onContact;
-  const _JobCard({
-    required this.color,
-    required this.title,
-    required this.company,
-    required this.location,
-    required this.imageUrl,
-    required this.status,
-    required this.postDate,
-    required this.onContact,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final bool isAvailable = status == "Disponible";
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      child: Material(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        elevation: 2,
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const _BouncingDot(size: 12, color: Colors.amber),
-                  const SizedBox(width: 8),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: Image.network(
-                      imageUrl,
-                      width: 100,
-                      height: 110,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TitleWidget(
-                                text: title,
-                                fontSize: 18,
-                                color: color.primary,
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: isAvailable ? color.bgA : color.errorBg,
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text(
-                                status,
-                                style: TextStyle(
-                                  color: isAvailable
-                                      ? color.accepted
-                                      : color.error,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ),
-                          ],
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () {},
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          side: BorderSide(
+                            color: colors.primary.withOpacity(0.2),
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
-                        const SizedBox(height: 6),
-                        SubTitle(text: company, fontsize: 16),
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            HugeIcon(
-                              icon: HugeIcons.strokeRoundedLocation01,
-                              size: 18,
-                              color: color.primary,
-                            ),
-                            const SizedBox(width: 4),
-                            SubTitle(text: location, fontsize: 14),
-                            const SizedBox(width: 12),
-                            HugeIcon(
-                              icon: HugeIcons.strokeRoundedClock01,
-                              size: 16,
-                              color: color.primary,
-                            ),
-                            const SizedBox(width: 4),
-                            SubTitle(text: postDate, fontsize: 12),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {},
-                      icon: const Icon(Icons.bookmark_border),
-                      label: const Text("Sauvegarder"),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: color.primary,
-                        side: BorderSide(color: color.tertiary),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                        child: Text(
+                          "Détails",
+                          style: TextStyle(
+                            color: colors.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: onContact,
-                      icon: const Icon(Icons.send),
-                      label: const Text("Contacter"),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: color.primary,
-                        foregroundColor: color.bg,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => ChatPage(presta: job),
+                            ),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: colors.primary,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          "Postuler",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _BouncingDot extends StatefulWidget {
-  final double size;
-  final Color color;
-  const _BouncingDot({this.size = 12, this.color = Colors.amber});
-
-  @override
-  State<_BouncingDot> createState() => _BouncingDotState();
-}
-
-class _BouncingDotState extends State<_BouncingDot>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  late final Animation<double> _offsetAnim;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 900),
-    )..repeat(reverse: true);
-
-    _offsetAnim = Tween<double>(
-      begin: -4,
-      end: 4,
-    ).chain(CurveTween(curve: Curves.easeInOut)).animate(_controller);
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _offsetAnim,
-      builder: (context, child) {
-        return Transform.translate(
-          offset: Offset(0, _offsetAnim.value),
-          child: Container(
-            width: widget.size,
-            height: widget.size,
-            decoration: BoxDecoration(
-              color: widget.color,
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: widget.color.withOpacity(0.4),
-                  blurRadius: 6,
-                  spreadRadius: 1,
-                  offset: const Offset(0, 2),
+                  ],
                 ),
               ],
             ),
           ),
-        );
-      },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTag(String text, List<List<dynamic>> icon) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: colors.bg,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          HugeIcon(icon: icon, size: 12, color: colors.secondary),
+          const SizedBox(width: 4),
+          Text(
+            text,
+            style: TextStyle(
+              color: colors.secondary,
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

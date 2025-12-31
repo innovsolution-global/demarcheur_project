@@ -1,6 +1,14 @@
+import 'package:demarcheur_app/apps/demandeurs/main_screens/dem_home_page.dart';
+import 'package:demarcheur_app/apps/demandeurs/main_screens/dem_onboarding_page.dart';
+import 'package:demarcheur_app/apps/demandeurs/main_screens/vancy.dart';
 import 'package:demarcheur_app/apps/donneurs/main_screens/dashboard_page.dart';
+import 'package:demarcheur_app/apps/immo/immo_home_page.dart';
+import 'package:demarcheur_app/apps/prestataires/presta_home_page.dart';
+import 'package:provider/provider.dart';
+import 'package:demarcheur_app/apps/donneurs/main_screens/jobs/home_page.dart';
 import 'package:demarcheur_app/consts/color.dart';
 import 'package:demarcheur_app/screens/decision_page.dart';
+import 'package:demarcheur_app/services/auth_provider.dart';
 import 'package:demarcheur_app/widgets/sub_title.dart';
 import 'package:demarcheur_app/widgets/title_widget.dart';
 import 'package:flutter/material.dart';
@@ -16,6 +24,139 @@ class _LoginPageState extends State<LoginPage> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
   bool textVisible = true;
+
+  final _keyForm = GlobalKey<FormState>();
+  bool _isLoading = false;
+  void _submit() async {
+    if (!_keyForm.currentState!.validate()) {
+      return;
+    }
+    setState(() {
+      _isLoading = true;
+    });
+    final authProvider = context.read<AuthProvider>();
+    final succes = await authProvider.authentification(
+      emailController.text,
+      passwordController.text,
+    );
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+    final role = authProvider.role;
+    print("DEBUG: User role is $role");
+    if (succes && role == 'SEARCHER') {
+      // TODO: Handle navigation based on role (SEARCHER, GIVER, IMMO, PRESTATAIRE)
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.green,
+          content: Center(
+            child: Text(
+              'Vous êtes connecté avec succès',
+              style: TextStyle(color: color.bg),
+            ),
+          ),
+        ),
+      );
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => DashboardPage()),
+      );
+    } else if (succes && role == 'GIVER') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.green,
+          content: Center(
+            child: Text(
+              'Vous êtes connecté avec succès',
+              style: TextStyle(color: color.bg),
+            ),
+          ),
+        ),
+      );
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => DemOnboardingPage()),
+      );
+    } else if (succes && role == 'IMMO') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.green,
+          content: Center(
+            child: Text(
+              'Vous êtes connecté avec succès',
+              style: TextStyle(color: color.bg),
+            ),
+          ),
+        ),
+      );
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => ImmoHomePage()),
+      );
+    } else if (succes && role == 'SERVICE') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.green,
+          content: Center(
+            child: Text(
+              'Vous êtes connecté avec succès',
+              style: TextStyle(color: color.bg),
+            ),
+          ),
+        ),
+      );
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => PrestaHomePage()),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.red,
+          content: Center(
+            child: Text(
+              'Verifiez vos informations',
+              style: TextStyle(color: color.bg),
+            ),
+          ),
+        ),
+      );
+    }
+  }
+
+  String? emailOrPhoneValidator(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'L\'email ou le numéro est requis';
+    }
+
+    final input = value.trim();
+
+    // Email regex
+    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+
+    // Phone number regex (international + local)
+    final phoneRegex = RegExp(r'^(\+?[0-9]{8,15})$');
+
+    if (emailRegex.hasMatch(input) || phoneRegex.hasMatch(input)) {
+      return null; // valid
+    }
+
+    return 'Format d\'email ou numéro invalide';
+  }
+
+  String? _passwordValidator(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Le mot de passe est requis';
+    }
+    if (value.length < 4) {
+      return 'Format de mot de passe invalide il doit contenir au moins 4 caracteres';
+    }
+    return null;
+  }
+
   ConstColors color = ConstColors();
   @override
   Widget build(BuildContext context) {
@@ -71,90 +212,113 @@ class _LoginPageState extends State<LoginPage> {
                               color: color.secondary,
                             ),
                             SizedBox(height: 16),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                TextFormField(
-                                  controller: emailController,
-                                  keyboardType: TextInputType.emailAddress,
-                                  textInputAction: TextInputAction.next,
-                                  decoration: InputDecoration(
-                                    hint: SubTitle(
-                                      text: "E-mail ou numero de telephone",
-                                      fontsize: 16,
+                            Form(
+                              key: _keyForm,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  TextFormField(
+                                    controller: emailController,
+                                    keyboardType: TextInputType.emailAddress,
+                                    textInputAction: TextInputAction.next,
+                                    validator: (value) =>
+                                        emailOrPhoneValidator(value),
+                                    decoration: InputDecoration(
+                                      hint: SubTitle(
+                                        text: "E-mail ou numero de telephone",
+                                        fontsize: 16,
+                                      ),
+                                      fillColor: color.bgSubmit,
+                                      prefixIcon: Icon(
+                                        Icons.email,
+                                        color: color.secondary,
+                                      ),
+                                      filled: true,
+                                      border: OutlineInputBorder(
+                                        borderSide: BorderSide.none,
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                      errorStyle: TextStyle(color: color.error),
+                                      errorBorder: OutlineInputBorder(
+                                        borderSide: BorderSide(
+                                          color: color.error,
+                                        ),
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
                                     ),
-                                    fillColor: color.bgSubmit,
-                                    prefixIcon: Icon(
-                                      Icons.email,
-                                      color: color.secondary,
-                                    ),
-                                    filled: true,
-                                    border: OutlineInputBorder(
-                                      borderSide: BorderSide.none,
-                                      borderRadius: BorderRadius.circular(16),
-                                    ),
-                                  ),
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                SizedBox(height: 16),
-                                TextFormField(
-                                  obscureText: textVisible,
-                                  obscuringCharacter: "*",
-                                  controller: passwordController,
-                                  keyboardType: TextInputType.text,
-                                  textInputAction: TextInputAction.done,
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                  decoration: InputDecoration(
-                                    helperStyle: TextStyle(
+                                    style: TextStyle(
                                       fontSize: 18,
+                                      color: color.secondary,
+                                      fontWeight: FontWeight.w400,
+                                    ),
+                                  ),
+                                  SizedBox(height: 16),
+                                  TextFormField(
+                                    obscureText: textVisible,
+                                    validator: (value) =>
+                                        _passwordValidator(value),
+                                    obscuringCharacter: "*",
+                                    controller: passwordController,
+                                    keyboardType: TextInputType.text,
+                                    textInputAction: TextInputAction.done,
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      color: color.secondary,
+                                      fontWeight: FontWeight.w400,
+                                    ),
+                                    decoration: InputDecoration(
+                                      helperStyle: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      hint: SubTitle(
+                                        text: "Mot de passe",
+                                        fontsize: 16,
+                                      ),
+                                      fillColor: color.bgSubmit,
+                                      suffixIcon: InkWell(
+                                        onTap: () {
+                                          setState(() {
+                                            textVisible = !textVisible;
+                                          });
+                                        },
+                                        child: textVisible
+                                            ? Icon(
+                                                Icons.visibility_off,
+                                                color: color.secondary,
+                                              )
+                                            : Icon(
+                                                Icons.visibility,
+                                                color: color.secondary,
+                                              ),
+                                      ),
+                                      prefixIcon: Icon(
+                                        Icons.lock,
+                                        color: color.secondary,
+                                      ),
+                                      filled: true,
+                                      border: OutlineInputBorder(
+                                        borderSide: BorderSide.none,
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                      errorStyle: TextStyle(color: color.error),
+                                      errorBorder: OutlineInputBorder(
+                                        borderSide: BorderSide(
+                                          color: color.error,
+                                        ),
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                    ),
+                                  ),
+                                  SizedBox(height: 16),
+                                  GestureDetector(
+                                    child: SubTitle(
+                                      text: "Mot de passe oublie?",
                                       fontWeight: FontWeight.bold,
                                     ),
-                                    hint: SubTitle(
-                                      text: "Mot de passe",
-                                      fontsize: 16,
-                                    ),
-                                    fillColor: color.bgSubmit,
-                                    suffixIcon: InkWell(
-                                      onTap: () {
-                                        setState(() {
-                                          textVisible = !textVisible;
-                                        });
-                                      },
-                                      child: textVisible
-                                          ? Icon(
-                                              Icons.visibility_off,
-                                              color: color.secondary,
-                                            )
-                                          : Icon(
-                                              Icons.visibility,
-                                              color: color.secondary,
-                                            ),
-                                    ),
-                                    prefixIcon: Icon(
-                                      Icons.lock,
-                                      color: color.secondary,
-                                    ),
-                                    filled: true,
-                                    border: OutlineInputBorder(
-                                      borderSide: BorderSide.none,
-                                      borderRadius: BorderRadius.circular(16),
-                                    ),
                                   ),
-                                ),
-                                SizedBox(height: 16),
-                                GestureDetector(
-                                  child: SubTitle(
-                                    text: "Mot de passe oublie?",
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ],
                         ),
@@ -166,26 +330,35 @@ class _LoginPageState extends State<LoginPage> {
                         children: [
                           SizedBox(height: 10),
                           SizedBox(
-                            height: 50,
+                            height: 55,
                             width: double.infinity,
                             child: OutlinedButton(
                               onPressed: () {
-                                Navigator.push<void>(
-                                  context,
-                                  MaterialPageRoute<void>(
-                                    builder: (BuildContext context) =>
-                                        const DashboardPage(),
-                                  ),
-                                );
+                                _isLoading ? null : _submit();
                               },
                               style: OutlinedButton.styleFrom(
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadiusGeometry.circular(
+                                    16,
+                                  ),
+                                ),
                                 backgroundColor: color.primary,
                               ),
-                              child: TitleWidget(
-                                text: "Se connecter",
-                                color: color.bg,
-                                fontSize: 20,
-                              ),
+                              child: _isLoading
+                                  ? Center(
+                                      child: SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          color: color.bg,
+                                        ),
+                                      ),
+                                    )
+                                  : TitleWidget(
+                                      text: "Se connecter",
+                                      color: color.bg,
+                                      fontSize: 20,
+                                    ),
                             ),
                           ),
                         ],

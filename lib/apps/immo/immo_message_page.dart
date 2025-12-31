@@ -1,12 +1,12 @@
+import 'dart:async';
 import 'dart:ui';
+import 'package:chat_plugin/chat_plugin.dart';
 import 'package:demarcheur_app/apps/immo/immo_chat.dart';
 import 'package:demarcheur_app/consts/color.dart';
-import 'package:demarcheur_app/providers/house_provider.dart';
-import 'package:demarcheur_app/providers/immo/immo_chat_provider.dart';
+import 'package:demarcheur_app/models/house_model.dart';
 import 'package:demarcheur_app/widgets/immo_header.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
 
 class ImmoMessagePage extends StatefulWidget {
   const ImmoMessagePage({super.key});
@@ -30,43 +30,14 @@ class _ImmoMessagePageState extends State<ImmoMessagePage>
 
   final List<String> _filters = ['Tous', 'Non lus', 'Favoris', 'Récents'];
 
-  // Mock data for when provider is not available
-  final List<MockConversation> _mockConversations = [
-    MockConversation(
-      companyName: "Immobilier Premium",
-      lastMessage:
-          "Merci pour votre intérêt, quand pouvons-nous planifier la visite ?",
-      timeLabel: "10:30",
-      unreadCount: 2,
-      imageUrl: "https://example.com/image1.jpg",
-      type: "Appartement",
-      location: "Conakry, Kaloum",
-    ),
-    MockConversation(
-      companyName: "Habitat Plus",
-      lastMessage: "Le prix est négociable pour un achat rapide",
-      timeLabel: "Hier",
-      unreadCount: 0,
-      imageUrl: "https://example.com/image2.jpg",
-      type: "Villa",
-      location: "Dixinn, Conakry",
-    ),
-    MockConversation(
-      companyName: "Vision Immobilier",
-      lastMessage: "Oui, la propriété est encore disponible",
-      timeLabel: "14:20",
-      unreadCount: 1,
-      imageUrl: "https://example.com/image3.jpg",
-      type: "Maison",
-      location: "Ratoma, Conakry",
-    ),
-  ];
+  List<ChatRoom> _chatRooms = [];
+  StreamSubscription? _chatRoomsSubscription;
 
   @override
   void initState() {
     super.initState();
     _initializeAnimations();
-    _loadConversations();
+    _initializeChatRooms();
   }
 
   void _initializeAnimations() {
@@ -91,22 +62,30 @@ class _ImmoMessagePageState extends State<ImmoMessagePage>
     _animationController.forward();
   }
 
-  void _loadConversations() {
-    Future.microtask(() {
-      try {
-        final houses = context.read<HouseProvider>().allhouses;
-        context.read<ImmoChatProvider>().seedFromJobs(houses);
-      } catch (e) {
-        // Provider not available, we'll use mock data
-        setState(() {
-          // Mock data is already loaded in _mockConversations
+  Future<void> _initializeChatRooms() async {
+    final chatService = ChatPlugin.chatService;
+    await chatService.loadChatRooms();
+
+    try {
+      final stream =
+          (chatService as dynamic).chatRoomsStream as Stream<List<ChatRoom>>?;
+      if (stream != null) {
+        _chatRoomsSubscription = stream.listen((rooms) {
+          if (mounted) {
+            setState(() {
+              _chatRooms = rooms;
+            });
+          }
         });
       }
-    });
+    } catch (e) {
+      debugPrint("Error subscribing to chat rooms: $e");
+    }
   }
 
   @override
   void dispose() {
+    _chatRoomsSubscription?.cancel();
     _searchController.dispose();
     _animationController.dispose();
     _searchAnimationController.dispose();
@@ -114,39 +93,30 @@ class _ImmoMessagePageState extends State<ImmoMessagePage>
   }
 
   List<dynamic> _getFilteredConversations() {
-    List<dynamic> conversations;
-
-    try {
-      // Try to get real conversations from provider and create a copy
-      conversations = List<dynamic>.from(
-        context.watch<ImmoChatProvider>().conversations,
-      );
-    } catch (e) {
-      // Fallback to mock conversations and create a copy
-      conversations = List<dynamic>.from(_mockConversations);
-    }
+    List<dynamic> conversations = List.from(_chatRooms);
 
     final query = _searchController.text.trim().toLowerCase();
 
     // Apply search filter
     if (query.isNotEmpty) {
-      conversations = conversations
-          .where(
-            (c) =>
-                c.companyName?.toLowerCase().contains(query) == true ||
-                c.type?.toLowerCase().contains(query) == true ||
-                c.lastMessage?.toLowerCase().contains(query) == true ||
-                (c.house?.companyName?.toLowerCase().contains(query) == true) ||
-                (c.house?.type?.toLowerCase().contains(query) == true),
-          )
-          .toList();
+      conversations = conversations.where((c) {
+        if (c is ChatRoom) {
+          final name =
+              (c as dynamic).receiverName?.toString().toLowerCase() ?? '';
+          final msg =
+              (c as dynamic).lastMessage?.content?.toString().toLowerCase() ??
+              '';
+          return name.contains(query) || msg.contains(query);
+        }
+        return false;
+      }).toList();
     }
 
     // Apply category filter
     switch (_selectedFilter) {
       case 'Non lus':
         conversations = conversations
-            .where((c) => (c.unreadCount ?? 0) > 0)
+            .where((c) => ((c as dynamic).unreadCount ?? 0) > 0)
             .toList();
         break;
       case 'Favoris':
@@ -160,7 +130,9 @@ class _ImmoMessagePageState extends State<ImmoMessagePage>
 
     // Sort by unread count
     conversations.sort(
-      (a, b) => (b.unreadCount ?? 0).compareTo(a.unreadCount ?? 0),
+      (a, b) => ((b as dynamic).unreadCount ?? 0).compareTo(
+        (a as dynamic).unreadCount ?? 0,
+      ),
     );
 
     return conversations;
@@ -211,12 +183,19 @@ class _ImmoMessagePageState extends State<ImmoMessagePage>
   }
 
   Widget _buildModernHeader() {
+    int safeUnread(dynamic item) {
+      try {
+        return item?.unreadCount is int ? item.unreadCount : 0;
+      } catch (_) {
+        return 0;
+      }
+    }
     return SliverToBoxAdapter(
       child: Container(
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [_colors.primary, _colors.primary.withOpacity(0.8)],
+            colors: [_colors.primary, _colors.primary.withOpacity(0.75)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -239,6 +218,8 @@ class _ImmoMessagePageState extends State<ImmoMessagePage>
                   ),
                 ),
                 const SizedBox(width: 16),
+
+                // TITLE + UNREAD IN REAL TIME
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -251,44 +232,34 @@ class _ImmoMessagePageState extends State<ImmoMessagePage>
                           color: Colors.white,
                         ),
                       ),
+
                       const SizedBox(height: 4),
-                      Consumer<ImmoChatProvider>(
-                        builder: (context, provider, child) {
-                          try {
-                            final conversations = List.from(
-                              provider.conversations,
-                            );
-                            final unreadCount = conversations.fold<int>(
-                              0,
-                              (sum, c) => sum + ((c.unreadCount ?? 0) as int),
-                            );
-                            return Text(
-                              unreadCount > 0
-                                  ? "$unreadCount nouveau${unreadCount > 1 ? 'x' : ''} message${unreadCount > 1 ? 's' : ''}"
-                                  : "Toutes les conversations",
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.white.withOpacity(0.9),
+
+                      Builder(
+                        builder: (context) {
+                          int unreadCount = _chatRooms.fold<int>(
+                            0,
+                            (sum, c) => sum + safeUnread(c),
+                          );
+
+                          return Row(
+                            children: [
+                              Icon(
+                                Icons.circle,
+                                color: Colors.white.withOpacity(0.6),
+                                size: 8,
                               ),
-                            );
-                          } catch (e) {
-                            final conversations = List<MockConversation>.from(
-                              _mockConversations,
-                            );
-                            final unreadCount = conversations.fold<int>(
-                              0,
-                              (sum, c) => sum + c.unreadCount,
-                            );
-                            return Text(
-                              unreadCount > 0
-                                  ? "$unreadCount nouveau${unreadCount > 1 ? 'x' : ''} message${unreadCount > 1 ? 's' : ''}"
-                                  : "Toutes les conversations",
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.white.withOpacity(0.9),
+                              const SizedBox(width: 6),
+                              Text(
+                                "$unreadCount messages non lus",
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w400,
+                                  color: Colors.white.withOpacity(0.85),
+                                ),
                               ),
-                            );
-                          }
+                            ],
+                          );
                         },
                       ),
                     ],
@@ -316,14 +287,14 @@ class _ImmoMessagePageState extends State<ImmoMessagePage>
                 border: Border.all(
                   color: _isSearchFocused
                       ? _colors.primary
-                      : Colors.grey.withOpacity(0.3),
+                      : Colors.grey.withValues(alpha: 0.3),
                   width: _isSearchFocused ? 2 : 1,
                 ),
                 boxShadow: [
                   BoxShadow(
                     color: _isSearchFocused
-                        ? _colors.primary.withOpacity(0.1)
-                        : Colors.black.withOpacity(0.05),
+                        ? _colors.primary.withValues(alpha: 0.1)
+                        : Colors.black.withValues(alpha: 0.05),
                     blurRadius: _isSearchFocused ? 15 : 8,
                     offset: const Offset(0, 4),
                   ),
@@ -368,94 +339,63 @@ class _ImmoMessagePageState extends State<ImmoMessagePage>
   }
 
   Widget _buildQuickStats() {
-    return Consumer<ImmoChatProvider>(
-      builder: (context, provider, child) {
-        try {
-          final conversations = List.from(provider.conversations);
-          final unreadCount = conversations.fold<int>(
-            0,
-            (sum, c) => sum + ((c.unreadCount ?? 0) as int),
-          );
-          final activeToday = conversations
-              .where(
-                (c) => c.timeLabel.contains('min') || c.timeLabel.contains('h'),
-              )
-              .length;
+    return Builder(
+      builder: (context) {
+        final unreadCount = _chatRooms.fold<int>(
+          0,
+          (sum, c) => sum + ((c as dynamic).unreadCount as int? ?? 0),
+        );
 
-          return Row(
-            children: [
-              Expanded(
-                child: _QuickStatCard(
-                  icon: Icons.chat,
-                  count: conversations.length,
-                  label: 'Total',
-                  color: _colors.primary,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _QuickStatCard(
-                  icon: Icons.mark_chat_unread,
-                  count: unreadCount,
-                  label: 'Non lus',
-                  color: Colors.red,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _QuickStatCard(
-                  icon: Icons.schedule,
-                  count: activeToday,
-                  label: 'Actifs',
-                  color: Colors.green,
-                ),
-              ),
-            ],
-          );
-        } catch (e) {
-          // Fallback to mock data stats
-          final conversations = List<MockConversation>.from(_mockConversations);
-          final unreadCount = conversations.fold<int>(
-            0,
-            (sum, c) => sum + c.unreadCount,
-          );
-          final activeToday = conversations
-              .where(
-                (c) => c.timeLabel.contains('min') || c.timeLabel.contains(':'),
-              )
-              .length;
+        // Simple logic for "active today" - check if last message was today
+        final now = DateTime.now();
+        final activeToday = _chatRooms.where((c) {
+          final lastMsg = (c as dynamic).lastMessage;
+          if (lastMsg == null) return false;
+          final ts =
+              (lastMsg as dynamic).timestamp ?? (lastMsg as dynamic).createdAt;
+          if (ts == null) return false;
 
-          return Row(
-            children: [
-              Expanded(
-                child: _QuickStatCard(
-                  icon: Icons.chat,
-                  count: conversations.length,
-                  label: 'Total',
-                  color: _colors.primary,
-                ),
+          DateTime? date;
+          if (ts is DateTime) date = ts;
+          if (ts is String) date = DateTime.tryParse(ts);
+          if (ts is int) date = DateTime.fromMillisecondsSinceEpoch(ts);
+
+          if (date == null) return false;
+          return date.year == now.year &&
+              date.month == now.month &&
+              date.day == now.day;
+        }).length;
+
+        return Row(
+          children: [
+            Expanded(
+              child: _QuickStatCard(
+                icon: Icons.chat,
+                count: _chatRooms.length,
+                label: 'Total',
+                color: _colors.primary,
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _QuickStatCard(
-                  icon: Icons.mark_chat_unread,
-                  count: unreadCount,
-                  label: 'Non lus',
-                  color: Colors.red,
-                ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _QuickStatCard(
+                icon: Icons.mark_chat_unread,
+                count: unreadCount,
+                label: 'Non lus',
+                color: Colors.red,
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _QuickStatCard(
-                  icon: Icons.schedule,
-                  count: activeToday,
-                  label: 'Actifs',
-                  color: Colors.green,
-                ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _QuickStatCard(
+                icon: Icons.schedule,
+                count: activeToday,
+                label: 'Actifs',
+                color: Colors.green,
               ),
-            ],
-          );
-        }
+            ),
+          ],
+        );
       },
     );
   }
@@ -499,7 +439,7 @@ class _ImmoMessagePageState extends State<ImmoMessagePage>
                         ),
                       ),
                       elevation: isSelected ? 2 : 0,
-                      shadowColor: _colors.primary.withOpacity(0.3),
+                      shadowColor: _colors.primary.withValues(alpha: 0.3),
                     ),
                   );
                 },
@@ -523,21 +463,15 @@ class _ImmoMessagePageState extends State<ImmoMessagePage>
         final conversation = filteredConversations[index];
 
         // Check if it's a real conversation or mock conversation
-        if (conversation is MockConversation) {
-          return _ConversationTileFallback(
-            conversation: conversation,
-            colors: _colors,
-            onTap: () => _navigateToChat(conversation),
-            index: index,
-          );
-        } else {
-          // Real conversation from provider
+        if (conversation is ChatRoom) {
           return _ConversationTile(
             conversation: conversation,
             colors: _colors,
             onTap: () => _navigateToChat(conversation),
             index: index,
           );
+        } else {
+          return const SizedBox.shrink();
         }
       }, childCount: filteredConversations.length),
     );
@@ -571,7 +505,7 @@ class _ImmoMessagePageState extends State<ImmoMessagePage>
           Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: _colors.primary.withOpacity(0.1),
+              color: _colors.primary.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(icon, color: _colors.primary, size: 48),
@@ -598,52 +532,31 @@ class _ImmoMessagePageState extends State<ImmoMessagePage>
     );
   }
 
-  Widget _buildNewChatFab() {
-    return FloatingActionButton.extended(
-      onPressed: () {
-        HapticFeedback.mediumImpact();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text("Nouvelle conversation"),
-            backgroundColor: _colors.primary,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-        );
-      },
-      backgroundColor: _colors.primary,
-      foregroundColor: Colors.white,
-      icon: const Icon(Icons.add),
-      label: const Text("Nouveau"),
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-    );
-  }
-
   void _navigateToChat(dynamic conversation) {
     HapticFeedback.lightImpact();
 
-    try {
-      // Try to navigate with real conversation
+    if (conversation is ChatRoom) {
+      final room = conversation;
+      // Create a HouseModel from ChatRoom data
+      final house = HouseModel(
+        id: (room as dynamic).receiverId,
+        companyName: (room as dynamic).receiverName ?? 'Utilisateur',
+        imageUrl: [(room as dynamic).receiverImage ?? ''],
+        // Default values for required fields
+        logo: '',
+        countType: '',
+        postDate: '',
+        rent: 0.0,
+        location: '',
+        type: '',
+        rate: 0.0,
+        status: '',
+        category: '',
+      );
+
       Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (context) => ImmoChat(presta: conversation.house),
-        ),
-      );
-    } catch (e) {
-      // Handle mock conversation or show message
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Chat avec ${conversation.companyName ?? 'Client'}"),
-          backgroundColor: _colors.primary,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
+        MaterialPageRoute(builder: (context) => ImmoChat(presta: house)),
       );
     }
   }
@@ -671,7 +584,7 @@ class _QuickStatCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -704,7 +617,7 @@ class _QuickStatCard extends StatelessWidget {
 }
 
 class _ConversationTile extends StatelessWidget {
-  final dynamic conversation;
+  final ChatRoom conversation;
   final ConstColors colors;
   final VoidCallback onTap;
   final int index;
@@ -719,7 +632,36 @@ class _ConversationTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = conversation;
-    final hasUnread = c.unreadCount > 0;
+    final unreadCount = (c as dynamic).unreadCount ?? 0;
+    final hasUnread = unreadCount > 0;
+    final receiverName = (c as dynamic).receiverName ?? 'Utilisateur';
+    final receiverImage = (c as dynamic).receiverImage;
+    final lastMessageContent = (c as dynamic).lastMessage?.content ?? '';
+
+    String timeLabel = '';
+    final lastMsg = (c as dynamic).lastMessage;
+    if (lastMsg != null) {
+      final ts =
+          (lastMsg as dynamic).timestamp ?? (lastMsg as dynamic).createdAt;
+      if (ts != null) {
+        DateTime? date;
+        if (ts is DateTime) date = ts;
+        if (ts is String) date = DateTime.tryParse(ts);
+        if (ts is int) date = DateTime.fromMillisecondsSinceEpoch(ts);
+
+        if (date != null) {
+          final now = DateTime.now();
+          if (date.year == now.year &&
+              date.month == now.month &&
+              date.day == now.day) {
+            timeLabel =
+                "${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}";
+          } else {
+            timeLabel = "${date.day}/${date.month}";
+          }
+        }
+      }
+    }
 
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 0, 20, 12),
@@ -727,13 +669,13 @@ class _ConversationTile extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: hasUnread
-            ? Border.all(color: colors.primary.withOpacity(0.3))
+            ? Border.all(color: colors.primary.withValues(alpha: 0.3))
             : null,
         boxShadow: [
           BoxShadow(
             color: hasUnread
-                ? colors.primary.withOpacity(0.1)
-                : Colors.black.withOpacity(0.05),
+                ? colors.primary.withValues(alpha: 0.1)
+                : Colors.black.withValues(alpha: 0.05),
             blurRadius: hasUnread ? 12 : 8,
             offset: const Offset(0, 4),
           ),
@@ -753,7 +695,7 @@ class _ConversationTile extends StatelessWidget {
                     ClipRRect(
                       borderRadius: BorderRadius.circular(12),
                       child: Image.network(
-                        c.house.imageUrl.first,
+                        receiverImage ?? '',
                         width: 56,
                         height: 56,
                         fit: BoxFit.cover,
@@ -764,11 +706,11 @@ class _ConversationTile extends StatelessWidget {
                             color: Colors.grey[200],
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: const Icon(Icons.home, color: Colors.grey),
+                          child: const Icon(Icons.person, color: Colors.grey),
                         ),
                       ),
                     ),
-                    if (index % 3 == 0)
+                    if (index % 3 == 0) // Placeholder for online status
                       Positioned(
                         bottom: 2,
                         right: 2,
@@ -793,7 +735,7 @@ class _ConversationTile extends StatelessWidget {
                         children: [
                           Expanded(
                             child: Text(
-                              c.house.companyName,
+                              receiverName,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
@@ -806,7 +748,7 @@ class _ConversationTile extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            c.timeLabel,
+                            timeLabel,
                             style: TextStyle(
                               fontSize: 12,
                               color: hasUnread
@@ -825,12 +767,12 @@ class _ConversationTile extends StatelessWidget {
                           Icon(
                             Icons.done_all,
                             size: 16,
-                            color: colors.primary.withOpacity(0.7),
+                            color: colors.primary.withValues(alpha: 0.7),
                           ),
                           const SizedBox(width: 4),
                           Expanded(
                             child: Text(
-                              c.lastMessage,
+                              lastMessageContent,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
@@ -856,7 +798,7 @@ class _ConversationTile extends StatelessWidget {
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Text(
-                                "${c.unreadCount}",
+                                "$unreadCount",
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 12,
@@ -867,10 +809,7 @@ class _ConversationTile extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        "${c.house.type} • ${c.house.location}",
-                        style: TextStyle(fontSize: 12, color: colors.primary),
-                      ),
+                      // Removed house specific info as it might not be available in ChatRoom
                     ],
                   ),
                 ),
@@ -881,195 +820,4 @@ class _ConversationTile extends StatelessWidget {
       ),
     );
   }
-}
-
-class _ConversationTileFallback extends StatelessWidget {
-  final MockConversation conversation;
-  final ConstColors colors;
-  final VoidCallback onTap;
-  final int index;
-
-  const _ConversationTileFallback({
-    required this.conversation,
-    required this.colors,
-    required this.onTap,
-    required this.index,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final c = conversation;
-    final hasUnread = c.unreadCount > 0;
-
-    return Container(
-      margin: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: hasUnread
-            ? Border.all(color: colors.primary.withOpacity(0.3))
-            : null,
-        boxShadow: [
-          BoxShadow(
-            color: hasUnread
-                ? colors.primary.withOpacity(0.1)
-                : Colors.black.withOpacity(0.05),
-            blurRadius: hasUnread ? 12 : 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(16),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Stack(
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Container(
-                        width: 56,
-                        height: 56,
-                        color: colors.primary.withOpacity(0.1),
-                        child: Icon(Icons.home, color: colors.primary),
-                      ),
-                    ),
-                    if (index % 3 == 0)
-                      Positioned(
-                        bottom: 2,
-                        right: 2,
-                        child: Container(
-                          width: 14,
-                          height: 14,
-                          decoration: BoxDecoration(
-                            color: Colors.green,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 2),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              c.companyName,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: hasUnread
-                                    ? FontWeight.bold
-                                    : FontWeight.w600,
-                                color: colors.secondary,
-                              ),
-                            ),
-                          ),
-                          Text(
-                            c.timeLabel,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: hasUnread
-                                  ? colors.primary
-                                  : colors.tertiary,
-                              fontWeight: hasUnread
-                                  ? FontWeight.w600
-                                  : FontWeight.normal,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.done_all,
-                            size: 16,
-                            color: colors.primary.withOpacity(0.7),
-                          ),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              c.lastMessage,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: hasUnread
-                                    ? colors.secondary
-                                    : colors.tertiary,
-                                fontWeight: hasUnread
-                                    ? FontWeight.w500
-                                    : FontWeight.normal,
-                              ),
-                            ),
-                          ),
-                          if (hasUnread)
-                            Container(
-                              margin: const EdgeInsets.only(left: 8),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: colors.primary,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                "${c.unreadCount}",
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        "${c.type} • ${c.location}",
-                        style: TextStyle(fontSize: 12, color: colors.tertiary),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class MockConversation {
-  final String lastMessage;
-  final String timeLabel;
-  final int unreadCount;
-  final String companyName;
-  final String imageUrl;
-  final String type;
-  final String location;
-
-  MockConversation({
-    required this.lastMessage,
-    required this.timeLabel,
-    required this.unreadCount,
-    required this.companyName,
-    required this.imageUrl,
-    required this.type,
-    required this.location,
-  });
 }

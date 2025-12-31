@@ -1,15 +1,26 @@
+import 'package:demarcheur_app/apps/demandeurs/main_screens/announce_list.dart';
+import 'package:demarcheur_app/apps/demandeurs/main_screens/statistics_page.dart';
+import 'package:demarcheur_app/apps/donneurs/inner_screens/jobs/job_posting.dart';
 import 'package:demarcheur_app/consts/color.dart';
+import 'package:demarcheur_app/models/enterprise/enterprise_model.dart';
+import 'package:demarcheur_app/providers/enterprise_provider.dart';
+import 'package:demarcheur_app/providers/settings_provider.dart';
+import 'package:demarcheur_app/services/auth_provider.dart';
 import 'package:demarcheur_app/widgets/header_page.dart';
+import 'package:demarcheur_app/widgets/payment_widget.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_spinkit/flutter_spinkit.dart';
+import 'package:provider/provider.dart';
 
 class DemProfile extends StatefulWidget {
   const DemProfile({super.key});
 
   @override
-  State<DemProfile> createState() => _DemProfileState();
+  State<DemProfile> createState() => _ProfilePageState();
 }
 
-class _DemProfileState extends State<DemProfile> with TickerProviderStateMixin {
+class _ProfilePageState extends State<DemProfile>
+    with TickerProviderStateMixin {
   ConstColors colors = ConstColors();
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
@@ -33,6 +44,9 @@ class _DemProfileState extends State<DemProfile> with TickerProviderStateMixin {
           ),
         );
     _animationController.forward();
+    Future.microtask(() {
+      context.read<EnterpriseProvider>().loadUser();
+    });
   }
 
   @override
@@ -43,281 +57,429 @@ class _DemProfileState extends State<DemProfile> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
+    final settings = context.watch<SettingsProvider>();
+    final demUser = context.watch<EnterpriseProvider>();
+    final user = demUser.user;
+    if (user != null) {
+      print("DEBUG PROFILE: User is not null");
+      print("DEBUG PROFILE: Name: ${user.name}");
+      print("DEBUG PROFILE: Phone: ${user.phone}");
+      print("DEBUG PROFILE: Email: ${user.email}");
+      print("DEBUG PROFILE: Address: ${user.adress}");
+      print("DEBUG PROFILE: City: ${user.city}");
+    } else {
+      print("DEBUG PROFILE: User is NULL");
+    }
+    if (demUser.isLoading) {
+      return Scaffold(
+        backgroundColor: colors.bg,
+        body: Center(child: SpinKitDancingSquare(color: colors.accepted)),
+      );
+    }
+
+    // if (user == null) {
+    //   return Scaffold(
+    //     backgroundColor: colors.bg,
+    //     body: Center(
+    //       child: Column(
+    //         mainAxisAlignment: MainAxisAlignment.center,
+    //         children: [
+    //           Icon(Icons.error_outline, size: 48, color: colors.primary),
+    //           const SizedBox(height: 16),
+    //           Text(
+    //             "Impossible de charger le profil",
+    //             style: TextStyle(color: colors.primary, fontSize: 16),
+    //           ),
+    //           const SizedBox(height: 16),
+    //           ElevatedButton(
+    //             onPressed: () {
+    //               context.read<EnterpriseProvider>().loadUser();
+    //             },
+    //             style: ElevatedButton.styleFrom(
+    //               backgroundColor: colors.primary,
+    //               foregroundColor: Colors.white,
+    //             ),
+    //             child: const Text("Réessayer"),
+    //           ),
+    //         ],
+    //       ),
+    //     ),
+    //   );
+    // }
+
     return Scaffold(
-      backgroundColor: colors.bg,
-      body: CustomScrollView(
-        physics: const BouncingScrollPhysics(),
-        slivers: [
-          Header(auto: false),
-          SliverToBoxAdapter(
-            child: AnimatedBuilder(
-              animation: _animationController,
-              builder: (context, child) {
-                return FadeTransition(
-                  opacity: _fadeAnimation,
-                  child: SlideTransition(
-                    position: _slideAnimation,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16.0,
-                        vertical: 8.0,
-                      ),
-                      child: Column(
-                        children: [
-                          _EnhancedProfileHeader(colors: colors),
-                          const SizedBox(height: 20),
-                          _ModernStatsSection(colors: colors),
-                          const SizedBox(height: 20),
-                          _QuickActionsSection(colors: colors),
-                          const SizedBox(height: 20),
-                          _ModernSectionCard(
-                            colors: colors,
-                            title: "Informations personnelles",
-                            icon: Icons.person_outline_rounded,
-                            children: [
-                              _ModernInfoTile(
-                                icon: Icons.badge_outlined,
-                                label: "Nom complet",
-                                value: "Utilisateur",
-                                colors: colors,
-                              ),
-                              _ModernInfoTile(
-                                icon: Icons.email_outlined,
-                                label: "Adresse email",
-                                value: "user@example.com",
-                                colors: colors,
-                              ),
-                              _ModernInfoTile(
-                                icon: Icons.phone_outlined,
-                                label: "Numéro de téléphone",
-                                value: "+224 620 00 00 00",
-                                colors: colors,
-                              ),
-                              _ModernInfoTile(
-                                icon: Icons.location_on_outlined,
-                                label: "Localisation",
-                                value: "Conakry, Guinée",
-                                colors: colors,
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          _ModernSectionCard(
-                            colors: colors,
-                            title: "Préférences & Paramètres",
-                            icon: Icons.settings_outlined,
-                            children: [
-                              _ModernInfoTile(
-                                icon: Icons.language_outlined,
-                                label: "Langue de l'interface",
-                                value: "Français",
-                                colors: colors,
-                                hasAction: true,
-                              ),
-                              _ModernInfoTile(
-                                icon: Icons.dark_mode_outlined,
-                                label: "Mode d'affichage",
-                                value: "Thème système",
-                                colors: colors,
-                                hasAction: true,
-                              ),
-                              _ModernInfoTile(
-                                icon: Icons.notifications_outlined,
-                                label: "Notifications push",
-                                value: "Activées",
-                                colors: colors,
-                                hasAction: true,
-                              ),
-                              _ModernInfoTile(
-                                icon: Icons.security_outlined,
-                                label: "Confidentialité",
-                                value: "Gérer les paramètres",
-                                colors: colors,
-                                hasAction: true,
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 20),
-                          _ActionButtonsSection(colors: colors),
-                          const SizedBox(height: 24),
-                        ],
+      backgroundColor: const Color(0xFFF8FAFC),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await context.read<EnterpriseProvider>().loadUser();
+        },
+        child: CustomScrollView(
+          physics: const BouncingScrollPhysics(),
+          slivers: [
+            Header(auto: false),
+            SliverToBoxAdapter(
+              child: AnimatedBuilder(
+                animation: _animationController,
+                builder: (context, child) {
+                  return FadeTransition(
+                    opacity: _fadeAnimation,
+                    child: SlideTransition(
+                      position: _slideAnimation,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16.0,
+                          vertical: 8.0,
+                        ),
+                        child: Column(
+                          children: [
+                            _EnhancedProfileHeader(colors: colors),
+                            const SizedBox(height: 20),
+                            _ModernStatsSection(colors: colors),
+                            const SizedBox(height: 20),
+                            _QuickActionsSection(colors: colors),
+                            const SizedBox(height: 20),
+                            _ModernSectionCard(
+                              colors: colors,
+                              title: "Informations personnelles",
+                              icon: Icons.person_outline_rounded,
+                              children: [
+                                if (user?.name != null)
+                                  _ModernInfoTile(
+                                    icon: Icons.business_outlined,
+                                    label: "Organisation",
+                                    value: user!.name,
+                                    colors: colors,
+                                  ),
+                                _ModernInfoTile(
+                                  icon: Icons.email_outlined,
+                                  label: "Adresse email",
+                                  value: user?.email ?? "Non renseigné",
+                                  colors: colors,
+                                ),
+                                _ModernInfoTile(
+                                  icon: Icons.phone_outlined,
+                                  label: "Numéro de téléphone",
+                                  value: user?.phone ?? "Non renseigné",
+                                  colors: colors,
+                                ),
+                                _ModernInfoTile(
+                                  icon: Icons.location_on_outlined,
+                                  label: "Localisation",
+                                  value:
+                                      user?.adress ??
+                                      user?.city ??
+                                      "Non renseigné",
+                                  colors: colors,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            _ModernSectionCard(
+                              colors: colors,
+                              title: "Préférences & Paramètres",
+                              icon: Icons.settings_outlined,
+                              children: [
+                                _ModernInfoTile(
+                                  icon: Icons.notifications_outlined,
+                                  label: "Notifications push",
+                                  value: settings.notificationsEnabled
+                                      ? "Activées"
+                                      : "Désactivées",
+                                  colors: colors,
+                                  hasAction: true,
+                                  onTap: () {
+                                    settings.toggleNotifications(
+                                      !settings.notificationsEnabled,
+                                    );
+                                  },
+                                ),
+                                _ModernInfoTile(
+                                  icon: Icons.security_outlined,
+                                  label: "Confidentialité",
+                                  value: "Gérer les paramètres",
+                                  colors: colors,
+                                  hasAction: true,
+                                  onTap: () {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          "Paramètres de confidentialité bientôt disponibles",
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                                _ModernInfoTile(
+                                  icon: Icons.help,
+                                  label: "Centre d'aide",
+                                  value: "Voir comment nous pouvons vous aider",
+                                  colors: colors,
+                                  hasAction: true,
+                                  onTap: () {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          "Centre d'aide bientôt disponible",
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 20),
+                            _ActionButtonsSection(colors: colors),
+                            const SizedBox(height: 24),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                );
-              },
+                  );
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
-class _EnhancedProfileHeader extends StatelessWidget {
+class _EnhancedProfileHeader extends StatefulWidget {
   final ConstColors colors;
+
   const _EnhancedProfileHeader({required this.colors});
 
   @override
+  State<_EnhancedProfileHeader> createState() => _EnhancedProfileHeaderState();
+}
+
+class _EnhancedProfileHeaderState extends State<_EnhancedProfileHeader> {
+  bool isLoading = false;
+  Future<void> submit(BuildContext context, EnterpriseProvider dem) async {
+    setState(() {
+      isLoading = true;
+    });
+
+    await Future.delayed(const Duration(seconds: 2));
+
+    if (!mounted) return;
+
+    await dem.toggleIsVerified();
+
+    setState(() {
+      isLoading = false;
+    });
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const PaymentWidget()),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Colors.white, Colors.grey.shade50],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
+    final demUser = context.watch<EnterpriseProvider>();
+    final user = demUser.user;
+    return Padding(
+      padding: const EdgeInsets.only(top: 10.0),
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Colors.white, Colors.grey.shade50],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          children: [
-            Row(
-              children: [
-                Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: colors.primary.withOpacity(0.2),
-                        blurRadius: 15,
-                        offset: const Offset(0, 5),
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.09),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: widget.colors.primary.withValues(alpha: 0.2),
+                          blurRadius: 15,
+                          offset: const Offset(0, 5),
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: Image.network(
+                        demUser.user?.profile ?? "",
+                        width: 80,
+                        height: 80,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            width: 80,
+                            height: 80,
+                            color: Colors.grey.shade200,
+                            child: Icon(Icons.person, color: Colors.grey),
+                          );
+                        },
                       ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(20),
-                    child: Image.network(
-                      "https://images.unsplash.com/photo-1531123897727-8f129e1688ce?w=300&q=80&auto=format&fit=crop",
-                      width: 80,
-                      height: 80,
-                      fit: BoxFit.cover,
                     ),
                   ),
-                ),
-                const SizedBox(width: 20),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        "Utilisateur",
-                        style: TextStyle(
-                          color: colors.primary,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 22,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: colors.primary.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          "Prestataire",
+                  const SizedBox(width: 20),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          user?.name ?? "Nom de l'entreprise",
                           style: TextStyle(
-                            color: colors.primary,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
+                            color: widget.colors.primary,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 22,
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 10),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: colors.accepted.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.verified_rounded,
-                              color: colors.accepted,
-                              size: 16,
+
+                        // user.isVerified
+                        //     ? Container(
+                        //         padding: const EdgeInsets.symmetric(
+                        //           horizontal: 10,
+                        //           vertical: 6,
+                        //         ),
+                        //         decoration: BoxDecoration(
+                        //           color: widget.colors.accepted.withValues(
+                        //             alpha: 0.08,
+                        //           ),
+                        //           borderRadius: BorderRadius.circular(16),
+                        //         ),
+                        //         child: Row(
+                        //           mainAxisSize: MainAxisSize.min,
+                        //           children: [
+                        //             Icon(
+                        //               Icons.verified_rounded,
+                        //               color: widget.colors.accepted,
+                        //               size: 16,
+                        //             ),
+                        //             const SizedBox(width: 4),
+                        //             Text(
+                        //               "Compte certifié",
+                        //               style: TextStyle(
+                        //                 color: widget.colors.accepted,
+                        //                 fontSize: 12,
+                        //                 fontWeight: FontWeight.w600,
+                        //               ),
+                        //             ),
+                        //           ],
+                        //         ),
+                        //       )
+                        //     :
+                        TextButton(
+                          onPressed: () {
+                            if (!demUser.isLoading && !isLoading) {
+                              submit(context, demUser);
+                            }
+                          },
+                          style: TextButton.styleFrom(
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
                             ),
-                            const SizedBox(width: 4),
-                            Text(
-                              "Compte vérifié",
-                              style: TextStyle(
-                                color: colors.accepted,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
+                            backgroundColor: widget.colors.primary.withValues(
+                              alpha: 0.08,
                             ),
-                          ],
+                          ),
+                          child: isLoading
+                              ? SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    color: widget.colors.primary,
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : Text(
+                                  'Certifier mon compte',
+                                  style: TextStyle(
+                                    color: widget.colors.primary,
+                                  ),
+                                ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: widget.colors.primary.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: widget.colors.primary.withValues(alpha: 0.02),
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: colors.primary.withOpacity(0.05),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: colors.primary.withOpacity(0.1)),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.star_rounded, color: Colors.amber, size: 20),
-                  const SizedBox(width: 8),
-                  Text(
-                    "4.8",
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 16,
-                      color: colors.primary,
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    "(127 avis)",
-                    style: TextStyle(color: colors.secondary, fontSize: 14),
-                  ),
-                  const Spacer(),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: colors.primary,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      "Profil à 95%",
+                child: Row(
+                  children: [
+                    Icon(Icons.star_rounded, color: Colors.amber, size: 20),
+                    const SizedBox(width: 8),
+                    // Text(
+                    //   demUser.user!.rate.toString(),
+                    //   style: TextStyle(
+                    //     fontWeight: FontWeight.w700,
+                    //     fontSize: 16,
+                    //     color: widget.colors.primary,
+                    //   ),
+                    // ),
+                    // const SizedBox(width: 4),
+                    // Text(
+                    //   "(127 avis)",
+                    //   style: TextStyle(
+                    //     color: widget.colors.secondary,
+                    //     fontSize: 14,
+                    //   ),
+                    // ),
+                    // const Spacer(),
+                    // Container(
+                    //   padding: const EdgeInsets.symmetric(
+                    //     horizontal: 12,
+                    //     vertical: 6,
+                    //   ),
+                    //   decoration: BoxDecoration(
+                    //     color: widget.colors.primary,
+                    //     borderRadius: BorderRadius.circular(12),
+                    //   ),
+                    //   child: demUser.user!.isVerified
+                    //       ? Text(
+                    //           "Profil à 100%",
+                    //           style: TextStyle(
+                    //             color: Colors.white,
+                    //             fontSize: 12,
+                    //             fontWeight: FontWeight.w600,
+                    //           ),
+                    //         )
+                    //       :
+                    Text(
+                      "Profil à 80%",
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -333,12 +495,20 @@ class _ModernStatsSection extends StatelessWidget {
     return Row(
       children: [
         Expanded(
-          child: _ModernStatCard(
-            colors: colors,
-            icon: Icons.campaign_outlined,
-            label: "Annonces",
-            value: "12",
-            subtitle: "Actives",
+          child: GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => AnnounceList()),
+              );
+            },
+            child: _ModernStatCard(
+              colors: colors,
+              icon: Icons.campaign_outlined,
+              label: "Annonces",
+              value: "12",
+              subtitle: "Actives",
+            ),
           ),
         ),
         const SizedBox(width: 12),
@@ -390,8 +560,8 @@ class _ModernStatCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 15,
+            color: Colors.black.withValues(alpha: 0.09),
+            blurRadius: 20,
             offset: const Offset(0, 4),
           ),
         ],
@@ -401,7 +571,7 @@ class _ModernStatCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: colors.primary.withOpacity(0.1),
+              color: colors.primary.withValues(alpha: 0.02),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(icon, color: colors.primary, size: 20),
@@ -424,10 +594,7 @@ class _ModernStatCard extends StatelessWidget {
               fontWeight: FontWeight.w500,
             ),
           ),
-          Text(
-            subtitle,
-            style: TextStyle(color: colors.tertiary, fontSize: 10),
-          ),
+          Text(subtitle, style: TextStyle(color: colors.primary, fontSize: 10)),
         ],
       ),
     );
@@ -447,7 +614,7 @@ class _QuickActionsSection extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
+            color: Colors.black.withValues(alpha: 0.06),
             blurRadius: 15,
             offset: const Offset(0, 4),
           ),
@@ -472,7 +639,14 @@ class _QuickActionsSection extends StatelessWidget {
                   colors: colors,
                   icon: Icons.add_circle_outline,
                   label: "Nouvelle annonce",
-                  onTap: () {},
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const JobPosting(),
+                      ),
+                    );
+                  },
                 ),
               ),
               const SizedBox(width: 12),
@@ -481,7 +655,14 @@ class _QuickActionsSection extends StatelessWidget {
                   colors: colors,
                   icon: Icons.analytics_outlined,
                   label: "Statistiques",
-                  onTap: () {},
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const StatisticsPage(),
+                      ),
+                    );
+                  },
                 ),
               ),
               const SizedBox(width: 12),
@@ -490,7 +671,13 @@ class _QuickActionsSection extends StatelessWidget {
                   colors: colors,
                   icon: Icons.support_agent_outlined,
                   label: "Support",
-                  onTap: () {},
+                  onTap: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text("Support bientôt disponible"),
+                      ),
+                    );
+                  },
                 ),
               ),
             ],
@@ -519,11 +706,12 @@ class _QuickActionButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
+        height: 90,
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: colors.primary.withOpacity(0.05),
+          color: colors.primary.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: colors.primary.withOpacity(0.1)),
+          border: Border.all(color: colors.primary.withValues(alpha: 0.01)),
         ),
         child: Column(
           children: [
@@ -566,7 +754,7 @@ class _ModernSectionCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
+            color: Colors.black.withValues(alpha: 0.09),
             blurRadius: 15,
             offset: const Offset(0, 4),
           ),
@@ -582,7 +770,7 @@ class _ModernSectionCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: colors.primary.withOpacity(0.1),
+                    color: colors.primary.withValues(alpha: 0.05),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(icon, color: colors.primary, size: 20),
@@ -618,6 +806,7 @@ class _ModernInfoTile extends StatelessWidget {
   final String value;
   final ConstColors colors;
   final bool hasAction;
+  final VoidCallback? onTap;
 
   const _ModernInfoTile({
     required this.icon,
@@ -625,6 +814,7 @@ class _ModernInfoTile extends StatelessWidget {
     required this.value,
     required this.colors,
     this.hasAction = false,
+    this.onTap,
   });
 
   @override
@@ -634,7 +824,7 @@ class _ModernInfoTile extends StatelessWidget {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: hasAction ? () {} : null,
+          onTap: hasAction ? onTap : null,
           borderRadius: BorderRadius.circular(12),
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
@@ -643,7 +833,7 @@ class _ModernInfoTile extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: colors.primary.withOpacity(0.08),
+                    color: colors.primary.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(icon, color: colors.primary, size: 18),
@@ -664,6 +854,7 @@ class _ModernInfoTile extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         value,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: colors.primary,
                           fontSize: 15,
@@ -676,7 +867,7 @@ class _ModernInfoTile extends StatelessWidget {
                 if (hasAction)
                   Icon(
                     Icons.arrow_forward_ios_rounded,
-                    color: colors.tertiary,
+                    color: colors.primary,
                     size: 16,
                   ),
               ],
@@ -696,67 +887,143 @@ class _ActionButtonsSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            onPressed: () {},
-            icon: const Icon(Icons.edit_outlined, size: 20),
-            label: const Text(
-              "Modifier le profil",
-              style: TextStyle(fontWeight: FontWeight.w600),
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: colors.primary,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              elevation: 0,
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
+        SizedBox(height: 12),
         Row(
           children: [
             Expanded(
-              child: OutlinedButton.icon(
-                onPressed: () {},
-                icon: const Icon(Icons.help_outline_rounded, size: 18),
-                label: const Text(
-                  "Aide",
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: colors.secondary,
-                  side: BorderSide(color: colors.secondary.withOpacity(0.3)),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text("Modification bientôt disponible"),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.edit_outlined, size: 20),
+                  label: const Text(
+                    "Modifier le profil",
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: colors.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    elevation: 0,
                   ),
                 ),
               ),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: 8),
             Expanded(
-              child: OutlinedButton.icon(
-                onPressed: () {},
-                icon: const Icon(Icons.logout_rounded, size: 18),
-                label: const Text(
-                  "Déconnexion",
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.red.shade600,
-                  side: BorderSide(color: Colors.red.shade200),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text("Modification bientôt disponible"),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.archive, size: 20),
+                  label: const Text(
+                    "Mon portofolio",
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: colors.primary.withValues(alpha: 0.2),
+                    foregroundColor: colors.primary,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    elevation: 0,
                   ),
                 ),
               ),
             ),
           ],
+        ),
+        const SizedBox(height: 24),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: () {
+              showDialog(
+                //barrierColor: colors.bg,
+                context: context,
+                builder: (context) => AlertDialog(
+                  backgroundColor: const Color(0xFFF8FAFC),
+                  title: Text(
+                    "Déconnexion !",
+                    style: TextStyle(
+                      color: colors.primary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  content: Text(
+                    "Voulez-vous vraiment vous déconnecter ?",
+                    style: TextStyle(
+                      color: colors.primary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  actionsAlignment: MainAxisAlignment.center,
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: OutlinedButton.styleFrom(
+                        backgroundColor: colors.primary.withValues(alpha: 0.05),
+                        foregroundColor: colors.primary,
+                        side: BorderSide(color: colors.primary),
+                        padding: const EdgeInsets.all(14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      child: const Text("Annuler"),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        context.read<AuthProvider>().logout(context);
+                      },
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.red.shade600,
+                        side: BorderSide(color: Colors.red.shade200),
+                        padding: const EdgeInsets.all(14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      child: Text(
+                        "Déconnexion",
+                        style: TextStyle(color: Colors.red.shade600),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+            icon: const Icon(Icons.logout_rounded, size: 18),
+            label: const Text(
+              "Déconnexion",
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.red.shade600,
+              side: BorderSide(color: Colors.red.shade200),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+          ),
         ),
       ],
     );

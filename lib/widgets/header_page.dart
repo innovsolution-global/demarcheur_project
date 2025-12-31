@@ -33,11 +33,21 @@ class Header extends StatelessWidget {
               IconButton(onPressed: () {}, icon: Icon(Icons.notifications)),
             ],
       leading: auto
-          ? IconButton(
-              onPressed: () {
-                Navigator.pop(context);
-              },
-              icon: HugeIcon(icon: HugeIcons.strokeRoundedArrowTurnBackward),
+          ? Container(
+              margin: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: color.primary.withOpacity(0.02),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: IconButton(
+                onPressed: () => Navigator.pop(context),
+                icon: HugeIcon(
+                  icon: HugeIcons.strokeRoundedArrowTurnBackward,
+                  color: color.bg,
+                  strokeWidth: 2,
+                  size: 30,
+                ),
+              ),
             )
           : null,
       backgroundColor: Colors.transparent,

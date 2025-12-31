@@ -1,4 +1,6 @@
+import 'package:demarcheur_app/apps/donneurs/inner_screens/jobs/job_detail.dart';
 import 'package:demarcheur_app/consts/color.dart';
+import 'package:demarcheur_app/providers/compa_profile_provider.dart';
 import 'package:demarcheur_app/providers/search_provider.dart';
 import 'package:demarcheur_app/widgets/sub_title.dart';
 import 'package:demarcheur_app/widgets/title_widget.dart';
@@ -33,13 +35,13 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
     _initializeAnimations();
 
     // Load data and start animations
-    Future.microtask(() {
-      final searchProvider = context.read<SearchProvider>();
-      searchProvider.loadJobs().then((_) {
-        searchProvider.setJobs(searchProvider.filteredJobs);
-        _animationController.forward();
-      });
-    });
+    // Future.microtask(() {
+    //   final searchProvider = context.read<CompaProfileProvider>();
+    //   searchProvider.loadVancies().then((_) {
+    //     searchProvider.setJobs(searchProvider.filterVancy);
+    //     _animationController.forward();
+    //   });
+    // });
 
     _searchController.addListener(() {
       setState(() {
@@ -50,7 +52,7 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
 
   void _initializeAnimations() {
     _animationController = AnimationController(
-      duration: const Duration(milliseconds: 1000),
+      duration: const Duration(milliseconds: 1200),
       vsync: this,
     );
 
@@ -87,6 +89,7 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final search = Provider.of<SearchProvider>(context);
+    final categories = search.categories;
 
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
@@ -112,9 +115,86 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
                       },
                     ),
                   ),
-                  _buildJobResults(search),
+                  SliverToBoxAdapter(child: _buildButtonSection(categories)),
+                  SliverToBoxAdapter(child: _buildJobResults(search)),
                 ],
               ),
+      ),
+    );
+  }
+
+  Widget _buildButtonSection(List<String> categories) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 20, left: 20, bottom: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TitleWidget(text: "Categories", fontSize: 20),
+          SizedBox(height: 16),
+          SizedBox(
+            height: 50,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: categories.length,
+              itemBuilder: (context, index) {
+                return Padding(
+                  padding: EdgeInsets.only(
+                    right: index == categories.length - 1 ? 0 : 12,
+                  ),
+                  child: _buildMenuSection(categories[index], index),
+                );
+              },
+            ),
+          ),
+          SizedBox(height: 16),
+
+          SubTitle(
+            text: "Recommandé pour vous",
+            fontWeight: FontWeight.w700,
+            fontsize: 18,
+          ),
+        ],
+      ),
+    );
+  }
+
+  int currentIndex = 0;
+  Widget _buildMenuSection(String label, int index) {
+    bool selected = currentIndex == index;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          currentIndex = index;
+        });
+      },
+      child: AnimatedContainer(
+        duration: Duration(microseconds: 300),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(25),
+          boxShadow: [
+            BoxShadow(
+              color: (selected ? color.primary : Colors.black).withOpacity(
+                selected ? 0.2 : 0.05,
+              ),
+              blurRadius: selected ? 12 : 8,
+              offset: const Offset(0, .2),
+            ),
+          ],
+          color: selected ? color.primary : color.bg,
+          border: Border.all(
+            color: selected ? color.primary : Colors.grey.shade300,
+            width: selected ? 2 : 1,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? Colors.white : color.primary,
+            fontWeight: FontWeight.w600,
+            fontSize: 14,
+          ),
+        ),
       ),
     );
   }
@@ -151,14 +231,14 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
       leading: Container(
         margin: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.2),
+          color: Colors.white,
           borderRadius: BorderRadius.circular(12),
         ),
         child: IconButton(
           onPressed: () => Navigator.pop(context),
-          icon: const HugeIcon(
+          icon: HugeIcon(
             icon: HugeIcons.strokeRoundedArrowTurnBackward,
-            color: Colors.white,
+            color: color.primary,
             size: 20,
           ),
         ),
@@ -367,7 +447,7 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    '${search.filteredJobs.length} trouvé${search.filteredJobs.length > 1 ? 's' : ''}',
+                    '${search.allJob.length} trouvé${search.allJob.length > 1 ? 's' : ''}',
                     style: TextStyle(
                       color: color.primary,
                       fontSize: 14,
@@ -383,50 +463,64 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildJobResults(SearchProvider search) {
-    if (search.filteredJobs.isEmpty) {
-      return SliverToBoxAdapter(
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.work_off_rounded,
-                size: 80,
-                color: Colors.grey.shade400,
+  Widget _buildEmptyState(String message) {
+    return SizedBox(
+      height: 300,
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.home_outlined, size: 80, color: Colors.grey.shade400),
+            const SizedBox(height: 16),
+            Text(
+              message,
+              style: TextStyle(
+                color: color.secondary,
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
               ),
-              const SizedBox(height: 16),
-              Text(
-                'Aucun emploi trouvé',
-                style: TextStyle(
-                  color: color.primary,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Essayez de modifier vos critères de recherche',
-                style: TextStyle(color: color.secondary, fontSize: 14),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
+              textAlign: TextAlign.center,
+            ),
+          ],
         ),
-      );
+      ),
+    );
+  }
+
+  Widget _buildJobResults(SearchProvider search) {
+    final provider = context.watch<SearchProvider>();
+    final categories = provider.categories;
+    final houses = provider.filteredJobs;
+
+    if (houses.isEmpty) {
+      return _buildEmptyState('Aucune offre disponible pour le moment.');
     }
 
-    return SliverPadding(
+    final selectedCategory = currentIndex == 0
+        ? null
+        : categories[currentIndex];
+    final filteredHouses = selectedCategory == null
+        ? houses
+        : houses
+              .where(
+                (h) =>
+                    h.category.toLowerCase() == selectedCategory.toLowerCase(),
+              )
+              .toList();
+
+    if (filteredHouses.isEmpty) {
+      return _buildEmptyState('Aucune offre trouvée dans cette catégorie.');
+    }
+    return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      sliver: SliverList.builder(
-        itemCount: search.filteredJobs.length,
-        itemBuilder: (context, index) {
-          final job = search.filteredJobs[index];
-          return Padding(
+      child: Column(
+        children: List.generate(
+          filteredHouses.length,
+          (index) => Padding(
             padding: const EdgeInsets.only(bottom: 16),
-            child: _buildModernJobCard(job),
-          );
-        },
+            child: _buildModernJobCard(filteredHouses[index]),
+          ),
+        ),
       ),
     );
   }
@@ -435,8 +529,13 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
     return GestureDetector(
       onTap: () {
         // Navigate to job detail
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => JobDetail(job: job)),
+        );
       },
-      child: Container(
+      child: AnimatedContainer(
+        duration: Duration(microseconds: 1000),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
@@ -460,6 +559,8 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
                     width: 60,
                     height: 60,
                     decoration: BoxDecoration(
+                      color: color.tertiary,
+                      border: Border.all(color: color.tertiary),
                       borderRadius: BorderRadius.circular(12),
                       image: DecorationImage(
                         fit: BoxFit.cover,

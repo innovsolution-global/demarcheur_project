@@ -1,8 +1,7 @@
 import 'package:demarcheur_app/apps/donneurs/inner_screens/jobs/upload.dart';
 import 'package:demarcheur_app/consts/color.dart';
+import 'package:demarcheur_app/models/add_vancy_model.dart';
 import 'package:demarcheur_app/models/job_model.dart';
-import 'package:demarcheur_app/widgets/sub_title.dart';
-import 'package:demarcheur_app/widgets/title_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:hugeicons/hugeicons.dart';
@@ -10,7 +9,7 @@ import 'package:icons_plus/icons_plus.dart';
 import 'package:intl/intl.dart';
 
 class JobDetail extends StatefulWidget {
-  final JobModel job;
+  final AddVancyModel job;
   const JobDetail({super.key, required this.job});
 
   @override
@@ -38,7 +37,6 @@ class _JobDetailState extends State<JobDetail> with TickerProviderStateMixin {
 
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
-  late Animation<double> _scaleAnimation;
   late Animation<double> _rotationAnimation;
 
   @override
@@ -78,11 +76,6 @@ class _JobDetailState extends State<JobDetail> with TickerProviderStateMixin {
             curve: Curves.easeOutCubic,
           ),
         );
-
-    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
-      CurvedAnimation(parent: _fabController, curve: Curves.elasticOut),
-    );
-
     _rotationAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _shareController, curve: Curves.easeInOut),
     );
@@ -240,7 +233,7 @@ class _JobDetailState extends State<JobDetail> with TickerProviderStateMixin {
                         ),
                       ),
                       child: Text(
-                        'Opportunité ${widget.job.status}',
+                        'Opportunité ${widget.job.typeJobe}',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 12,
@@ -317,7 +310,7 @@ class _JobDetailState extends State<JobDetail> with TickerProviderStateMixin {
                     ],
                     image: DecorationImage(
                       fit: BoxFit.cover,
-                      image: NetworkImage(widget.job.imageUrl),
+                      image: NetworkImage(widget.job.companyImage!),
                     ),
                   ),
                 ),
@@ -338,7 +331,7 @@ class _JobDetailState extends State<JobDetail> with TickerProviderStateMixin {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      widget.job.companyName,
+                      widget.job.title,
                       style: TextStyle(
                         color: color.secondary,
                         fontSize: 16,
@@ -356,7 +349,7 @@ class _JobDetailState extends State<JobDetail> with TickerProviderStateMixin {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        widget.job.postDate,
+                        widget.job.createdAt!,
                         style: TextStyle(
                           color: color.primary,
                           fontSize: 12,
@@ -463,19 +456,19 @@ class _JobDetailState extends State<JobDetail> with TickerProviderStateMixin {
           const SizedBox(height: 16),
           _buildInfoRow(
             'Type d\'emploi',
-            widget.job.type,
+            widget.job.typeJobe,
             HugeIcons.strokeRoundedBriefcase01,
           ),
           const SizedBox(height: 16),
           _buildInfoRow(
             'Localisation',
-            widget.job.location,
+            widget.job.city,
             HugeIcons.strokeRoundedLocation01,
           ),
           const SizedBox(height: 16),
           _buildInfoRow(
             'Catégorie',
-            widget.job.category,
+            widget.job.city,
             HugeIcons.strokeRoundedTag01,
           ),
         ],

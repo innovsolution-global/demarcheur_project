@@ -1,7 +1,5 @@
 import 'dart:io';
 import 'package:demarcheur_app/consts/color.dart';
-import 'package:demarcheur_app/widgets/sub_title.dart';
-import 'package:demarcheur_app/widgets/title_widget.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
@@ -28,7 +26,6 @@ class _UploadState extends State<Upload> with TickerProviderStateMixin {
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
   late Animation<double> _scaleAnimation;
-  late Animation<double> _rotationAnimation;
 
   @override
   void initState() {
@@ -68,11 +65,6 @@ class _UploadState extends State<Upload> with TickerProviderStateMixin {
     _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
       CurvedAnimation(parent: _uploadController, curve: Curves.elasticOut),
     );
-
-    _rotationAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(parent: _uploadController, curve: Curves.linear));
   }
 
   @override

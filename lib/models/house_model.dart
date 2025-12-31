@@ -6,6 +6,7 @@ class HouseModel {
     final List<String> 
  imageUrl;
   final String postDate;
+  
   final double rent;
   final String location;
   final String type;

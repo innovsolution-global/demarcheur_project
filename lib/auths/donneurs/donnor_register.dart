@@ -1,24 +1,43 @@
-import 'package:demarcheur_app/auths/donneurs/domain_pref_page.dart';
+import 'dart:io';
+import 'package:demarcheur_app/apps/donneurs/main_screens/dashboard_page.dart';
+import 'package:demarcheur_app/auths/donneurs/login_page.dart';
 import 'package:demarcheur_app/consts/color.dart';
-import 'package:demarcheur_app/providers/donor_register_provider.dart';
+import 'package:demarcheur_app/methods/my_methodes.dart';
+import 'package:demarcheur_app/models/donneur/donneur_model.dart';
+import 'package:demarcheur_app/services/auth_provider.dart';
 import 'package:demarcheur_app/widgets/header_page.dart';
 import 'package:demarcheur_app/widgets/sub_title.dart';
 import 'package:demarcheur_app/widgets/title_widget.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:hugeicons/hugeicons.dart';
-import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
 
 class DonnorRegister extends StatefulWidget {
   const DonnorRegister({super.key});
 
   @override
-  State<DonnorRegister> createState() => _DonnorRegisterState();
+  State<DonnorRegister> createState() => _DonnorRegister();
 }
 
-class _DonnorRegisterState extends State<DonnorRegister>
+class _DonnorRegister extends State<DonnorRegister>
     with SingleTickerProviderStateMixin {
-  ConstColors color = ConstColors();
+  final MyMethodes methodes = MyMethodes();
+  final _formKey = GlobalKey<FormState>();
+  final ImagePicker _picker = ImagePicker();
+
+  // Separate controllers for each field
+  final _companyNameController = TextEditingController();
+  final _domainController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _locationController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _cityController = TextEditingController();
+
+  File? selectedImage;
+  bool isLoading = false;
+  bool isSubmitting = false;
+
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
 
@@ -26,499 +45,556 @@ class _DonnorRegisterState extends State<DonnorRegister>
   void initState() {
     super.initState();
     _animationController = AnimationController(
-      vsync: this,
       duration: const Duration(milliseconds: 800),
+      vsync: this,
     );
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeIn),
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
-
-    // Initialize provider
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<DonorRegisterProvider>().initialize().then((_) {
-        _animationController.forward();
-      });
-    });
+    _animationController.forward();
   }
 
-  @override
-  void dispose() {
-    _animationController.dispose();
-    super.dispose();
+  // @override
+  // void dispose() {
+  //   _companyNameController.dispose();
+  //   _domainController.dispose();
+  //   _emailController.dispose();
+  //   _phoneController.dispose();
+  //   _locationController.dispose();
+  //   _animationController.dispose();
+
+  //   super.dispose();
+  // }
+
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final XFile? image = await _picker.pickImage(
+        source: source,
+        maxWidth: 1080,
+        imageQuality: 80,
+      );
+
+      if (image != null) {
+        setState(() {
+          selectedImage = File(image.path);
+        });
+      }
+    } catch (e) {
+      _showSnackBar('Erreur lors de la sélection de l\'image', isError: true);
+    }
   }
 
-  void _showImageSourceDialog(BuildContext context) {
+  void _showImageSourceDialog() {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (BuildContext context) {
-        return Container(
-          decoration: BoxDecoration(
-            color: color.bg,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Handle bar
-                  Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: color.primary,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  TitleWidget(
-                    text: "Choisissez une source",
-                    fontSize: 22,
-                    color: color.secondary,
-                  ),
-                  const SizedBox(height: 32),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _buildImageSourceOption(
-                        context: context,
-                        icon: Icons.photo_library_rounded,
-                        label: "Galerie",
-                        onTap: () {
-                          Navigator.pop(context);
-                          context
-                              .read<DonorRegisterProvider>()
-                              .pickImageFromGallery();
-                        },
-                      ),
-                      _buildImageSourceOption(
-                        context: context,
-                        icon: Icons.camera_alt_rounded,
-                        label: "Caméra",
-                        onTap: () {
-                          Navigator.pop(context);
-                          context
-                              .read<DonorRegisterProvider>()
-                              .pickImageFromCamera();
-                        },
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildImageSourceOption({
-    required BuildContext context,
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: color.tertiary,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.primary.withOpacity(0.2)),
+          color: ConstColors().bg,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 36, color: color.primary),
-            const SizedBox(height: 12),
-            SubTitle(text: label, fontsize: 16, fontWeight: FontWeight.w600),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: ConstColors().primary,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+            TitleWidget(
+              text: "Choisir une image",
+              fontSize: 20,
+              color: ConstColors().secondary,
+            ),
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _ImageSourceOption(
+                  icon: Icons.camera,
+                  label: "Galerie",
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickImage(ImageSource.gallery);
+                  },
+                ),
+                _ImageSourceOption(
+                  icon: Icons.camera_alt_outlined,
+                  label: "Caméra",
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickImage(ImageSource.camera);
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildImagePicker() {
-    return Consumer<DonorRegisterProvider>(
-      builder: (context, provider, child) {
-        return GestureDetector(
-          onTap: () => _showImageSourceDialog(context),
-          child: Container(
-            width: 130,
-            height: 130,
-            decoration: BoxDecoration(
-              color: color.tertiary,
-              shape: BoxShape.circle,
-              border: Border.all(color: color.primary, width: 3),
-              boxShadow: [
-                BoxShadow(
-                  color: color.primary.withOpacity(0.2),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Stack(
-              children: [
-                if (provider.selectedImage != null)
-                  ClipOval(
-                    child: Image.file(
-                      provider.selectedImage!,
-                      fit: BoxFit.cover,
-                      width: double.infinity,
-                      height: double.infinity,
-                    ),
-                  )
-                else
-                  Center(
-                    child: HugeIcon(
-                      icon: HugeIcons.strokeRoundedCamera01,
-                      size: 40,
-                      color: color.primary,
-                    ),
-                  ),
-                Positioned(
-                  bottom: 0,
-                  right: 0,
-                  child: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: color.primary,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: color.bg, width: 3),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
-                          blurRadius: 6,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Icon(Icons.add, color: color.bg, size: 24),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+  void _showSnackBar(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.red : ConstColors().primary,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
     );
   }
 
-  Widget _buildTextField({
-    required String hint,
-    required IconData prefixIcon,
-    required TextInputType keyboardType,
-    required TextInputAction textInputAction,
-    required Function(String) onChanged,
-    String? errorText,
-    String? value,
-    TextCapitalization? textCapitalization,
-  }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 20),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
+  Future<void> _submitForm() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    if (selectedImage == null) {
+      _showSnackBar('Veuillez sélectionner votre de profil', isError: true);
+      return;
+    }
+
+    setState(() {
+      isSubmitting = true;
+    });
+
+    // Simulate API call
+    //  await Future.delayed(const Duration(seconds: 2));
+    final donneur = DonneurModel(
+      name: _companyNameController.text,
+      phone: _phoneController.text,
+      email: _emailController.text,
+      password: _passwordController.text,
+      adress: _locationController.text,
+      city: _cityController.text,
+      image: selectedImage,
+    );
+    final succes = await AuthProvider().registerDonneur(donneur);
+    if (mounted) {
+      setState(() {
+        isSubmitting = false;
+      });
+    }
+    if (succes) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Center(
+            child: Text(
+              'Enregister avec success',
+              style: TextStyle(color: Colors.white, fontSize: 16),
+            ),
+          ),
+        ),
+      );
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginPage()),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.red,
+          content: Center(
+            child: Text(
+              'Erreur lors de l\'engistrement',
+              style: TextStyle(color: Colors.white, fontSize: 16),
+            ),
+          ),
+        ),
+      );
+    }
+  }
+
+  String? _validateEmail(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'L\'email est requis';
+    }
+    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+      return 'Format d\'email invalide';
+    }
+    return null;
+  }
+
+  String? _validatePhone(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Le numéro de téléphone est requis';
+    }
+    if (value.length < 8) {
+      return 'Numéro de téléphone invalide';
+    }
+    return null;
+  }
+
+  String? _validateRequired(String? value, String fieldName) {
+    if (value == null || value.isEmpty) {
+      return '$fieldName est requis';
+    }
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color = ConstColors();
+
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: Scaffold(
+        backgroundColor: color.bg,
+        extendBodyBehindAppBar: true,
+        body: CustomScrollView(
+          slivers: [
+            const Header(auto: true),
+            SliverToBoxAdapter(
+              child: FadeTransition(
+                opacity: _fadeAnimation,
+                child: Container(
+                  width: double.infinity,
+                  color: color.bg,
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      children: [
+                        _buildHeader(),
+                        _buildImageSelector(),
+                        _buildFormFields(),
+                        const SizedBox(height: 24),
+                        _buildSubmitButton(),
+                        const SizedBox(height: 40),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Padding(
+      padding: const EdgeInsets.all(20.0),
+      child: Column(
+        children: [
+          TitleWidget(
+            text: "Créer un compte",
+            fontSize: 32,
+            color: ConstColors().secondary,
+          ),
+          const SizedBox(height: 8),
+          SubTitle(
+            text: "Rejoignez notre plateforme",
+            fontsize: 16,
+            color: ConstColors().primary,
           ),
         ],
       ),
-      child: TextFormField(
-        textCapitalization: textCapitalization ?? TextCapitalization.none,
-        initialValue: value,
-        keyboardType: keyboardType,
-        textInputAction: textInputAction,
-        onChanged: onChanged,
-        style: TextStyle(
-          fontSize: 16,
-          color: color.secondary,
-          fontWeight: FontWeight.w500,
-        ),
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: TextStyle(
-            color: color.secondary.withOpacity(0.5),
-            fontSize: 16,
-            fontWeight: FontWeight.w400,
-          ),
-          prefixIcon: Container(
-            margin: const EdgeInsets.all(12),
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: color.tertiary,
-              borderRadius: BorderRadius.circular(12),
+    );
+  }
+
+  Widget _buildImageSelector() {
+    final color = ConstColors();
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20.0),
+      child: Column(
+        children: [
+          GestureDetector(
+            onTap: _showImageSourceDialog,
+            child: Container(
+              width: 140,
+              height: 140,
+              decoration: BoxDecoration(
+                color: selectedImage != null
+                    ? Colors.transparent
+                    : color.tertiary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: color.primary.withOpacity(0.3),
+                  width: 2,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: color.primary.withOpacity(0.1),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+                image: selectedImage != null
+                    ? DecorationImage(
+                        image: FileImage(selectedImage!),
+                        fit: BoxFit.cover,
+                      )
+                    : null,
+              ),
+              child: selectedImage == null
+                  ? Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        HugeIcon(
+                          icon: HugeIcons.strokeRoundedCamera01,
+                          color: color.primary,
+                          size: 40,
+                        ),
+                        const SizedBox(height: 8),
+                        SubTitle(
+                          text: "Ajouter",
+                          fontsize: 14,
+                          color: color.primary,
+                        ),
+                      ],
+                    )
+                  : Stack(
+                      children: [
+                        Positioned(
+                          bottom: 8,
+                          right: 8,
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: color.primary,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: HugeIcon(
+                              icon: HugeIcons.strokeRoundedEdit02,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
             ),
-            child: Icon(prefixIcon, size: 20, color: color.primary),
           ),
-          filled: true,
-          fillColor: color.bg,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide.none,
+          const SizedBox(height: 12),
+          SubTitle(
+            text: "Votre photo de profil",
+            fontWeight: FontWeight.w600,
+            fontsize: 18,
+            color: ConstColors().secondary,
           ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide(
-              color: errorText != null ? color.error : Colors.transparent,
-              width: 1.5,
-            ),
+          const SizedBox(height: 30),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFormFields() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20.0),
+      child: Column(
+        children: [
+          _CustomTextField(
+            textCapitalization: TextCapitalization.sentences,
+            controller: _companyNameController,
+            label: "Nom complet",
+            icon: HugeIcons.strokeRoundedBuilding01,
+            validator: (value) => _validateRequired(value, "Le nom"),
           ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide(
-              color: errorText != null ? color.error : color.primary,
-              width: 2,
-            ),
+          const SizedBox(height: 20),
+          // _CustomTextField(
+          //   controller: _domainController,
+          //   textCapitalization: TextCapitalization.sentences,
+          //   label: "Domaine d'activité",
+          //   icon: HugeIcons.strokeRoundedBriefcase01,
+          //   validator: (value) =>
+          //       _validateRequired(value, "Le domaine d'activité"),
+          // ),
+          // const SizedBox(height: 20),
+          _CustomTextField(
+            textCapitalization: TextCapitalization.none,
+
+            controller: _emailController,
+            label: "Adresse e-mail",
+            icon: HugeIcons.strokeRoundedMail01,
+            keyboardType: TextInputType.emailAddress,
+            validator: _validateEmail,
           ),
-          errorBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide(color: color.error, width: 1.5),
+          const SizedBox(height: 20),
+          _CustomTextField(
+            textCapitalization: TextCapitalization.none,
+
+            controller: _phoneController,
+            label: "Numéro de téléphone",
+            icon: HugeIcons.strokeRoundedAiPhone01,
+            keyboardType: TextInputType.phone,
+            validator: _validatePhone,
           ),
-          focusedErrorBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide(color: color.error, width: 2),
+          const SizedBox(height: 20),
+          _CustomTextField(
+            textCapitalization: TextCapitalization.sentences,
+            controller: _locationController,
+            label: "Addresse",
+            icon: HugeIcons.strokeRoundedLocation01,
+            validator: (value) => _validateRequired(value, "L'addresse"),
+            textInputAction: TextInputAction.next,
           ),
-          errorText: errorText,
-          errorStyle: TextStyle(
-            color: color.error,
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
+          const SizedBox(height: 20),
+          _CustomTextField(
+            textCapitalization: TextCapitalization.sentences,
+            controller: _cityController,
+            label: "Ville",
+            icon: HugeIcons.strokeRoundedLocation01,
+            validator: (value) => _validateRequired(value, "La ville"),
+            textInputAction: TextInputAction.next,
           ),
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 20,
-            vertical: 18,
+          const SizedBox(height: 20),
+          _CustomTextField(
+            textCapitalization: TextCapitalization.none,
+            controller: _passwordController,
+            label: "Mot de passe",
+            icon: HugeIcons.strokeRoundedLocation01,
+            validator: (value) => _validateRequired(value, "Mot de passe"),
+            textInputAction: TextInputAction.done,
           ),
-        ),
+        ],
       ),
     );
   }
 
   Widget _buildSubmitButton() {
-    return Consumer<DonorRegisterProvider>(
-      builder: (context, provider, child) {
-        return Container(
-          margin: const EdgeInsets.only(top: 8),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            gradient: LinearGradient(
-              colors: [color.primary, color.primary.withOpacity(0.8)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: color.primary.withOpacity(0.4),
-                blurRadius: 15,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: provider.isSubmitting
-                  ? null
-                  : () async {
-                      FocusScope.of(context).unfocus();
-                      final success = await provider.submitForm();
-                      if (success && mounted) {
-                        Navigator.push<void>(
-                          context,
-                          MaterialPageRoute<void>(
-                            builder: (BuildContext context) =>
-                                const DomainPrefPage(),
-                          ),
-                        );
-                      } else if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: const Text(
-                              'Veuillez remplir tous les champs correctement',
-                            ),
-                            backgroundColor: color.error,
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                        );
-                      }
-                    },
+    return Padding(
+      padding: const EdgeInsets.only(right: 20.0, left: 20),
+      child: SizedBox(
+        width: double.infinity,
+        height: 56,
+        child: ElevatedButton(
+          onPressed: isSubmitting ? null : _submitForm,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: ConstColors().primary,
+            foregroundColor: Colors.white,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
-              child: Container(
-                width: double.infinity,
-                height: 56,
-                alignment: Alignment.center,
-                child: provider.isSubmitting
-                    ? SpinKitThreeBounce(color: color.bg, size: 24.0)
-                    : Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          TitleWidget(
-                            text: "Continuer",
-                            fontSize: 18,
-                            color: color.bg,
-                          ),
-                          const SizedBox(width: 12),
-                          Icon(
-                            Icons.arrow_forward_rounded,
-                            color: color.bg,
-                            size: 24,
-                          ),
-                        ],
-                      ),
-              ),
             ),
+            disabledBackgroundColor: ConstColors().primary.withOpacity(0.6),
           ),
-        );
-      },
+          child: isSubmitting
+              ? const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                )
+              : const Text(
+                  "Créer mon compte",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                ),
+        ),
+      ),
     );
   }
+}
+
+class _CustomTextField extends StatelessWidget {
+  final TextEditingController controller;
+  final String label;
+  final dynamic icon;
+  final TextInputType? keyboardType;
+  final String? Function(String?)? validator;
+  final TextInputAction? textInputAction;
+  final TextCapitalization textCapitalization;
+
+  const _CustomTextField({
+    required this.controller,
+    required this.label,
+    required this.icon,
+    required this.textCapitalization,
+
+    this.keyboardType,
+    this.validator,
+    this.textInputAction,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<DonorRegisterProvider>(
-      builder: (context, provider, child) {
-        if (provider.isInitialLoading) {
-          return Scaffold(
-            backgroundColor: color.bg,
-            body: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  SpinKitThreeBounce(color: color.primary, size: 30.0),
-                  const SizedBox(height: 24),
-                  SubTitle(
-                    text: "Chargement...",
-                    fontsize: 16,
-                    color: color.secondary,
-                  ),
-                ],
-              ),
-            ),
-          );
-        }
+    final color = ConstColors();
 
-        return GestureDetector(
-          onTap: () => FocusScope.of(context).unfocus(),
-          child: Scaffold(
-            backgroundColor: color.bg,
-            extendBodyBehindAppBar: true,
-            body: CustomScrollView(
-              physics: const BouncingScrollPhysics(),
-              slivers: [
-                const Header(isLeading: true),
-                SliverToBoxAdapter(
-                  child: FadeTransition(
-                    opacity: _fadeAnimation,
-                    child: Container(
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        color: color.bg,
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(28),
-                        ),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(24.0),
-                        child: Form(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              const SizedBox(height: 8),
-                              // Title
-                              TitleWidget(
-                                text: "Créer un compte",
-                                fontSize: 32,
-                                color: color.secondary,
-                              ),
-                              const SizedBox(height: 8),
-                              SubTitle(
-                                text:
-                                    "Remplissez vos informations pour commencer",
-                                fontsize: 14,
-                                color: color.secondary.withOpacity(0.6),
-                                fontWeight: FontWeight.w400,
-                              ),
-                              const SizedBox(height: 32),
-                              // Image picker
-                              _buildImagePicker(),
-                              const SizedBox(height: 40),
-                              // Form fields
-                              _buildTextField(
-                                hint: "Votre nom complet",
-                                prefixIcon: Icons.person_outline_rounded,
-                                keyboardType: TextInputType.name,
-                                textInputAction: TextInputAction.next,
-                                textCapitalization: TextCapitalization.words,
-                                onChanged: provider.setFullName,
-                                errorText: provider.fullNameError,
-                                value: provider.fullName,
-                              ),
-                              _buildTextField(
-                                hint: "Votre spécialité",
-                                prefixIcon: Icons.work_outline_rounded,
-                                keyboardType: TextInputType.text,
-                                textInputAction: TextInputAction.next,
-                                onChanged: provider.setSpecialty,
-                                errorText: provider.specialtyError,
-                                value: provider.specialty,
-                                textCapitalization: TextCapitalization.words,
-                              ),
-                              _buildTextField(
-                                hint: "Votre adresse e-mail",
-                                prefixIcon: Icons.email_outlined,
-                                keyboardType: TextInputType.emailAddress,
-                                textInputAction: TextInputAction.next,
-                                onChanged: provider.setEmail,
-                                errorText: provider.emailError,
-                                value: provider.email,
-                              ),
-                              _buildTextField(
-                                hint: "Votre numéro de téléphone",
-                                prefixIcon: Icons.phone_outlined,
-                                keyboardType: TextInputType.phone,
-                                textInputAction: TextInputAction.next,
-                                onChanged: provider.setPhone,
-                                errorText: provider.phoneError,
-                                value: provider.phone,
-                              ),
-                              _buildTextField(
-                                hint: "Votre localisation",
-                                prefixIcon: Icons.location_on_outlined,
-                                keyboardType: TextInputType.streetAddress,
-                                textInputAction: TextInputAction.done,
-                                onChanged: provider.setLocation,
-                                errorText: provider.locationError,
-                                textCapitalization: TextCapitalization.words,
-                                value: provider.location,
-                              ),
-                              const SizedBox(height: 12),
-                              // Submit button
-                              _buildSubmitButton(),
-                              const SizedBox(height: 24),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+    return TextFormField(
+      controller: controller,
+      keyboardType: keyboardType ?? TextInputType.text,
+      textInputAction: textInputAction ?? TextInputAction.next,
+      textCapitalization: textCapitalization,
+      validator: validator,
+      style: TextStyle(fontSize: 16, color: color.secondary),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: TextStyle(color: color.primary, fontSize: 16),
+        // prefixIcon: HugeIcon(icon: icon, color: color.primary, size: 10),
+        filled: true,
+        fillColor: color.bgSubmit,
+        border: OutlineInputBorder(
+          borderSide: BorderSide.none,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: color.primary, width: 2),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderSide: const BorderSide(color: Colors.red, width: 2),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderSide: const BorderSide(color: Colors.red, width: 2),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
+      ),
+    );
+  }
+}
+
+class _ImageSourceOption extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _ImageSourceOption({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = ConstColors();
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: color.primary.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: color.primary.withOpacity(0.2), width: 1),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: color.primary, size: 32),
+            const SizedBox(height: 8),
+            SubTitle(
+              text: label,
+              fontsize: 16,
+              color: color.secondary,
+              fontWeight: FontWeight.w500,
             ),
-          ),
-        );
-      },
+          ],
+        ),
+      ),
     );
   }
 }

@@ -6,13 +6,9 @@ import 'package:demarcheur_app/apps/demandeurs/main_screens/vancy.dart';
 import 'package:demarcheur_app/consts/color.dart';
 import 'package:demarcheur_app/providers/dem_job_provider.dart';
 import 'package:demarcheur_app/providers/user_provider.dart';
-import 'package:demarcheur_app/widgets/btn_page.dart';
-import 'package:demarcheur_app/widgets/sub_title.dart';
-import 'package:demarcheur_app/widgets/title_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:provider/provider.dart';
-import 'package:shimmer/shimmer.dart';
 
 class DemHomePage extends StatefulWidget {
   const DemHomePage({super.key});
@@ -24,6 +20,7 @@ class DemHomePage extends StatefulWidget {
 class _DemHomePageState extends State<DemHomePage> {
   ConstColors color = ConstColors();
   bool isSelected = true;
+
   @override
   void initState() {
     Future.microtask(() {
@@ -37,66 +34,45 @@ class _DemHomePageState extends State<DemHomePage> {
     super.initState();
   }
 
-  String dispo = "Disponible";
-  String nonDispo = "Plus disponible";
-
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<DemJobProvider>();
     final user = context.watch<UserProvider>();
-    return Scaffold(
-      backgroundColor: color.bg,
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar.large(
-            automaticallyImplyLeading: false,
-            iconTheme: IconThemeData(color: color.bg),
-            actionsIconTheme: IconThemeData(color: color.bg),
-            backgroundColor: Colors.transparent,
 
-            flexibleSpace: Container(
-              decoration: BoxDecoration(
-                color: color.primary,
-                image: DecorationImage(
-                  fit: BoxFit.cover,
-                  image: NetworkImage(
-                    "https://www.shutterstock.com/image-photo/job-search-human-resources-recruitment-260nw-1292578582.jpg",
-                  ),
-                ),
-              ),
-            ),
-          ),
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
+      body: CustomScrollView(
+        physics: const BouncingScrollPhysics(),
+        slivers: [
+          _buildModernAppBar(),
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.all(10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      SubTitle(
-                        text: "Mes annonces",
-                        fontsize: 18,
-                        fontWeight: FontWeight.w500,
+                  Text(
+                    "Mes annonces",
+                    style: TextStyle(
+                      color: color.primary,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => Applicants()),
+                      );
+                    },
+                    child: Text(
+                      "Tout voir",
+                      style: TextStyle(
+                        color: color.primary,
+                        fontWeight: FontWeight.w600,
                       ),
-                      GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => Applicants(),
-                            ),
-                          );
-                        },
-
-                        child: SubTitle(
-                          text: "Tout voir",
-                          fontsize: 15,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ],
               ),
@@ -104,874 +80,397 @@ class _DemHomePageState extends State<DemHomePage> {
           ),
           SliverToBoxAdapter(
             child: SizedBox(
-              width: double.infinity,
-              height: 220,
+              height: 240,
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
                 itemCount: provider.allJobs.length,
                 itemBuilder: (context, index) {
                   final dem = provider.allJobs[index];
-                  return Padding(
-                    padding: const EdgeInsets.only(
-                      right: 10.0,
-                      left: 10,
-                      bottom: 10,
-                    ),
-                    child: Container(
-                      width: MediaQuery.of(context).size.width,
-                      height: 218,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: color.tertiary),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(10.0),
-                        child: Column(
-                          children: [
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Container(
-                                  width: 100,
-                                  height: 100,
-                                  decoration: BoxDecoration(
-                                    border: Border.all(color: color.tertiary),
-                                    borderRadius: BorderRadius.circular(8),
-                                    image: DecorationImage(
-                                      fit: BoxFit.cover,
-                                      image: NetworkImage(dem.imageUrl),
-                                    ),
-                                  ),
-                                ),
-                                SizedBox(width: 10),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        TitleWidget(
-                                          text: dem.title,
-                                          fontSize: 18,
-                                        ),
-                                        SizedBox(width: 5),
-                                      ],
-                                    ),
-                                    SubTitle(
-                                      text: dem.companyName,
-                                      fontsize: 16,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-
-                                    SubTitle(text: dem.postDate, fontsize: 12),
-                                    SizedBox(height: 5),
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        SizedBox(
-                                          height: 30,
-                                          child: OutlinedButton(
-                                            onPressed: () {
-                                              setState(() {
-                                                dispo != nonDispo;
-                                              });
-                                            },
-                                            style: OutlinedButton.styleFrom(
-                                              side: BorderSide.none,
-                                              backgroundColor:
-                                                  dem.status == "Disponible"
-                                                  ? color.bgA
-                                                  : color.errorBg,
-                                            ),
-                                            child: dem.status == "Disponible"
-                                                ? Center(
-                                                    child: TitleWidget(
-                                                      text: "Disponible",
-                                                      fontSize: 12,
-                                                      color: color.accepted,
-                                                    ),
-                                                  )
-                                                : Center(
-                                                    child: SizedBox(
-                                                      width: 60,
-                                                      child: Text(
-                                                        overflow: TextOverflow
-                                                            .ellipsis,
-                                                        "Plus disponible",
-                                                        style: TextStyle(
-                                                          fontSize: 12,
-                                                          color: color.error,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ),
-                                          ),
-                                        ),
-                                        SizedBox(width: 10),
-                                        SizedBox(
-                                          height: 30,
-                                          child: OutlinedButton(
-                                            onPressed: () {},
-                                            style: OutlinedButton.styleFrom(
-                                              side: BorderSide.none,
-                                              backgroundColor: color.errorBg,
-                                            ),
-                                            child: Center(
-                                              child: TitleWidget(
-                                                text: "Supprimer",
-                                                fontSize: 12,
-                                                color: color.error,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                            SizedBox(height: 15),
-                            Divider(color: color.tertiary, height: 2),
-                            SizedBox(height: 17),
-                            SizedBox(
-                              height: 45,
-                              child: BtnPage(texte: "Booster", route: "/boost"),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
+                  return _buildModernJobCard(dem);
                 },
               ),
             ),
           ),
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.fromLTRB(20, 32, 20, 16),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  SubTitle(
-                    text: "Reccement applique",
-                    fontWeight: FontWeight.w500,
-                    fontsize: 18,
+                  Text(
+                    "Récemment appliqué",
+                    style: TextStyle(
+                      color: color.primary,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                  GestureDetector(
-                    onTap: () {
+                  TextButton(
+                    onPressed: () {
                       Navigator.push(
                         context,
                         MaterialPageRoute(builder: (context) => Vancy()),
                       );
                     },
-                    child: SubTitle(
-                      text: "Tout voir",
-                      fontWeight: FontWeight.w500,
-                      fontsize: 15,
+                    child: Text(
+                      "Tout voir",
+                      style: TextStyle(
+                        color: color.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
           ),
-          SliverList.builder(
-            itemCount: user.allusers.length,
-            itemBuilder: (context, index) {
-              final users = user.allusers[index];
-              return SizedBox(
-                width: double.infinity,
-                height: 200,
-                child: Padding(
-                  padding: const EdgeInsets.all(10),
-                  child: Container(
-                    width: double.infinity,
-                    height: 150,
-                    decoration: BoxDecoration(
-                      color: color.bg,
-                      border: Border.all(color: color.tertiary),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Column(
-                        children: [
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Container(
-                                width: 90,
-                                height: 90,
-                                decoration: BoxDecoration(
-                                  border: Border.all(color: color.tertiary),
-                                  borderRadius: BorderRadius.circular(8),
-                                  image: DecorationImage(
-                                    fit: BoxFit.cover,
-                                    image: NetworkImage(users.photo),
-                                  ),
-                                ),
-                              ),
-                              SizedBox(width: 8),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  TitleWidget(text: users.name),
-                                  SubTitle(text: users.speciality),
-                                  SubTitle(text: users.exp),
-                                  Row(
-                                    children: [
-                                      HugeIcon(
-                                        size: 18,
-                                        icon: HugeIcons.strokeRoundedTime04,
-                                      ),
-                                      SizedBox(width: 3),
-                                      SubTitle(text: users.postDate),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                          Divider(color: color.tertiary),
-                          SizedBox(height: 8),
-                          Row(
-                            children: [
-                              SizedBox(
-                                width: 150,
-                                height: 40,
-                                child: OutlinedButton(
-                                  style: OutlinedButton.styleFrom(
-                                    backgroundColor: color.primary,
-                                  ),
-                                  onPressed: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            UserCvView(userCv: users),
-                                      ),
-                                    );
-                                  },
-                                  child: TitleWidget(
-                                    text: "Voir CV",
-                                    color: color.bg,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                              ),
-                              SizedBox(width: 10),
-                              SizedBox(
-                                width: 150,
-                                height: 40,
-                                child: OutlinedButton(
-                                  onPressed: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            ApplicantDetail(details: users),
-                                      ),
-                                    );
-                                  },
-                                  child: TitleWidget(
-                                    text: "Voir detail",
-                                    color: color.primary,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            },
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            sliver: SliverList.builder(
+              itemCount: user.allusers.length,
+              itemBuilder: (context, index) {
+                final users = user.allusers[index];
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: _buildModernUserCard(users),
+                );
+              },
+            ),
           ),
+          const SliverPadding(padding: EdgeInsets.only(bottom: 80)),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: FloatingActionButton.extended(
         backgroundColor: color.primary,
+        elevation: 4,
         onPressed: () {
           Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => PostVancy()),
           );
         },
-        child: Icon(Icons.add, color: color.bg),
+        icon: const Icon(Icons.add_rounded, color: Colors.white),
+        label: const Text(
+          "Nouvelle annonce",
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+        ),
       ),
     );
   }
 
-  int value = 0;
-  Widget menu(String label, int index) {
-    bool selected = value == index;
-    return GestureDetector(
-      child: Container(
-        width: 110,
-        height: 40,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          color: selected ? color.primary : color.bg,
-          border: BoxBorder.all(
-            color: selected ? color.primary : color.tertiary,
+  Widget _buildModernAppBar() {
+    return SliverAppBar.large(
+      expandedHeight: 180,
+      floating: false,
+      pinned: true,
+      backgroundColor: color.primary,
+      automaticallyImplyLeading: false,
+      flexibleSpace: FlexibleSpaceBar(
+        titlePadding: const EdgeInsets.only(left: 20, bottom: 16),
+        title: const Text(
+          'Tableau de bord',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w700,
+            fontSize: 24,
           ),
         ),
-        child: Center(
-          child: Text(
-            label,
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-              color: selected ? color.bg : color.primary,
+        background: Stack(
+          fit: StackFit.expand,
+          children: [
+            Image.network(
+              "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80",
+              fit: BoxFit.cover,
             ),
-          ),
-        ),
-      ),
-      onTap: () {
-        setState(() {
-          value = index;
-        });
-      },
-    );
-  }
-
-  Widget content() {
-    if (value == 0) {
-      return Column(
-        children: [
-          isSelected
-              ? Shimmer.fromColors(
-                  baseColor: Colors.grey,
-                  highlightColor: Colors.white,
-                  child: Container(
-                    width: double.infinity,
-                    height: 218,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      // border: Border.all(color: color.tertiary),
-                      color: color.accepted,
-                    ),
-                  ),
-                )
-              : SizedBox(height: 20),
-          isSelected
-              ? Shimmer.fromColors(
-                  baseColor: Colors.grey,
-                  highlightColor: Colors.white,
-                  child: Container(
-                    width: double.infinity,
-                    height: 218,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      // border: Border.all(color: color.tertiary),
-                      color: color.accepted,
-                    ),
-                  ),
-                )
-              : Container(
-                  width: double.infinity,
-                  height: 218,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: color.tertiary),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(10.0),
-                    child: Column(
-                      children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              width: 100,
-                              height: 100,
-                              decoration: BoxDecoration(
-                                border: Border.all(color: color.tertiary),
-                                borderRadius: BorderRadius.circular(8),
-                                image: DecorationImage(
-                                  fit: BoxFit.cover,
-                                  image: NetworkImage(
-                                    "https://tse2.mm.bing.net/th/id/OIP.HP55nAQfHY4mlb4v9MxJKAHaEK?cb=12&rs=1&pid=ImgDetMain&o=7&rm=3",
-                                  ),
-                                ),
-                              ),
-                            ),
-                            SizedBox(width: 10),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                TitleWidget(
-                                  text: "UI/UX Designer",
-                                  fontSize: 18,
-                                ),
-                                SubTitle(
-                                  text: "Google",
-                                  fontsize: 16,
-                                  fontWeight: FontWeight.w500,
-                                ),
-
-                                SubTitle(text: "Il y a 1 min", fontsize: 12),
-                              ],
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 20),
-
-                        Divider(color: color.tertiary, height: 2),
-                        SizedBox(height: 20),
-                        Container(
-                          width: double.infinity,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: color.bgcour,
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Center(
-                            child: TitleWidget(
-                              color: color.cour,
-                              text: "En attente ",
-                              fontSize: 18,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-          SizedBox(height: 20),
-          isSelected
-              ? Shimmer.fromColors(
-                  baseColor: Colors.grey,
-                  highlightColor: Colors.white,
-                  child: Container(
-                    width: double.infinity,
-                    height: 218,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      // border: Border.all(color: color.tertiary),
-                      color: color.accepted,
-                    ),
-                  ),
-                )
-              : Container(
-                  width: double.infinity,
-                  height: 218,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: color.tertiary),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(10.0),
-                    child: Column(
-                      children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              width: 100,
-                              height: 100,
-                              decoration: BoxDecoration(
-                                border: Border.all(color: color.tertiary),
-                                borderRadius: BorderRadius.circular(8),
-                                image: DecorationImage(
-                                  fit: BoxFit.cover,
-                                  image: NetworkImage(
-                                    "https://tse2.mm.bing.net/th/id/OIP.HP55nAQfHY4mlb4v9MxJKAHaEK?cb=12&rs=1&pid=ImgDetMain&o=7&rm=3",
-                                  ),
-                                ),
-                              ),
-                            ),
-                            SizedBox(width: 10),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                TitleWidget(
-                                  text: "UI/UX Designer",
-                                  fontSize: 18,
-                                ),
-                                SubTitle(
-                                  text: "Google",
-                                  fontsize: 16,
-                                  fontWeight: FontWeight.w500,
-                                ),
-
-                                SubTitle(text: "Il y a 1 min", fontsize: 12),
-                              ],
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 20),
-
-                        Divider(color: color.tertiary, height: 2),
-                        SizedBox(height: 20),
-                        Container(
-                          width: double.infinity,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: color.bgA,
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Center(
-                            child: TitleWidget(
-                              color: color.accepted,
-                              text: "Accepte",
-                              fontSize: 18,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-          SizedBox(height: 20),
-          isSelected
-              ? Shimmer.fromColors(
-                  baseColor: Colors.grey,
-                  highlightColor: Colors.white,
-                  child: Container(
-                    width: double.infinity,
-                    height: 218,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      // border: Border.all(color: color.tertiary),
-                      color: color.accepted,
-                    ),
-                  ),
-                )
-              : Container(
-                  width: double.infinity,
-                  height: 218,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: color.tertiary),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(10.0),
-                    child: Column(
-                      children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              width: 100,
-                              height: 100,
-                              decoration: BoxDecoration(
-                                border: Border.all(color: color.tertiary),
-                                borderRadius: BorderRadius.circular(8),
-                                image: DecorationImage(
-                                  fit: BoxFit.cover,
-                                  image: NetworkImage(
-                                    "https://tse2.mm.bing.net/th/id/OIP.HP55nAQfHY4mlb4v9MxJKAHaEK?cb=12&rs=1&pid=ImgDetMain&o=7&rm=3",
-                                  ),
-                                ),
-                              ),
-                            ),
-                            SizedBox(width: 10),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                TitleWidget(
-                                  text: "UI/UX Designer",
-                                  fontSize: 18,
-                                ),
-                                SubTitle(
-                                  text: "Google",
-                                  fontsize: 16,
-                                  fontWeight: FontWeight.w500,
-                                ),
-
-                                SubTitle(text: "Il y a 1 min", fontsize: 12),
-                              ],
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 20),
-
-                        Divider(color: color.tertiary, height: 2),
-                        SizedBox(height: 20),
-                        Container(
-                          width: double.infinity,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: color.errorBg,
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Center(
-                            child: TitleWidget(
-                              color: color.error,
-                              text: "Rejeté",
-                              fontSize: 18,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-        ],
-      );
-    } else if (value == 1) {
-      return isSelected
-          ? Shimmer.fromColors(
-              baseColor: Colors.grey,
-              highlightColor: Colors.white,
-              child: Container(
-                width: double.infinity,
-                height: 218,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  // border: Border.all(color: color.tertiary),
-                  color: color.accepted,
-                ),
-              ),
-            )
-          : Container(
-              width: double.infinity,
-              height: 218,
+            Container(
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: color.tertiary),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(10.0),
-                child: Column(
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          width: 100,
-                          height: 100,
-                          decoration: BoxDecoration(
-                            border: Border.all(color: color.tertiary),
-                            borderRadius: BorderRadius.circular(8),
-                            image: DecorationImage(
-                              fit: BoxFit.cover,
-                              image: NetworkImage(
-                                "https://tse2.mm.bing.net/th/id/OIP.HP55nAQfHY4mlb4v9MxJKAHaEK?cb=12&rs=1&pid=ImgDetMain&o=7&rm=3",
-                              ),
-                            ),
-                          ),
-                        ),
-                        SizedBox(width: 10),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            TitleWidget(text: "UI/UX Designer", fontSize: 18),
-                            SubTitle(
-                              text: "Google",
-                              fontsize: 16,
-                              fontWeight: FontWeight.w500,
-                            ),
-
-                            SubTitle(text: "Il y a 1 min", fontsize: 12),
-                          ],
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: 20),
-
-                    Divider(color: color.tertiary, height: 2),
-                    SizedBox(height: 20),
-                    Container(
-                      width: double.infinity,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: color.bgA,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Center(
-                        child: TitleWidget(
-                          color: color.accepted,
-                          text: "Accepte",
-                          fontSize: 18,
-                        ),
-                      ),
-                    ),
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withOpacity(0.3),
+                    color.primary.withOpacity(0.8),
                   ],
                 ),
               ),
-            );
-    } else if (value == 2) {
-      return isSelected
-          ? Shimmer.fromColors(
-              baseColor: Colors.grey,
-              highlightColor: Colors.white,
-              child: Container(
-                width: double.infinity,
-                height: 218,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  // border: Border.all(color: color.tertiary),
-                  color: color.accepted,
-                ),
-              ),
-            )
-          : SizedBox(
-              height: 520,
-              child: ListView.builder(
-                itemCount: 5,
-                itemBuilder: (context, index) {
-                  return Container(
-                    width: double.infinity,
-                    height: 218,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: color.tertiary),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(10.0),
-                      child: Column(
-                        children: [
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Container(
-                                width: 100,
-                                height: 100,
-                                decoration: BoxDecoration(
-                                  border: Border.all(color: color.tertiary),
-                                  borderRadius: BorderRadius.circular(8),
-                                  image: DecorationImage(
-                                    fit: BoxFit.cover,
-                                    image: NetworkImage(
-                                      "https://tse2.mm.bing.net/th/id/OIP.HP55nAQfHY4mlb4v9MxJKAHaEK?cb=12&rs=1&pid=ImgDetMain&o=7&rm=3",
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              SizedBox(width: 10),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  TitleWidget(
-                                    text: "UI/UX Designer",
-                                    fontSize: 18,
-                                  ),
-                                  SubTitle(
-                                    text: "Google",
-                                    fontsize: 16,
-                                    fontWeight: FontWeight.w500,
-                                  ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-                                  SubTitle(text: "Il y a 1 min", fontsize: 12),
-                                ],
-                              ),
-                            ],
-                          ),
-                          SizedBox(height: 20),
-
-                          Divider(color: color.tertiary, height: 2),
-                          SizedBox(height: 20),
-                          Container(
-                            width: double.infinity,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              color: color.bgSubmit,
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Center(
-                              child: TitleWidget(
-                                color: color.primary,
-                                text: "Planifié pour interview",
-                                fontSize: 18,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-            );
-    } else {
-      {
-        return isSelected
-            ? Shimmer.fromColors(
-                baseColor: Colors.grey,
-                highlightColor: Colors.white,
-                child: Container(
-                  width: double.infinity,
-                  height: 218,
+  Widget _buildModernJobCard(dynamic dem) {
+    return Container(
+      width: 300,
+      margin: const EdgeInsets.only(right: 16, bottom: 8, top: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 50,
+                  height: 50,
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    // border: Border.all(color: color.tertiary),
-                    color: color.accepted,
+                    borderRadius: BorderRadius.circular(12),
+                    image: DecorationImage(
+                      fit: BoxFit.cover,
+                      image: NetworkImage(dem.imageUrl),
+                    ),
                   ),
                 ),
-              )
-            : Container(
-                width: double.infinity,
-                height: 218,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: color.tertiary),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(10.0),
+                const SizedBox(width: 12),
+                Expanded(
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            width: 100,
-                            height: 100,
-                            decoration: BoxDecoration(
-                              border: Border.all(color: color.tertiary),
-                              borderRadius: BorderRadius.circular(8),
-                              image: DecorationImage(
-                                fit: BoxFit.cover,
-                                image: NetworkImage(
-                                  "https://tse2.mm.bing.net/th/id/OIP.HP55nAQfHY4mlb4v9MxJKAHaEK?cb=12&rs=1&pid=ImgDetMain&o=7&rm=3",
-                                ),
-                              ),
-                            ),
-                          ),
-                          SizedBox(width: 10),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              TitleWidget(text: "UI/UX Designer", fontSize: 18),
-                              SubTitle(
-                                text: "Google",
-                                fontsize: 16,
-                                fontWeight: FontWeight.w500,
-                              ),
-
-                              SubTitle(text: "Il y a 1 min", fontsize: 12),
-                            ],
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: 20),
-
-                      Divider(color: color.tertiary, height: 2),
-                      SizedBox(height: 20),
-                      Container(
-                        width: double.infinity,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: color.errorBg,
-                          borderRadius: BorderRadius.circular(16),
+                      Text(
+                        dem.title,
+                        style: TextStyle(
+                          color: color.primary,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 16,
                         ),
-                        child: Center(
-                          child: TitleWidget(
-                            color: color.error,
-                            text: "Rejeté ",
-                            fontSize: 18,
-                          ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        dem.companyName,
+                        style: TextStyle(
+                          color: color.secondary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ],
                   ),
                 ),
-              );
-      }
-    }
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                HugeIcon(
+                  icon: HugeIcons.strokeRoundedTime02,
+                  size: 16,
+                  color: color.secondary,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  dem.postDate,
+                  style: TextStyle(color: color.secondary, fontSize: 13),
+                ),
+              ],
+            ),
+            const Spacer(),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () {
+                      // Toggle status logic
+                    },
+                    style: OutlinedButton.styleFrom(
+                      backgroundColor: dem.status == "Disponible"
+                          ? color.accepted.withOpacity(0.1)
+                          : color.error.withOpacity(0.1),
+                      side: BorderSide.none,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    child: Text(
+                      dem.status == "Disponible" ? "Disponible" : "Fermé",
+                      style: TextStyle(
+                        color: dem.status == "Disponible"
+                            ? color.accepted
+                            : color.error,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Container(
+                  decoration: BoxDecoration(
+                    color: color.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: IconButton(
+                    onPressed: () {
+                      // Boost logic
+                    },
+                    icon: HugeIcon(
+                      icon: HugeIcons.strokeRoundedRocket,
+                      color: color.primary,
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildModernUserCard(dynamic users) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 70,
+                  height: 70,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    image: DecorationImage(
+                      fit: BoxFit.cover,
+                      image: NetworkImage(users.photo),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        users.name,
+                        style: TextStyle(
+                          color: color.primary,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        users.speciality,
+                        style: TextStyle(
+                          color: color.secondary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          HugeIcon(
+                            icon: HugeIcons.strokeRoundedBriefcase01,
+                            size: 14,
+                            color: color.secondary,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            users.exp,
+                            style: TextStyle(
+                              color: color.secondary,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => UserCvView(userCv: users),
+                        ),
+                      );
+                    },
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: color.primary),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    child: Text(
+                      "Voir CV",
+                      style: TextStyle(
+                        color: color.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ApplicantDetail(details: users),
+                        ),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: color.primary,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    child: const Text(
+                      "Détails",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

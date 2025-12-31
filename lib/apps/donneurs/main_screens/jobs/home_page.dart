@@ -1,13 +1,21 @@
+import 'package:demarcheur_app/apps/donneurs/inner_screens/houses/house_detail.dart';
 import 'package:demarcheur_app/apps/donneurs/inner_screens/jobs/job_detail.dart';
+import 'package:demarcheur_app/apps/donneurs/inner_screens/jobs/search_page.dart';
+import 'package:demarcheur_app/apps/donneurs/main_screens/houses/immo_page.dart';
 import 'package:demarcheur_app/consts/color.dart';
+import 'package:demarcheur_app/models/add_vancy_model.dart';
+import 'package:demarcheur_app/models/house_model.dart';
+import 'package:demarcheur_app/models/job_model.dart';
+import 'package:demarcheur_app/providers/compa_profile_provider.dart';
+import 'package:demarcheur_app/services/auth_provider.dart';
+import 'package:demarcheur_app/providers/house_provider.dart';
 import 'package:demarcheur_app/providers/search_provider.dart';
-import 'package:demarcheur_app/widgets/sub_title.dart';
-import 'package:demarcheur_app/widgets/title_widget.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:hugeicons/hugeicons.dart';
+import 'package:shimmer/shimmer.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'dart:math' as math;
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -24,21 +32,37 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   // Animation controllers
   late AnimationController _animationController;
   late AnimationController _filterController;
-  late Animation<double> _fadeAnimation;
-  late Animation<Offset> _slideAnimation;
   late Animation<double> _scaleAnimation;
+
+  int currentIndex = 0;
+  // late AnimationController _houseanimationController;
+  // late AnimationController _housefabController;
+  // late Animation<double> _housefadeAnimation;
+  // late Animation<Offset> _houseslideAnimation;
+  // late Animation<double> _fabAnimation;
 
   @override
   void initState() {
     super.initState();
     _initializeAnimations();
-
+    // houseControllerInitialization();
     // Load data and start animations
     Future.microtask(() {
+      final token = context.read<AuthProvider>().token;
+      context.read<CompaProfileProvider>().loadVancies(token);
+
       final searchProvider = context.read<SearchProvider>();
       searchProvider.loadJobs().then((_) {
+        if (!mounted) return;
         searchProvider.setJobs(searchProvider.filteredJobs);
         _animationController.forward();
+        final provider = context.read<HouseProvider>();
+        provider.loadHous();
+        _animationController.forward();
+        Future.delayed(
+          const Duration(milliseconds: 800),
+          // _housefabController.forward,
+        );
       });
     });
 
@@ -54,24 +78,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       duration: const Duration(milliseconds: 1000),
       vsync: this,
     );
-
     _filterController = AnimationController(
-      duration: const Duration(milliseconds: 600),
       vsync: this,
+      duration: Duration(microseconds: 100),
     );
-
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
-    );
-
-    _slideAnimation =
-        Tween<Offset>(begin: const Offset(0, 0.1), end: Offset.zero).animate(
-          CurvedAnimation(
-            parent: _animationController,
-            curve: Curves.easeOutCubic,
-          ),
-        );
-
     _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
       CurvedAnimation(parent: _filterController, curve: Curves.elasticOut),
     );
@@ -81,62 +91,193 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   void dispose() {
     _animationController.dispose();
     _filterController.dispose();
+    // _houseanimationController.dispose();
+    // _housefabController.dispose();
     _searchController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final search = Provider.of<SearchProvider>(context);
+    final search = Provider.of<CompaProfileProvider>(context);
+    final houses = Provider.of<HouseProvider>(context);
 
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
         backgroundColor: const Color(0xFFF8FAFC),
-        body: search.isLoading
-            ? _buildLoadingState()
-            : CustomScrollView(
-                physics: const BouncingScrollPhysics(),
-                slivers: [
-                  _buildModernAppBar(),
-                  SliverToBoxAdapter(
-                    child: AnimatedBuilder(
-                      animation: _animationController,
-                      builder: (context, child) {
-                        return FadeTransition(
-                          opacity: _fadeAnimation,
-                          child: SlideTransition(
-                            position: _slideAnimation,
-                            child: _buildSearchSection(search),
+        body: CustomScrollView(
+          physics: const BouncingScrollPhysics(),
+          slivers: [
+            _buildModernAppBar(),
+            SliverToBoxAdapter(child: _buildSearchSection(search, houses)),
+
+            // Check if both lists are empty
+            if (search.filterVancy.isEmpty && houses.housefiltered.isEmpty)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 50),
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.search_off_rounded,
+                          size: 80,
+                          color: Colors.grey.shade300,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Aucun résultat trouvé',
+                          style: TextStyle(
+                            color: color.primary,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w600,
                           ),
-                        );
-                      },
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Essayez de modifier vos critères de recherche',
+                          style: TextStyle(
+                            color: color.secondary,
+                            fontSize: 14,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
                     ),
                   ),
-                  _buildJobResults(search),
-                ],
-              ),
-      ),
-    );
-  }
+                ),
+              )
+            else ...[
+              // Jobs Section
+              if (search.filterVancy.isNotEmpty) ...[
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.only(
+                      right: 8.0,
+                      top: 24.0,
+                      left: 20.0,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Text(
+                          'Boulots en vedette',
+                          style: TextStyle(
+                            color: color.primary,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        if (search.filterVancy.length > 2)
+                          Padding(
+                            padding: const EdgeInsets.only(
+                              right: 16.0,
+                              top: 8.0,
+                              bottom: 20.0,
+                            ),
+                            child: Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton.icon(
+                                icon: Icon(
+                                  Icons.arrow_forward_rounded,
+                                  color: color.primary,
+                                ),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: color.primary,
+                                  backgroundColor: color.primary.withValues(
+                                    alpha: 0.1,
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 8,
+                                  ),
+                                ),
+                                onPressed: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (context) => const SearchPage(),
+                                    ),
+                                  );
+                                },
+                                label: const Text(
+                                  'Tout voir',
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                _buildJobResults(search, limit: 2),
+              ],
 
-  Widget _buildLoadingState() {
-    return Scaffold(
-      backgroundColor: Colors.grey.shade50,
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            SpinKitPulse(color: color.primary, size: 60.0),
-            const SizedBox(height: 16),
-            Text(
-              'Recherche des offres...',
-              style: TextStyle(
-                color: color.secondary,
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
+              // Houses Section
+              if (houses.housefiltered.isNotEmpty) ...[
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Maisons en vedette',
+                          style: TextStyle(
+                            color: color.primary,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        if (houses.housefiltered.length > 2)
+                          Padding(
+                            padding: const EdgeInsets.only(
+                              right: 16.0,
+                              top: 8.0,
+                              bottom: 20.0,
+                            ),
+                            child: TextButton.icon(
+                              style: TextButton.styleFrom(
+                                foregroundColor: color.primary,
+                                backgroundColor: color.primary.withValues(
+                                  alpha: 0.1,
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                              ),
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const ImmoPage(),
+                                  ),
+                                );
+                              },
+                              icon: Icon(
+                                Icons.arrow_forward_rounded,
+                                color: color.primary,
+                              ),
+                              label: Text(
+                                'Voir tout',
+                                style: TextStyle(
+                                  color: color.primary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                _buildHouseResults(houses, search, limit: 2),
+              ],
+            ],
           ],
         ),
       ),
@@ -148,35 +289,15 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       expandedHeight: 200,
       floating: false,
       pinned: true,
-      actions: [
-        IconButton(
-          onPressed: () {
-            // Action for notifications
-          },
-          icon: HugeIcon(
-            icon: HugeIcons.strokeRoundedNotification01,
-            color: Colors.white,
-          ),
-        ),
-        IconButton(
-          onPressed: () {
-            // Action for notifications
-          },
-          icon: HugeIcon(
-            icon: HugeIcons.strokeRoundedMoreVertical,
-            size: 30,
-            color: Colors.white,
-          ),
-        ),
-      ],
       backgroundColor: color.primary,
+      automaticallyImplyLeading: false,
       flexibleSpace: FlexibleSpaceBar(
         background: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [color.primary, color.primary.withOpacity(0.8)],
+              colors: [color.primary, color.primary.withValues(alpha: 0.8)],
             ),
           ),
           child: Stack(
@@ -189,7 +310,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                       "https://www.shutterstock.com/image-photo/job-search-human-resources-recruitment-260nw-1292578582.jpg",
                     ),
                     colorFilter: ColorFilter.mode(
-                      Colors.black.withOpacity(0.4),
+                      Colors.black.withValues(alpha: 0.4),
                       BlendMode.darken,
                     ),
                   ),
@@ -202,7 +323,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     end: Alignment.bottomCenter,
                     colors: [
                       Colors.transparent,
-                      color.primary.withOpacity(0.8),
+                      color.primary.withValues(alpha: 0.8),
                     ],
                   ),
                 ),
@@ -227,7 +348,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     Text(
                       'Trouvez l\'opportunité parfaite',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.9),
+                        color: Colors.white.withValues(alpha: 0.9),
                         fontSize: 16,
                         fontWeight: FontWeight.w400,
                       ),
@@ -242,13 +363,14 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildSearchSection(SearchProvider search) {
+  Widget _buildSearchSection(CompaProfileProvider search, HouseProvider house) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Search bar with filter button
+          SizedBox(height: 20),
           Row(
             children: [
               Expanded(
@@ -258,7 +380,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.08),
+                        color: Colors.black.withValues(alpha: 0.08),
                         blurRadius: 15,
                         offset: const Offset(0, 4),
                       ),
@@ -266,7 +388,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   ),
                   child: TextField(
                     controller: _searchController,
-                    onChanged: search.searchJobs,
+                    onChanged: (value) {
+                      search.search(value);
+                      house.searchHouse(value);
+                    },
                     decoration: InputDecoration(
                       hintText: 'Rechercher un emploi...',
                       hintStyle: TextStyle(color: color.secondary),
@@ -280,6 +405,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                               onPressed: () {
                                 _searchController.clear();
                                 search.clearSearch();
+                                house.clearSearch();
                                 FocusScope.of(context).unfocus();
                               },
                               icon: Icon(
@@ -309,7 +435,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: color.primary.withOpacity(0.3),
+                      color: color.primary.withValues(alpha: 0.3),
                       blurRadius: 15,
                       offset: const Offset(0, 4),
                     ),
@@ -326,109 +452,122 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               ),
             ],
           ),
-
-          const SizedBox(height: 24),
-
-          // Results header
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Résultats',
-                      style: TextStyle(
-                        color: color.primary,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Emplois disponibles',
-                      style: TextStyle(color: color.secondary, fontSize: 12),
-                    ),
-                  ],
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: color.primary.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    '${search.filteredJobs.length} trouvé${search.filteredJobs.length > 1 ? 's' : ''}',
-                    style: TextStyle(
-                      color: color.primary,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
         ],
       ),
     );
   }
 
-  Widget _buildJobResults(SearchProvider search) {
-    if (search.filteredJobs.isEmpty) {
-      return SliverToBoxAdapter(
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.work_off_rounded,
-                size: 80,
-                color: Colors.grey.shade400,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Aucun emploi trouvé',
-                style: TextStyle(
-                  color: color.primary,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
+  Widget _buildJobResults(CompaProfileProvider search, {int? limit}) {
+    // Empty check removed, handled in build method
+
+    if (search.isLoading) {
+      return SliverPadding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        sliver: SliverList.builder(
+          itemCount: 3,
+          itemBuilder: (context, index) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.08),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Shimmer.fromColors(
+                  baseColor: Colors.grey[300]!,
+                  highlightColor: Colors.grey[100]!,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 60,
+                            height: 60,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  width: 150,
+                                  height: 20,
+                                  color: Colors.white,
+                                ),
+                                const SizedBox(height: 8),
+                                Container(
+                                  width: 100,
+                                  height: 14,
+                                  color: Colors.white,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Container(
+                            width: 80,
+                            height: 24,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Container(
+                            width: 80,
+                            height: 24,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Container(
+                        width: double.infinity,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                'Essayez de modifier vos critères de recherche',
-                style: TextStyle(color: color.secondary, fontSize: 14),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
+            );
+          },
         ),
       );
     }
 
+    final total = search.filterVancy.length;
+    final count = limit != null ? math.min(limit, total) : total;
+
     return SliverPadding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       sliver: SliverList.builder(
-        itemCount: search.filteredJobs.length,
+        itemCount: count,
         itemBuilder: (context, index) {
-          final job = search.filteredJobs[index];
+          final job = search.filterVancy[index];
           return Padding(
             padding: const EdgeInsets.only(bottom: 16),
             child: _buildModernJobCard(job),
@@ -438,16 +577,12 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildModernJobCard(dynamic job) {
+  Widget _buildModernJobCard(AddVancyModel job) {
     return GestureDetector(
       onTap: () {
         Navigator.push(
           context,
-          MaterialPageRoute(
-            builder: (context) {
-              return JobDetail(job: job);
-            },
-          ),
+          MaterialPageRoute(builder: (context) => JobDetail(job: job)),
         );
       },
       child: Container(
@@ -456,8 +591,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.08),
-              blurRadius: 20,
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 8,
               offset: const Offset(0, 8),
             ),
           ],
@@ -474,10 +609,19 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     width: 60,
                     height: 60,
                     decoration: BoxDecoration(
+                      color: color.tertiary,
+                      border: Border.all(color: color.tertiary),
                       borderRadius: BorderRadius.circular(12),
-                      image: DecorationImage(
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.network(
+                        (job.companyImage != null && job.companyImage!.isNotEmpty)
+                            ? job.companyImage!
+                            : "https://via.placeholder.com/150",
                         fit: BoxFit.cover,
-                        image: NetworkImage(job.imageUrl),
+                        errorBuilder: (context, error, stackTrace) =>
+                            Icon(Icons.work, color: color.bgSubmit),
                       ),
                     ),
                   ),
@@ -498,7 +642,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          job.companyName,
+                          job.companyName!,
                           style: TextStyle(
                             color: color.secondary,
                             fontSize: 14,
@@ -514,15 +658,15 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: job.status == 'Disponible'
-                          ? color.accepted.withOpacity(0.1)
-                          : color.error.withOpacity(0.1),
+                      color: job.typeJobe == 'Disponible'
+                          ? color.accepted.withValues(alpha: 0.2)
+                          : color.error.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
-                      job.status,
+                      job.typeJobe,
                       style: TextStyle(
-                        color: job.status == 'Disponible'
+                        color: job.typeJobe == 'Disponible'
                             ? color.accepted
                             : color.error,
                         fontSize: 12,
@@ -535,11 +679,12 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
               const SizedBox(height: 16),
 
-              Row(
+              Wrap(
+                spacing: 12,
+                runSpacing: 8,
                 children: [
-                  _buildInfoChip(Icons.location_on_outlined, job.location),
-                  const SizedBox(width: 12),
-                  _buildInfoChip(Icons.work_outline, job.type),
+                  _buildInfoChip(Icons.location_on_outlined, job.city),
+                  _buildInfoChip(Icons.work_outline, job.typeJobe),
                 ],
               ),
 
@@ -554,7 +699,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    job.postDate,
+                    job.createdAt != null
+                        ? job.createdAt!.split('T')[0]
+                        : 'Recemment',
                     style: TextStyle(color: color.secondary, fontSize: 12),
                   ),
                 ],
@@ -565,9 +712,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: color.primary.withOpacity(0.05),
+                  color: color.primary.withValues(alpha: 0.05),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: color.primary.withOpacity(0.1)),
+                  border: Border.all(
+                    color: color.primary.withValues(alpha: 0.1),
+                  ),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -580,12 +729,15 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-                    Text(
-                      "${NumberFormat('#,###').format(job.salary)} GNF",
-                      style: TextStyle(
-                        color: color.primary,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
+                    Flexible(
+                      child: Text(
+                        "${NumberFormat('#,###').format(job.salary)} GNF",
+                        style: TextStyle(
+                          color: color.primary,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],
@@ -623,7 +775,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     );
   }
 
-  void _showFilterBottomSheet(SearchProvider search) {
+  void _showFilterBottomSheet(CompaProfileProvider search) {
     _filterController.forward();
 
     showModalBottomSheet(
@@ -697,30 +849,30 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _buildFilterSection(
-                              'Type d\'emploi',
-                              [
-                                'Tout',
-                                'Temps-plein',
-                                'Temps-partiel',
-                                'En ligne',
-                              ],
-                              selectedType,
-                              (value) {
-                                setState(() => selectedType = value);
-                                search.filterByType(value ?? 'Tout');
-                              },
-                            ),
+                            // _buildFilterSection(
+                            //   'Type d\'emploi',
+                            //   [
+                            //     'Tout',
+                            //     'Temps-plein',
+                            //     'Temps-partiel',
+                            //     'En ligne',
+                            //   ],
+                            //   // selectedType,
+                            //   // (value) {
+                            //   //   setState(() => selectedType = value);
+                            //   //   search.filterByType(value ?? 'Tout');
+                            //   // },
+                            // ),
                             const SizedBox(height: 20),
-                            _buildFilterSection(
-                              'Localisation',
-                              ['Tout', 'Conakry', 'Kindia', 'Labé'],
-                              selectedLocation,
-                              (value) {
-                                setState(() => selectedLocation = value);
-                                search.filterByLocation(value ?? 'Tout');
-                              },
-                            ),
+                            // _buildFilterSection(
+                            //  // 'Localisation',
+                            //  // ['Tout', 'Conakry', 'Kindia', 'Labé'],
+                            //   // selectedLocation,
+                            //   // (value) {
+                            //   //   setState(() => selectedLocation = value);
+                            //   //   search.filterByLocation(value ?? 'Tout');
+                            //   // },
+                            // ),
                           ],
                         ),
                       ),
@@ -806,6 +958,262 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildHouseResults(
+    HouseProvider house,
+    CompaProfileProvider search, {
+    int? limit,
+  }) {
+    // Empty check removed, handled in build method
+
+    if (search.isLoading) {
+      return SliverPadding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        sliver: SliverList.builder(
+          itemCount: 3,
+          itemBuilder: (context, index) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 20),
+              child: Container(
+                height: 320,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.08),
+                      blurRadius: 8,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Shimmer.fromColors(
+                      baseColor: Colors.grey[300]!,
+                      highlightColor: Colors.grey[100]!,
+                      child: Container(
+                        height: 200,
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.only(
+                            topLeft: Radius.circular(20),
+                            topRight: Radius.circular(20),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Shimmer.fromColors(
+                        baseColor: Colors.grey[300]!,
+                        highlightColor: Colors.grey[100]!,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: 150,
+                              height: 16,
+                              color: Colors.white,
+                            ),
+                            const SizedBox(height: 10),
+                            Container(
+                              width: 200,
+                              height: 16,
+                              color: Colors.white,
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Container(
+                                  width: 80,
+                                  height: 16,
+                                  color: Colors.white,
+                                ),
+                                Container(
+                                  width: 100,
+                                  height: 16,
+                                  color: Colors.white,
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      );
+    }
+
+    final total = house.housefiltered.length;
+    final count = limit != null ? math.min(limit, total) : total;
+
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      sliver: SliverList.builder(
+        itemCount: count,
+        itemBuilder: (context, index) {
+          final houses = house.housefiltered[index];
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: _buildModernHouseCard(houses),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildModernHouseCard(HouseModel house) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => DetailHouse(
+              house: house,
+              houseLenth: context.read<HouseProvider>(),
+            ),
+          ),
+        );
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 8,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // image section
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(20),
+                    topRight: Radius.circular(20),
+                  ),
+                  child: Image.network(
+                    house.imageUrl.isNotEmpty ? house.imageUrl.first : "",
+                    height: 220,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      height: 200,
+                      width: double.infinity,
+                      color: Colors.grey[200],
+                      child: Icon(
+                        Icons.home,
+                        size: 50,
+                        color: Colors.grey[400],
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: 16,
+                  left: 16,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: house.status == "Disponible"
+                          ? color.accepted
+                          : color.error,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      house.status,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    house.companyName,
+                    style: TextStyle(
+                      color: color.primary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      HugeIcon(
+                        icon: HugeIcons.strokeRoundedLocation01,
+                        size: 16,
+                        color: color.primary,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          house.location,
+                          style: TextStyle(
+                            color: color.secondary,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Prix du loyer',
+                        style: TextStyle(
+                          color: color.secondary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      Flexible(
+                        child: Text(
+                          "${NumberFormat().format(house.rent)} GNF/mois",
+                          style: TextStyle(
+                            color: color.primary,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

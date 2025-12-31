@@ -1,7 +1,6 @@
 import 'package:demarcheur_app/consts/color.dart';
 import 'package:demarcheur_app/models/application_model.dart';
 import 'package:demarcheur_app/providers/application_provider.dart';
-import 'package:demarcheur_app/widgets/sub_title.dart';
 import 'package:demarcheur_app/widgets/title_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
@@ -12,143 +11,331 @@ class ApplicationPage extends StatefulWidget {
   const ApplicationPage({super.key});
 
   @override
-  // ignore: library_private_types_in_public_api
-  _ApplicationPageState createState() => _ApplicationPageState();
+  State<ApplicationPage> createState() => _ApplicationPageState();
 }
 
 class _ApplicationPageState extends State<ApplicationPage> {
-  ConstColors color = ConstColors();
-  int currentIndex = 0;
+  final ConstColors colors = ConstColors();
+  int _selectedIndex = 0;
+
   @override
   void initState() {
     super.initState();
-    // Load local mock data when screen starts
     Future.microtask(() {
-      //final jobProvider = context.read<JobProvider>();
-      final searchProvider = context.read<ApplicationProvider>();
-
-      searchProvider.loadApplication().then((_) {
-        // searchProvider.setJobs(searchProvider.allJobs);
-      });
+      context.read<ApplicationProvider>().loadApplication();
     });
-  }
-
-  Widget _buildLoadingState() {
-    return Scaffold(
-      backgroundColor: Colors.grey.shade50,
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            SpinKitPulse(color: color.primary, size: 60.0),
-            const SizedBox(height: 16),
-            Text(
-              'Recherche des offres...',
-              style: TextStyle(
-                color: color.secondary,
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<ApplicationProvider>();
-    final categories = provider.categories;
-    return provider.isLoading
-        ? _buildLoadingState()
-        : InkWell(
-            onTap: () {
-              FocusScope.of(context).unfocus();
-            },
-            child: Scaffold(
-              backgroundColor: color.bg,
 
-              body: CustomScrollView(
-                slivers: [
-                  SliverAppBar.large(
-                    actionsPadding: EdgeInsets.all(20),
-                    automaticallyImplyLeading: false,
-                    iconTheme: IconThemeData(color: color.bg),
-                    actionsIconTheme: IconThemeData(color: color.bg),
-                    backgroundColor: Colors.transparent,
-                    flexibleSpace: Container(
-                      decoration: BoxDecoration(
-                        color: color.primary,
-                        image: DecorationImage(
-                          fit: BoxFit.cover,
-                          image: NetworkImage(
-                            "https://www.shutterstock.com/image-photo/job-search-human-resources-recruitment-260nw-1292578582.jpg",
-                          ),
-                        ),
-                      ),
-                    ),
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5F7FA),
+      body: provider.isLoading
+          ? _buildLoadingState()
+          : CustomScrollView(
+              physics: const BouncingScrollPhysics(),
+              slivers: [
+                _buildAppBar(),
+                SliverToBoxAdapter(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 20),
+                      _buildFilterChips(provider.categories),
+                      const SizedBox(height: 20),
+                    ],
                   ),
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.all(10),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                ),
+                _buildApplicationList(provider),
+                const SliverPadding(padding: EdgeInsets.only(bottom: 20)),
+              ],
+            ),
+    );
+  }
 
-                        children: [
-                          SizedBox(height: 10),
-                          SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: Row(
-                              children: List.generate(categories.length, (
-                                index,
-                              ) {
-                                return Row(
-                                  children: [
-                                    btnMenu(categories[index], index),
-                                    if (index != categories.length - 1)
-                                      const SizedBox(width: 10),
-                                  ],
-                                );
-                              }),
-                            ),
-                          ),
-                          SizedBox(height: 16),
-                        ],
-                      ),
-                    ),
+  Widget _buildAppBar() {
+    return SliverAppBar.large(
+      expandedHeight: 120,
+      pinned: true,
+      backgroundColor: Colors.white,
+      elevation: 0,
+      automaticallyImplyLeading: false,
+      title: Padding(
+        padding: const EdgeInsets.only(left: 8.0),
+        child: TitleWidget(
+          text: "Candidatures",
+          color: colors.primary,
+          fontSize: 28,
+        ),
+      ),
+      actions: [
+        Container(
+          margin: const EdgeInsets.only(right: 20),
+          decoration: BoxDecoration(
+            color: colors.bgSubmit,
+            shape: BoxShape.circle,
+          ),
+          child: IconButton(
+            onPressed: () {},
+            icon: HugeIcon(
+              icon: HugeIcons.strokeRoundedSearch01,
+              color: colors.primary,
+              size: 24,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFilterChips(List<String> categories) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Row(
+        children: List.generate(categories.length, (index) {
+          final isSelected = _selectedIndex == index;
+          return Padding(
+            padding: const EdgeInsets.only(right: 10),
+            child: GestureDetector(
+              onTap: () => setState(() => _selectedIndex = index),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: isSelected ? colors.primary : Colors.white,
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(
+                    color: isSelected ? colors.primary : Colors.grey.shade300,
                   ),
-                  content(),
-                ],
+                  boxShadow: isSelected
+                      ? [
+                          BoxShadow(
+                            color: colors.primary.withOpacity(0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
+                          ),
+                        ]
+                      : null,
+                ),
+                child: Text(
+                  categories[index],
+                  style: TextStyle(
+                    color: isSelected ? Colors.white : colors.secondary,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
               ),
             ),
           );
+        }),
+      ),
+    );
   }
 
-  Widget btnMenu(String title, int index) {
-    bool isTab = currentIndex == index;
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          currentIndex = index;
-        });
-      },
-      child: Container(
-        width: 100,
-        decoration: BoxDecoration(
-          color: isTab ? color.primary : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isTab ? Colors.transparent : color.tertiary,
+  Widget _buildApplicationList(ApplicationProvider provider) {
+    final categories = provider.categories;
+    final allApps = provider.allapplication;
+
+    List<ApplicationModel> filteredApps;
+    if (_selectedIndex == 0) {
+      filteredApps = allApps;
+    } else {
+      final selectedCategory = categories[_selectedIndex];
+      filteredApps = allApps
+          .where(
+            (app) => app.status.toLowerCase() == selectedCategory.toLowerCase(),
+          )
+          .toList();
+    }
+
+    if (filteredApps.isEmpty) {
+      return SliverFillRemaining(
+        hasScrollBody: false,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: colors.bgSubmit,
+                  shape: BoxShape.circle,
+                ),
+                child: HugeIcon(
+                  icon: HugeIcons.strokeRoundedFolder01,
+                  color: colors.primary.withOpacity(0.5),
+                  size: 48,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                "Aucune candidature trouvée",
+                style: TextStyle(
+                  color: Colors.grey[500],
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
           ),
         ),
-        height: 40,
-        child: Center(
-          child: Text(
-            title,
-            style: TextStyle(
-              color: isTab ? color.bg : color.primary,
-              fontWeight: FontWeight.bold,
+      );
+    }
+
+    return SliverList(
+      delegate: SliverChildBuilderDelegate((context, index) {
+        final app = filteredApps[index];
+        return _buildApplicationCard(app);
+      }, childCount: filteredApps.length),
+    );
+  }
+
+  Widget _buildApplicationCard(ApplicationModel app) {
+    Color statusColor;
+    Color statusBgColor;
+
+    switch (app.status.toLowerCase()) {
+      case 'accepte':
+        statusColor = const Color(0xFF08875C);
+        statusBgColor = const Color(0xFFE6F4EA);
+        break;
+      case 'en attente':
+        statusColor = const Color(0xFFC56D2A);
+        statusBgColor = const Color(0xFFFFF4E5);
+        break;
+      case 'interview':
+        statusColor = colors.primary;
+        statusBgColor = colors.primary.withOpacity(0.1);
+        break;
+      default:
+        statusColor = const Color(0xFFEB3223);
+        statusBgColor = const Color(0xFFFEEFEF);
+    }
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(20),
+        child: InkWell(
+          onTap: () {},
+          borderRadius: BorderRadius.circular(20),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 60,
+                      height: 60,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        color: colors.tertiary,
+                        image: DecorationImage(
+                          image: NetworkImage(app.logo),
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            app.title,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: colors.primary,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            app.companyName,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: colors.secondary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              HugeIcon(
+                                icon: HugeIcons.strokeRoundedLocation01,
+                                size: 14,
+                                color: Colors.grey[500]!,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                app.location,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[500],
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              HugeIcon(
+                                icon: HugeIcons.strokeRoundedClock01,
+                                size: 14,
+                                color: Colors.grey[500]!,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                app.postDate,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[500],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(
+                    color: statusBgColor,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Center(
+                    child: Text(
+                      app.status,
+                      style: TextStyle(
+                        color: statusColor,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -156,168 +343,23 @@ class _ApplicationPageState extends State<ApplicationPage> {
     );
   }
 
-  Widget content() {
-    final houseProvider = context.watch<ApplicationProvider>();
-    final categories = houseProvider
-        .categories; // final categories = houseProvider.categories;
-    final houses = houseProvider.allapplication;
-    List<ApplicationModel> filteredJobs;
-    if (currentIndex == 0) {
-      filteredJobs = houses; // "Tout"
-    } else {
-      final selectedCategory = categories[currentIndex];
-      filteredJobs = houses
-          .where(
-            (job) => job.status.toLowerCase() == selectedCategory.toLowerCase(),
-          )
-          .toList();
-    }
-
-    if (houses.isEmpty) {
-      return SliverToBoxAdapter(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Center(
-            child: Text(
-              "Aucune offre disponible pour cette catégorie.",
-              style: TextStyle(color: color.primary),
+  Widget _buildLoadingState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          SpinKitPulse(color: colors.primary, size: 60.0),
+          const SizedBox(height: 16),
+          Text(
+            'Chargement des candidatures...',
+            style: TextStyle(
+              color: colors.secondary,
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
             ),
           ),
-        ),
-      );
-    }
-    if (currentIndex == 0) {
-      filteredJobs = houses; // Show all
-    } else {
-      final selectedCategory = categories[currentIndex];
-      filteredJobs = houses
-          .where(
-            (job) => job.status.toLowerCase() == selectedCategory.toLowerCase(),
-          )
-          .toList();
-    }
-
-    if (filteredJobs.isEmpty) {
-      return SliverToBoxAdapter(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Center(
-            child: Text(
-              "Aucune offre trouvée dans cette catégorie.",
-              style: TextStyle(color: color.primary),
-            ),
-          ),
-        ),
-      );
-    }
-
-    // ✅ Build the job list dynamically
-    return SliverList(
-      delegate: SliverChildBuilderDelegate((context, index) {
-        final application = filteredJobs[index];
-        return Container(
-          width: MediaQuery.of(context).size.width,
-          margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: color.tertiary),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // ✅ Job image and info
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 100,
-                    height: 100,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: color.tertiary),
-                      image: DecorationImage(
-                        fit: BoxFit.cover,
-                        image: NetworkImage(application.logo),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      TitleWidget(
-                        text: application.title,
-                        fontSize: 18,
-                        color: color.primary,
-                      ),
-                      SubTitle(
-                        text: application.companyName,
-                        fontsize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      Row(
-                        children: [
-                          HugeIcon(
-                            icon: HugeIcons.strokeRoundedLocation01,
-                            size: 18,
-                            color: color.primary,
-                          ),
-                          SubTitle(text: application.location, fontsize: 16),
-                        ],
-                      ),
-                      Row(
-                        children: [
-                          HugeIcon(
-                            icon: HugeIcons.strokeRoundedClock01,
-                            size: 15,
-                            color: color.primary,
-                          ),
-                          SizedBox(width: 4),
-                          SubTitle(text: application.postDate, fontsize: 14),
-                        ],
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 5),
-              Divider(color: color.tertiary),
-              const SizedBox(height: 10),
-              Container(
-                height: 40,
-                decoration: BoxDecoration(
-                  color: application.status == "Accepte"
-                      ? color
-                            .bgA // Si VRAI (Accepte)
-                      : application.status ==
-                            "En attente" // Sinon, vérifie la deuxième condition
-                      ? color.bgcour
-                      : application.status == "Interview"
-                      ? color
-                            .bgSubmit // Si VRAI (En attente)
-                      : color.errorBg,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Center(
-                  child: TitleWidget(
-                    text: application.status,
-                    color: application.status == "Accepte"
-                        ? color.accepted
-                        : application.status == "En attente"
-                        ? color.cour
-                        : application.status == "Interview"
-                        ? color.primary
-                        : color.error,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-            ],
-          ),
-        );
-      }, childCount: filteredJobs.length),
+        ],
+      ),
     );
   }
 }

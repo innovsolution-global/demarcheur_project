@@ -1,12 +1,13 @@
 import 'package:demarcheur_app/apps/demandeurs/main_screens/user_cv_view.dart';
+import 'package:demarcheur_app/apps/demandeurs/main_screens/add_vacancy_page.dart';
 import 'package:demarcheur_app/consts/color.dart';
 import 'package:demarcheur_app/providers/compa_profile_provider.dart';
+import 'package:demarcheur_app/providers/enterprise_provider.dart';
 import 'package:demarcheur_app/providers/user_provider.dart';
 import 'package:demarcheur_app/widgets/header_page.dart';
 import 'package:demarcheur_app/widgets/sub_title.dart';
 import 'package:demarcheur_app/widgets/title_widget.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:provider/provider.dart';
 
@@ -66,7 +67,9 @@ class _VancyState extends State<Vancy> with TickerProviderStateMixin {
       userProvider.loadUsers();
 
       final compaProvider = context.read<CompaProfileProvider>();
-      compaProvider.loadVancies();
+      //compaProvider.loadVancies();
+
+      context.read<EnterpriseProvider>().loadUser();
 
       // Start animations after a delay
       Future.delayed(const Duration(milliseconds: 100), () {
@@ -162,87 +165,67 @@ class _VancyState extends State<Vancy> with TickerProviderStateMixin {
   }
 
   Widget _buildSearchAndFilter() {
-    return Container(
-      margin: const EdgeInsets.all(16),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         children: [
-          // Search Bar
           Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             decoration: BoxDecoration(
-              color: colors.bgSubmit,
+              color: colors.bgSubmit.withOpacity(0.5),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: colors.tertiary),
+              border: Border.all(color: colors.secondary.withOpacity(0.05)),
             ),
             child: TextField(
               controller: _searchController,
-              onChanged: (value) {
-                setState(() {
-                  searchQuery = value;
-                });
-              },
+              onChanged: (value) => setState(() => searchQuery = value),
+              style: TextStyle(color: colors.secondary, fontSize: 15),
               decoration: InputDecoration(
-                hintText: 'Rechercher un candidat...',
-                hintStyle: TextStyle(
-                  color: colors.secondary.withOpacity(0.6),
-                  fontSize: 16,
+                hintText: 'Chercher par nom ou spécialité...',
+                hintStyle: TextStyle(color: colors.secondary.withOpacity(0.4)),
+                prefixIcon: Icon(
+                  Icons.search_rounded,
+                  color: colors.primary,
+                  size: 20,
                 ),
-                prefixIcon: Icon(Icons.search, color: colors.secondary),
-                suffixIcon: searchQuery.isNotEmpty
-                    ? IconButton(
-                        onPressed: () {
-                          _searchController.clear();
-                          setState(() {
-                            searchQuery = '';
-                          });
-                        },
-                        icon: HugeIcon(
-                          icon: HugeIcons.strokeRoundedCancel01,
-                          color: colors.secondary,
-                          size: 18,
-                        ),
-                      )
-                    : null,
                 border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
+                contentPadding: const EdgeInsets.symmetric(vertical: 14),
               ),
             ),
           ),
-
-          const SizedBox(height: 16),
-
-          // Filter Chips
+          const SizedBox(height: 12),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
             child: Row(
               children: statusFilters.map((filter) {
                 final isSelected = selectedFilter == filter;
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
-                  child: FilterChip(
+                  child: ChoiceChip(
                     label: Text(filter),
                     selected: isSelected,
                     onSelected: (selected) {
-                      setState(() {
-                        selectedFilter = filter;
-                      });
+                      setState(() => selectedFilter = filter);
                     },
-                    selectedColor: colors.primary.withOpacity(0.2),
-                    checkmarkColor: colors.primary,
-                    backgroundColor: colors.bgSubmit,
                     labelStyle: TextStyle(
-                      color: isSelected ? colors.primary : colors.secondary,
+                      color: isSelected ? Colors.white : colors.secondary,
                       fontWeight: isSelected
                           ? FontWeight.w600
-                          : FontWeight.w400,
+                          : FontWeight.w500,
+                      fontSize: 13,
+                    ),
+                    selectedColor: colors.primary,
+                    backgroundColor: colors.bg,
+                    elevation: 0,
+                    pressElevation: 0,
+                    side: BorderSide(
+                      color: isSelected
+                          ? colors.primary
+                          : colors.secondary.withOpacity(0.1),
                     ),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
-                      side: BorderSide(
-                        color: isSelected ? colors.primary : colors.tertiary,
-                      ),
+                      borderRadius: BorderRadius.circular(10),
                     ),
                   ),
                 );
@@ -255,74 +238,218 @@ class _VancyState extends State<Vancy> with TickerProviderStateMixin {
   }
 
   Widget _buildStatsCards(List<dynamic> applicants) {
-    final totalCount = applicants.length;
-    final pendingCount = applicants.where((a) => a.status == 'En cours').length;
-    final interviewCount = applicants
-        .where((a) => a.status == 'Interview')
-        .length;
-    final acceptedCount = applicants.where((a) => a.status == 'Accepte').length;
+    final total = applicants.length;
+    final enCours = applicants.where((a) => a.status == 'En cours').length;
+    final interview = applicants.where((a) => a.status == 'Interview').length;
+    final accepte = applicants.where((a) => a.status == 'Accepte').length;
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       child: Row(
         children: [
-          _buildStatCard(
-            'Total',
-            totalCount.toString(),
-            HugeIcons.strokeRoundedUser,
-            colors.primary,
-          ),
+          _buildStatBubble('Tous', total.toString(), colors.primary),
           const SizedBox(width: 12),
-          _buildStatCard(
-            'En cours',
-            pendingCount.toString(),
-            HugeIcons.strokeRoundedClock02,
-            colors.impression,
-          ),
+          _buildStatBubble('Pendant', enCours.toString(), colors.impression),
           const SizedBox(width: 12),
-          _buildStatCard(
-            'Entretiens',
-            interviewCount.toString(),
-            HugeIcons.strokeRoundedUserGroup,
-            colors.cour,
-          ),
+          _buildStatBubble('Interview', interview.toString(), colors.cour),
           const SizedBox(width: 12),
-          _buildStatCard(
-            'Acceptés',
-            acceptedCount.toString(),
-            HugeIcons.strokeRoundedCheckmarkCircle01,
-            colors.accepted,
+          _buildStatBubble('Accepte', accepte.toString(), colors.accepted),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatBubble(String label, String value, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(100),
+        border: Border.all(color: color.withOpacity(0.1)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '$value $label',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildStatCard(
+  void _showStatusChangeModal(dynamic applicant) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: colors.bg,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 40,
+              offset: const Offset(0, -10),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.fromLTRB(28, 16, 28, 40),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 48,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: colors.secondary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+            const SizedBox(height: 32),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Modifier le statut',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800,
+                          color: colors.secondary,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Mise à jour pour ${applicant.name}',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: colors.secondary.withOpacity(0.5),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: colors.primary.withOpacity(0.06),
+                    shape: BoxShape.circle,
+                  ),
+                  child: HugeIcon(
+                    icon: HugeIcons.strokeRoundedEdit02,
+                    color: colors.primary,
+                    size: 24,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 32),
+            _buildStatusOption(
+              applicant,
+              'Interview',
+              'Planifier un entretien',
+              HugeIcons.strokeRoundedCalendar03,
+              colors.cour,
+            ),
+            const SizedBox(height: 16),
+            _buildStatusOption(
+              applicant,
+              'Accepte',
+              'Accepter la candidature',
+              HugeIcons.strokeRoundedCheckmarkCircle01,
+              colors.accepted,
+            ),
+            const SizedBox(height: 16),
+            _buildStatusOption(
+              applicant,
+              'Rejete',
+              'Rejeter le dossier',
+              HugeIcons.strokeRoundedCancel01,
+              colors.error,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusOption(
+    dynamic applicant,
+    String status,
     String label,
-    String count,
     List<List<dynamic>> icon,
     Color color,
   ) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(12),
+    bool isSelected = applicant.status == status;
+    return InkWell(
+      onTap: () {
+        _updateApplicantStatus(applicant, status);
+        Navigator.pop(context);
+      },
+      borderRadius: BorderRadius.circular(20),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        height: 72,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withOpacity(0.3)),
+          color: isSelected
+              ? color.withOpacity(0.08)
+              : colors.bgSubmit.withOpacity(0.4),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? color : colors.secondary.withOpacity(0.04),
+            width: 2,
+          ),
         ),
-        child: Column(
+        child: Row(
           children: [
-            HugeIcon(icon: icon, color: color, size: 24),
-            const SizedBox(height: 4),
-            TitleWidget(text: count, fontSize: 18, color: color),
-            SubTitle(
-              text: label,
-              fontsize: 10,
-              color: color,
-              fontWeight: FontWeight.w500,
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.12),
+                shape: BoxShape.circle,
+              ),
+              child: HugeIcon(icon: icon, color: color, size: 20),
             ),
+            const SizedBox(width: 18),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: isSelected
+                      ? colors.secondary
+                      : colors.secondary.withOpacity(0.7),
+                  fontSize: 16,
+                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                ),
+              ),
+            ),
+            if (isSelected)
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                child: const Icon(Icons.check, color: Colors.white, size: 16),
+              ),
           ],
         ),
       ),
@@ -331,312 +458,216 @@ class _VancyState extends State<Vancy> with TickerProviderStateMixin {
 
   Widget _buildApplicantCard(dynamic applicant) {
     Color statusColor;
-    Color statusBgColor;
-    String statusText = applicant.status;
+    String statusText;
 
     switch (applicant.status) {
       case 'Accepte':
         statusColor = colors.accepted;
-        statusBgColor = colors.bgA;
-        statusText = 'Accepté';
+        statusText = 'Admis';
         break;
       case 'Interview':
         statusColor = colors.cour;
-        statusBgColor = colors.bgcour;
+        statusText = 'Entretien';
         break;
       case 'En cours':
         statusColor = colors.impression;
-        statusBgColor = colors.errorBg;
+        statusText = 'En attente';
         break;
       default:
         statusColor = colors.error;
-        statusBgColor = colors.errorBg;
+        statusText = 'Décliné';
     }
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: colors.bg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colors.tertiary),
-        boxShadow: [
-          BoxShadow(
-            color: colors.secondary.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      child: GestureDetector(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => UserCvView(userCv: applicant),
+            ),
+          );
+        },
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: colors.bg,
+            borderRadius: BorderRadius.circular(32),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.03),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(8),
-        child: Column(
-          children: [
-            // Header Row
-            Row(
-              children: [
-                // Profile Image
-                Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: colors.tertiary, width: 2),
-                    image: DecorationImage(
-                      fit: BoxFit.cover,
-                      image: NetworkImage(applicant.photo),
-                      onError: (error, stackTrace) {},
+          child: Row(
+            children: [
+              // Avatar with Ring
+              Stack(
+                alignment: Alignment.center,
+                children: [
+                  Container(
+                    width: 76,
+                    height: 76,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: statusColor.withOpacity(0.2),
+                        width: 4,
+                      ),
                     ),
                   ),
-                  child: applicant.photo.isEmpty
-                      ? Center(
-                          child: HugeIcon(
-                            icon: HugeIcons.strokeRoundedUser,
-                            color: colors.primary,
-                            size: 24,
-                          ),
-                        )
-                      : null,
-                ),
-                const SizedBox(width: 8),
-
-                // Applicant Info
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      TitleWidget(text: applicant.name, fontSize: 18),
-                      const SizedBox(height: 4),
-                      SubTitle(
-                        text: applicant.speciality,
-                        fontsize: 14,
-                        color: colors.primary,
-                        fontWeight: FontWeight.w600,
+                  Hero(
+                    tag: 'avatar_${applicant.name}',
+                    child: Container(
+                      width: 60,
+                      height: 60,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        image: DecorationImage(
+                          fit: BoxFit.cover,
+                          image: NetworkImage(applicant.photo),
+                        ),
                       ),
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          HugeIcon(
-                            icon: HugeIcons.strokeRoundedLocation01,
-                            color: colors.secondary.withOpacity(0.7),
-                            size: 12,
-                          ),
-                          const SizedBox(width: 4),
-                          SubTitle(
-                            text: applicant.location,
-                            fontsize: 11,
-                            color: colors.secondary.withOpacity(0.7),
-                          ),
-                          const SizedBox(width: 12),
-                          HugeIcon(
-                            icon: HugeIcons.strokeRoundedTime02,
-                            color: colors.secondary.withOpacity(0.7),
-                            size: 12,
-                          ),
-                          const SizedBox(width: 4),
-                          SubTitle(
-                            text: "il y a ${applicant.postDate}",
-                            fontsize: 11,
-                            color: colors.secondary.withOpacity(0.7),
-                          ),
-                        ],
+                    ),
+                  ),
+                  Positioned(
+                    bottom: 0,
+                    right: 4,
+                    child: Container(
+                      width: 18,
+                      height: 18,
+                      decoration: BoxDecoration(
+                        color: statusColor,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 3),
                       ),
-                    ],
-                  ),
-                ),
-
-                // Status Badge
-                // Container(
-                //   padding: const EdgeInsets.symmetric(
-                //     horizontal: 12,
-                //     vertical: 6,
-                //   ),
-                //   decoration: BoxDecoration(
-                //     color: statusBgColor,
-                //     borderRadius: BorderRadius.circular(20),
-                //   ),
-                //   child: Text(
-                //     statusText,
-                //     style: TextStyle(
-                //       color: statusColor,
-                //       fontSize: 12,
-                //       fontWeight: FontWeight.w600,
-                //     ),
-                //   ),
-                // ),
-              ],
-            ),
-
-            const SizedBox(height: 16),
-
-            // Experience Info
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: colors.bgSubmit,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Row(
-                children: [
-                  HugeIcon(
-                    icon: HugeIcons.strokeRoundedBriefcase01,
-                    color: colors.primary,
-                    size: 16,
-                  ),
-                  const SizedBox(width: 8),
-                  SubTitle(
-                    text: applicant.exp,
-                    fontsize: 13,
-                    fontWeight: FontWeight.w500,
-                    color: colors.secondary,
+                    ),
                   ),
                 ],
               ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // Action Buttons
-            Row(
-              children: [
-                // View CV Button
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => UserCvView(userCv: applicant),
-                        ),
-                      );
-                      // TODO: Navigate to CV view
-                      _showMessage("Ouverture du CV de ${applicant.name}");
-                    },
-                    icon: HugeIcon(
-                      icon: HugeIcons.strokeRoundedFile02,
-                      color: colors.primary,
-                      size: 16,
-                    ),
-                    label: Text(
-                      "Voir CV",
-                      style: TextStyle(color: colors.primary),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: colors.primary),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
+              const SizedBox(width: 20),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      applicant.name,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        color: colors.secondary,
+                        letterSpacing: -0.5,
                       ),
                     ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-
-                // Status Dropdown
-                Expanded(
-                  flex: 2,
-                  child: Container(
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: colors.bgSubmit,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: colors.tertiary),
-                    ),
-                    child: DropdownButtonFormField<String>(
-                      decoration: InputDecoration(
-                        border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                        ),
-                        hintText: 'Changer le statut',
-                        hintStyle: TextStyle(
-                          color: colors.secondary.withOpacity(0.6),
-                          fontSize: 14,
-                        ),
+                    const SizedBox(height: 2),
+                    Text(
+                      applicant.speciality,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: colors.primary,
                       ),
-                      value: null,
-                      items: ['Interview planifie', 'Accepte', 'Rejete'].map((
-                        status,
-                      ) {
-                        return DropdownMenuItem<String>(
-                          value: status,
-                          child: Row(
-                            children: [
-                              HugeIcon(
-                                icon: status == 'Interview planifie'
-                                    ? HugeIcons.strokeRoundedCalendar03
-                                    : status == 'Accepte'
-                                    ? HugeIcons.strokeRoundedCheckmarkCircle01
-                                    : HugeIcons.strokeRoundedCancel01,
-                                color: status == 'Interview planifie'
-                                    ? colors.cour
-                                    : status == 'Accepte'
-                                    ? colors.accepted
-                                    : colors.error,
-                                size: 16,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                status == 'Interview planifie'
-                                    ? 'Planifier entretien'
-                                    : status == 'Accepte'
-                                    ? 'Accepter'
-                                    : 'Rejeter',
-                                style: TextStyle(
-                                  color: colors.primary,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }).toList(),
-                      onChanged: (value) {
-                        if (value != null) {
-                          _updateApplicantStatus(applicant, value);
-                        }
-                      },
                     ),
-                  ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: [
+                        _buildIdentityBadge(
+                          Icons.location_on_rounded,
+                          applicant.location,
+                        ),
+                        _buildIdentityBadge(
+                          Icons.work_history_rounded,
+                          applicant.exp,
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          ],
+              ),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: colors.bgSubmit.withOpacity(0.4),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 16,
+                  color: colors.secondary.withOpacity(0.3),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildIdentityBadge(IconData icon, String label) {
     return Container(
-      padding: const EdgeInsets.all(40),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: colors.bgSubmit.withOpacity(0.3),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          HugeIcon(
-            icon: HugeIcons.strokeRoundedSearch01,
-            color: colors.secondary.withOpacity(0.5),
-            size: 64,
-          ),
-          const SizedBox(height: 20),
-          TitleWidget(
-            text: searchQuery.isNotEmpty
-                ? 'Aucun résultat trouvé'
-                : selectedFilter != 'Tous'
-                ? 'Aucun candidat avec ce statut'
-                : 'Aucun candidat',
-            fontSize: 18,
-            color: colors.secondary,
-          ),
-          const SizedBox(height: 8),
-          SubTitle(
-            text: searchQuery.isNotEmpty
-                ? 'Essayez d\'autres mots-clés'
-                : 'Les candidatures apparaîtront ici',
-            fontsize: 14,
-            color: colors.secondary.withOpacity(0.7),
+          Icon(icon, size: 12, color: colors.secondary.withOpacity(0.4)),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: colors.secondary.withOpacity(0.6),
+            ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return SliverToBoxAdapter(
+      child: Container(
+        height: 300,
+        alignment: Alignment.center,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.search_off_rounded,
+              size: 48,
+              color: colors.secondary.withOpacity(0.1),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              searchQuery.isNotEmpty ? 'Aucun résultat' : 'Aucune candidature',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: colors.secondary.withOpacity(0.3),
+              ),
+            ),
+            if (searchQuery.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  'Essayez d\'autres mots-clés',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: colors.secondary.withOpacity(0.2),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -650,76 +681,172 @@ class _VancyState extends State<Vancy> with TickerProviderStateMixin {
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
-        backgroundColor: colors.bg,
-        body: CustomScrollView(
-          slivers: [
-            Header(auto: false),
-
-            // Header Section
-            SliverToBoxAdapter(
-              child: FadeTransition(
-                opacity: _fadeAnimation,
-                child: Container(
-                  padding: const EdgeInsets.all(16),
+        backgroundColor: const Color(0xFFFBFBFB),
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const AddVacancyPage()),
+            );
+          },
+          backgroundColor: colors.primary,
+          icon: const Icon(Icons.add_rounded, color: Colors.white),
+          label: const Text(
+            "Publier",
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
+          elevation: 4,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+        body: NestedScrollView(
+          headerSliverBuilder: (BuildContext context, bool innerBoxIsScrolled) {
+            return [Header(auto: false)];
+          },
+          body: CustomScrollView(
+            slivers: [
+              // Header Section
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      TitleWidget(
-                        text: 'Gestion des Candidatures',
-                        fontSize: 24,
-                        color: colors.secondary,
-                      ),
-                      const SizedBox(height: 4),
-                      SubTitle(
-                        text: 'Gérez et suivez vos candidats',
-                        fontsize: 16,
-                        color: colors.secondary.withOpacity(0.7),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Candidatures',
+                                style: TextStyle(
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.w900,
+                                  color: colors.secondary,
+                                  letterSpacing: -1,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: const BoxDecoration(
+                                      color: Colors.green,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    '${applicants.length} dossiers actifs',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: colors.secondary.withOpacity(0.4),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: colors.primary.withOpacity(0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              Icons.tune_rounded,
+                              color: colors.primary,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
                 ),
               ),
-            ),
 
-            // Loading State
-            if (userProvider.isLoading)
+              // Search Bar with Glow
               SliverToBoxAdapter(
-                child: Container(
-                  padding: const EdgeInsets.all(60),
-                  child: Center(
-                    child: Column(
-                      children: [
-                        SpinKitFadingCircle(color: colors.primary, size: 50.0),
-                        const SizedBox(height: 16),
-                        SubTitle(
-                          text: 'Chargement des candidatures...',
-                          fontsize: 16,
-                          color: colors.secondary,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: colors.bg,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: colors.primary.withOpacity(0.12),
+                          blurRadius: 24,
+                          offset: const Offset(0, 12),
                         ),
                       ],
                     ),
-                  ),
-                ),
-              )
-            else ...[
-              // Search and Filter
-              SliverToBoxAdapter(
-                child: FadeTransition(
-                  opacity: _fadeAnimation,
-                  child: SlideTransition(
-                    position: _slideAnimation,
-                    child: _buildSearchAndFilter(),
+                    child: TextField(
+                      controller: _searchController,
+                      onChanged: (value) => setState(() => searchQuery = value),
+                      decoration: InputDecoration(
+                        hintText: 'Rechercher un profil...',
+                        prefixIcon: Icon(
+                          Icons.search_rounded,
+                          color: colors.primary,
+                        ),
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: 18,
+                          horizontal: 20,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),
 
-              // Stats Cards
+              // Horizontal Filters
               SliverToBoxAdapter(
-                child: FadeTransition(
-                  opacity: _fadeAnimation,
-                  child: SlideTransition(
-                    position: _slideAnimation,
-                    child: _buildStatsCards(applicants),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Row(
+                    children: statusFilters.map((filter) {
+                      final isSelected = selectedFilter == filter;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 12),
+                        child: InkWell(
+                          onTap: () => setState(() => selectedFilter = filter),
+                          child: Column(
+                            children: [
+                              Text(
+                                filter,
+                                style: TextStyle(
+                                  color: isSelected
+                                      ? colors.primary
+                                      : colors.secondary.withOpacity(0.4),
+                                  fontWeight: isSelected
+                                      ? FontWeight.w800
+                                      : FontWeight.w600,
+                                  fontSize: 15,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              AnimatedContainer(
+                                duration: const Duration(milliseconds: 300),
+                                height: 3,
+                                width: isSelected ? 20 : 0,
+                                decoration: BoxDecoration(
+                                  color: colors.primary,
+                                  borderRadius: BorderRadius.circular(2),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }).toList(),
                   ),
                 ),
               ),
@@ -728,12 +855,7 @@ class _VancyState extends State<Vancy> with TickerProviderStateMixin {
 
               // Applicants List or Empty State
               if (filteredApplicants.isEmpty)
-                SliverToBoxAdapter(
-                  child: FadeTransition(
-                    opacity: _fadeAnimation,
-                    child: _buildEmptyState(),
-                  ),
-                )
+                _buildEmptyState()
               else
                 SliverList.builder(
                   itemCount: filteredApplicants.length,
@@ -765,7 +887,7 @@ class _VancyState extends State<Vancy> with TickerProviderStateMixin {
               // Bottom Padding
               const SliverToBoxAdapter(child: SizedBox(height: 24)),
             ],
-          ],
+          ),
         ),
       ),
     );

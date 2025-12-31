@@ -6,12 +6,13 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthService {
-  Future<bool> loginUser(String email, String password) async {
+  final String baseUrl = Config.baseUrl;
+  Future<bool> loginUser(String item, String password) async {
     try {
       final response = await http.post(
-        Uri.parse("${Config.url}/api"),
+        Uri.parse("$baseUrl/auth/login"),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'email': email, 'password': password}),
+        body: jsonEncode({'item': item, 'password': password}),
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -35,7 +36,7 @@ class AuthService {
   Future<bool> registerUser(String email, String password) async {
     try {
       final response = await http.post(
-        Uri.parse("${Config.url}/api"),
+        Uri.parse("${Config.baseUrl}"),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'email': email, 'password': password}),
       );
@@ -93,7 +94,7 @@ class AuthService {
 
     await ChatPlugin.initialize(
       config: ChatConfig(
-        apiUrl: Config.url,
+        apiUrl: Config.baseUrl,
         userId: userId,
         token: token,
         enableOnlineStatus: true,
@@ -116,7 +117,7 @@ class AuthService {
         if (receiverId.isEmpty) return [];
         try {
           var url =
-              "${Config.url}/api/chat/messages?currentUserId=$userId&receiverId=$receiverId&page=$page&limit=$limit";
+              "${Config.baseUrl}/api/chat/messages?currentUserId=$userId&receiverId=$receiverId&page=$page&limit=$limit";
           if (searchText.isNotEmpty) {
             url += "&searchText=${Uri.encodeComponent(searchText)}";
           }
@@ -138,7 +139,7 @@ class AuthService {
       },
       loadChatRoomsHandler: () async {
         try {
-          var url = "${Config.url}/api/chat/chat-room";
+          var url = "${Config.baseUrl}/api/chat/chat-room";
 
           final response = await http.get(
             Uri.parse(url),
@@ -164,7 +165,7 @@ class AuthService {
     var getUser = getUserToken();
     try {
       final response = await http.get(
-        Uri.parse("${Config.url}/api/user/users"),
+        Uri.parse("${Config.baseUrl}/api/user/users"),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'BEARER $getUser',

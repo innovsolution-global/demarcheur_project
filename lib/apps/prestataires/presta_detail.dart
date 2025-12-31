@@ -59,7 +59,8 @@ class _PrestaDetailState extends State<PrestaDetail> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => ChatPage(presta: widget.presta),
+                        builder: (_) => ChatPage
+(presta: widget.presta),
                       ),
                     );
                   },

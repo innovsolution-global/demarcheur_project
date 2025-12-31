@@ -2,12 +2,10 @@ import 'dart:io';
 import 'package:demarcheur_app/apps/immo/immo_dashboard.dart';
 import 'package:demarcheur_app/consts/color.dart';
 import 'package:demarcheur_app/methods/my_methodes.dart';
-import 'package:demarcheur_app/widgets/btn.dart';
 import 'package:demarcheur_app/widgets/immo_header.dart';
 import 'package:demarcheur_app/widgets/sub_title.dart';
 import 'package:demarcheur_app/widgets/title_widget.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -30,6 +28,7 @@ class _ImmoRegistrationPageState extends State<ImmoRegistrationPage>
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _locationController = TextEditingController();
+  final _passwordController = TextEditingController();
 
   File? selectedImage;
   bool isLoading = false;
@@ -217,7 +216,7 @@ class _ImmoRegistrationPageState extends State<ImmoRegistrationPage>
         extendBodyBehindAppBar: true,
         body: CustomScrollView(
           slivers: [
-            const ImmoHeader(isLeading: true),
+            const ImmoHeader(auto: true),
             SliverToBoxAdapter(
               child: FadeTransition(
                 opacity: _fadeAnimation,
@@ -361,6 +360,8 @@ class _ImmoRegistrationPageState extends State<ImmoRegistrationPage>
           _CustomTextField(
             controller: _companyNameController,
             label: "Nom de l'entreprise",
+            textCapitalization: TextCapitalization.sentences,
+
             icon: HugeIcons.strokeRoundedBuilding01,
             validator: (value) =>
                 _validateRequired(value, "Le nom de l'entreprise"),
@@ -368,6 +369,8 @@ class _ImmoRegistrationPageState extends State<ImmoRegistrationPage>
           const SizedBox(height: 20),
           _CustomTextField(
             controller: _domainController,
+            textCapitalization: TextCapitalization.sentences,
+
             label: "Domaine d'activité",
             icon: HugeIcons.strokeRoundedBriefcase01,
             validator: (value) =>
@@ -376,6 +379,8 @@ class _ImmoRegistrationPageState extends State<ImmoRegistrationPage>
           const SizedBox(height: 20),
           _CustomTextField(
             controller: _emailController,
+            textCapitalization: TextCapitalization.none,
+
             label: "Adresse e-mail",
             icon: HugeIcons.strokeRoundedMail01,
             keyboardType: TextInputType.emailAddress,
@@ -384,6 +389,8 @@ class _ImmoRegistrationPageState extends State<ImmoRegistrationPage>
           const SizedBox(height: 20),
           _CustomTextField(
             controller: _phoneController,
+            textCapitalization: TextCapitalization.none,
+
             label: "Numéro de téléphone",
             icon: HugeIcons.strokeRoundedAiPhone01,
             keyboardType: TextInputType.phone,
@@ -392,9 +399,19 @@ class _ImmoRegistrationPageState extends State<ImmoRegistrationPage>
           const SizedBox(height: 20),
           _CustomTextField(
             controller: _locationController,
+            textCapitalization: TextCapitalization.sentences,
             label: "Localisation",
             icon: HugeIcons.strokeRoundedLocation01,
             validator: (value) => _validateRequired(value, "La localisation"),
+            textInputAction: TextInputAction.done,
+          ),
+          const SizedBox(height: 20),
+          _CustomTextField(
+            textCapitalization: TextCapitalization.none,
+            controller: _passwordController,
+            label: "Mot de passe",
+            icon: HugeIcons.strokeRoundedLocation01,
+            validator: (value) => _validateRequired(value, "Mot de passe"),
             textInputAction: TextInputAction.done,
           ),
         ],
@@ -420,7 +437,9 @@ class _ImmoRegistrationPageState extends State<ImmoRegistrationPage>
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
-                disabledBackgroundColor: ConstColors().primary.withOpacity(0.6),
+                disabledBackgroundColor: ConstColors().primary.withValues(
+                  alpha: 0.6,
+                ),
               ),
               child: isSubmitting
                   ? const SizedBox(
@@ -453,11 +472,13 @@ class _CustomTextField extends StatelessWidget {
   final TextInputType? keyboardType;
   final String? Function(String?)? validator;
   final TextInputAction? textInputAction;
+  final TextCapitalization textCapitalization;
 
   const _CustomTextField({
     required this.controller,
     required this.label,
     required this.icon,
+    required this.textCapitalization,
     this.keyboardType,
     this.validator,
     this.textInputAction,

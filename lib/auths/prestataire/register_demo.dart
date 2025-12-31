@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'prestataire_register_page_redesigned.dart';
+import 'prestataire_register.dart';
 
 class RegisterDemoPage extends StatelessWidget {
   const RegisterDemoPage({super.key});
@@ -196,7 +196,7 @@ class RegisterDemoPage extends StatelessWidget {
                     context,
                     PageRouteBuilder(
                       pageBuilder: (context, animation, secondaryAnimation) =>
-                          const PrestataireRegisterPageRedesigned(),
+                          const PrestataireRegister(),
                       transitionsBuilder:
                           (context, animation, secondaryAnimation, child) {
                             const begin = Offset(1.0, 0.0);

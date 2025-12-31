@@ -1,12 +1,15 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:math';
+import 'package:chat_plugin/chat_plugin.dart';
 import 'package:demarcheur_app/consts/color.dart';
 import 'package:demarcheur_app/models/house_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
-import 'package:image_picker/image_picker.dart';
+
+enum MessageStatus { sending, sent, delivered, read }
+
+enum MessageType { text, image, file }
 
 class ImmoChat extends StatefulWidget {
   final HouseModel presta;
@@ -21,24 +24,25 @@ class _ImmoChatState extends State<ImmoChat>
   final ConstColors _colors = ConstColors();
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  final ImagePicker _picker = ImagePicker();
 
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
 
   bool _isTyping = false;
-  bool _isOnline = true;
-  String _lastSeen = "En ligne";
+  bool _isOnline = false;
+  String _lastSeen = "Hors ligne";
 
-  final List<ChatMessage> _messages = [];
+  final List<dynamic> _messages = [];
+  StreamSubscription? _messageSubscription;
+  StreamSubscription? _typingSubscription;
+  StreamSubscription? _statusSubscription;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _initializeAnimations();
-    _loadInitialMessages();
-    _simulateTyping();
+    _initializeChat();
   }
 
   void _initializeAnimations() {
@@ -54,93 +58,86 @@ class _ImmoChatState extends State<ImmoChat>
     _animationController.forward();
   }
 
-  void _loadInitialMessages() {
-    final initialMessages = [
-      ChatMessage(
-        id: '1',
-        text:
-            "Bonjour ! Je suis intéressé par votre propriété ${widget.presta.category}.",
-        isMe: false,
-        timestamp: DateTime.now().subtract(const Duration(hours: 2)),
-        status: MessageStatus.read,
-        senderName: "Client Intéressé",
-        messageType: MessageType.text,
-      ),
-      ChatMessage(
-        id: '2',
-        text:
-            "Bonjour ! Merci pour votre intérêt. Je serais ravi de vous donner plus de détails.",
-        isMe: true,
-        timestamp: DateTime.now().subtract(
-          const Duration(hours: 2, minutes: -5),
-        ),
-        status: MessageStatus.read,
-        senderName: widget.presta.companyName,
-        messageType: MessageType.text,
-      ),
-      ChatMessage(
-        id: '3',
-        text:
-            "Pouvez-vous me dire si la propriété est encore disponible ? Et quel est le prix final ?",
-        isMe: false,
-        timestamp: DateTime.now().subtract(
-          const Duration(hours: 1, minutes: 30),
-        ),
-        status: MessageStatus.read,
-        senderName: "Client Intéressé",
-        messageType: MessageType.text,
-      ),
-      ChatMessage(
-        id: '4',
-        text:
-            "Oui, elle est toujours disponible ! Le prix est de ${NumberFormat('#,###').format(widget.presta.rent).replaceAll(',', '.')} GNF par mois.",
-        isMe: true,
-        timestamp: DateTime.now().subtract(
-          const Duration(hours: 1, minutes: 25),
-        ),
-        status: MessageStatus.delivered,
-        senderName: widget.presta.companyName,
-        messageType: MessageType.text,
-      ),
-      ChatMessage(
-        id: '5',
-        text: "Parfait ! Pourrions-nous organiser une visite cette semaine ?",
-        isMe: false,
-        timestamp: DateTime.now().subtract(const Duration(minutes: 30)),
-        status: MessageStatus.sent,
-        senderName: "Client Intéressé",
-        messageType: MessageType.text,
-      ),
-    ];
+  Future<void> _initializeChat() async {
+    if (widget.presta.id == null) return;
 
-    setState(() {
-      _messages.addAll(initialMessages);
-    });
-  }
+    final chatService = ChatPlugin.chatService;
 
-  void _simulateTyping() {
-    Timer.periodic(const Duration(seconds: 10), (timer) {
-      if (mounted && Random().nextBool()) {
-        setState(() {
-          _isTyping = !_isTyping;
+    // Set the receiver
+    try {
+      chatService.setReceiverId(widget.presta.id!);
+    } catch (_) {
+      // ignore if setReceiverId not implemented
+    }
+
+    // Load initial messages
+    try {
+      await chatService.loadMessages();
+    } catch (_) {}
+
+    // Subscribe to streams
+    try {
+      final messagesStream =
+          (chatService as dynamic).messagesStream as Stream<List<ChatMessage>>?;
+      if (messagesStream != null) {
+        _messageSubscription = messagesStream.listen((messages) {
+          if (mounted) {
+            setState(() {
+              _messages.clear();
+              _messages.addAll(messages);
+            });
+            _scrollToBottom();
+          }
         });
-
-        if (_isTyping) {
-          Future.delayed(const Duration(seconds: 3), () {
-            if (mounted) {
-              setState(() {
-                _isTyping = false;
-              });
-            }
-          });
-        }
       }
-    });
+    } catch (_) {
+      // messagesStream not available on this ChatService implementation; ignore.
+    }
+
+    try {
+      final typingStream =
+          (chatService as dynamic).typingStream as Stream<bool>?;
+      if (typingStream != null) {
+        _typingSubscription = typingStream.listen((isTyping) {
+          if (mounted) {
+            setState(() {
+              _isTyping = isTyping;
+            });
+          }
+        });
+      }
+    } catch (_) {
+      // typingStream not available on this ChatService implementation; ignore.
+    }
+
+    try {
+      final statusStream =
+          (chatService as dynamic).userStatusStream as Stream<dynamic>?;
+      if (statusStream != null) {
+        _statusSubscription = statusStream.listen((status) {
+          if (mounted) {
+            setState(() {
+              _isOnline = (status is Map && status['isOnline'] != null)
+                  ? status['isOnline'] as bool
+                  : false;
+              _lastSeen = (status is Map && status['lastSeen'] != null)
+                  ? status['lastSeen'].toString()
+                  : "Hors ligne";
+            });
+          }
+        });
+      }
+    } catch (_) {
+      // userStatusStream not available on this ChatService implementation; ignore.
+    }
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _messageSubscription?.cancel();
+    _typingSubscription?.cancel();
+    _statusSubscription?.cancel();
     _messageController.dispose();
     _scrollController.dispose();
     _animationController.dispose();
@@ -151,54 +148,33 @@ class _ImmoChatState extends State<ImmoChat>
     String? text,
     File? image,
     MessageType type = MessageType.text,
-  }) {
+  }) async {
     if ((text == null || text.trim().isEmpty) && image == null) return;
 
-    final message = ChatMessage(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      text: text ?? '',
-      isMe: true,
-      timestamp: DateTime.now(),
-      status: MessageStatus.sending,
-      senderName: widget.presta.companyName,
-      messageType: type,
-      imageFile: image,
-    );
+    final chatService = ChatPlugin.chatService;
 
-    setState(() {
-      _messages.add(message);
+    try {
+      await chatService.sendMessage(
+        text ?? '',
+        attachmentName: type
+            .toString()
+            .split('.')
+            .last, // convert enum to string: 'text' or 'image'
+        //file: image,
+      );
+
       _messageController.clear();
-    });
+      _scrollToBottom();
+      HapticFeedback.lightImpact();
+    } catch (e) {
+      _showSnackBar('Erreur lors de l\'envoi du message');
+    }
+  }
 
-    _scrollToBottom();
-
-    // Simulate message delivery
-    Future.delayed(const Duration(seconds: 1), () {
-      if (mounted) {
-        setState(() {
-          final index = _messages.indexWhere((m) => m.id == message.id);
-          if (index != -1) {
-            _messages[index] = message.copyWith(status: MessageStatus.sent);
-          }
-        });
-      }
-    });
-
-    // Simulate message delivery confirmation
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) {
-        setState(() {
-          final index = _messages.indexWhere((m) => m.id == message.id);
-          if (index != -1) {
-            _messages[index] = message.copyWith(
-              status: MessageStatus.delivered,
-            );
-          }
-        });
-      }
-    });
-
-    HapticFeedback.lightImpact();
+  void _onTypingChanged(String text) {
+    try {
+      ChatPlugin.chatService.sendTypingIndicator(text.isNotEmpty);
+    } catch (_) {}
   }
 
   void _scrollToBottom() {
@@ -213,85 +189,6 @@ class _ImmoChatState extends State<ImmoChat>
     });
   }
 
-  Future<void> _pickImage(ImageSource source) async {
-    try {
-      final XFile? image = await _picker.pickImage(
-        source: source,
-        maxWidth: 1080,
-        imageQuality: 80,
-      );
-
-      if (image != null) {
-        _sendMessage(
-          text: '',
-          image: File(image.path),
-          type: MessageType.image,
-        );
-      }
-    } catch (e) {
-      _showSnackBar('Erreur lors de la sélection de l\'image');
-    }
-  }
-
-  void _showImageSourceDialog() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: _colors.bg,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: _colors.tertiary,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              "Choisir une image",
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: _colors.secondary,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _ImageSourceButton(
-                  icon: Icons.photo_library,
-                  label: "Galerie",
-                  onTap: () {
-                    Navigator.pop(context);
-                    _pickImage(ImageSource.gallery);
-                  },
-                ),
-                _ImageSourceButton(
-                  icon: Icons.camera_alt,
-                  label: "Caméra",
-                  onTap: () {
-                    Navigator.pop(context);
-                    _pickImage(ImageSource.camera);
-                  },
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-          ],
-        ),
-      ),
-    );
-  }
-
   void _showSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -300,6 +197,151 @@ class _ImmoChatState extends State<ImmoChat>
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
+    );
+  }
+
+  // --- Helpers for safe message handling ---
+
+  /// Safely get message type from dynamic message objects.
+  /// Handles enum `MessageType` or plugin returning a String like "image" / "text".
+  MessageType? _safeMessageType(dynamic msg) {
+    try {
+      final t = msg?.type;
+      if (t is MessageType) return t;
+      if (t is String) {
+        switch (t.toLowerCase()) {
+          case 'image':
+            return MessageType.image;
+          case 'text':
+            return MessageType.text;
+          default:
+            return null;
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  /// Safely get a file/object attached to the message.
+  dynamic _safeMessageFile(dynamic msg) {
+    try {
+      return msg?.file;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  ImageProvider? _safeNetworkImage(String? url) {
+    if (url == null) return null;
+    final trimmed = url.trim();
+    if (trimmed.isEmpty) return null;
+    try {
+      return NetworkImage(trimmed);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Widget _imageFromDynamic(
+    dynamic file, {
+    double? width,
+    double? height,
+    BoxFit fit = BoxFit.cover,
+  }) {
+    // file may be: File, String (url or path), Uri, or already an ImageProvider
+    if (file == null) return const SizedBox.shrink();
+
+    if (file is ImageProvider) {
+      return Image(image: file, width: width, height: height, fit: fit);
+    }
+    if (file is File) {
+      return Image.file(
+        file,
+        width: width,
+        height: height,
+        fit: fit,
+        errorBuilder: (_, __, ___) {
+          return Container(
+            width: width,
+            height: height,
+            color: Colors.grey[200],
+            child: const Icon(Icons.broken_image),
+          );
+        },
+      );
+    }
+    if (file is String) {
+      final trimmed = file.trim();
+      // If it's a valid URL (basic check)
+      if (trimmed.startsWith('http') || trimmed.startsWith('https')) {
+        return Image.network(
+          trimmed,
+          width: width,
+          height: height,
+          fit: fit,
+          errorBuilder: (_, __, ___) {
+            return Container(
+              width: width,
+              height: height,
+              color: Colors.grey[200],
+              child: const Icon(Icons.broken_image),
+            );
+          },
+        );
+      } else {
+        // try as local file path
+        try {
+          final f = File(trimmed);
+          if (f.existsSync()) {
+            return Image.file(
+              f,
+              width: width,
+              height: height,
+              fit: fit,
+              errorBuilder: (_, __, ___) {
+                return Container(
+                  width: width,
+                  height: height,
+                  color: Colors.grey[200],
+                  child: const Icon(Icons.broken_image),
+                );
+              },
+            );
+          }
+        } catch (_) {}
+        // fallback to an empty container
+        return Container(
+          width: width,
+          height: height,
+          color: Colors.grey[200],
+          child: const Icon(Icons.broken_image),
+        );
+      }
+    }
+    if (file is Uri) {
+      final s = file.toString();
+      return Image.network(
+        s,
+        width: width,
+        height: height,
+        fit: fit,
+        errorBuilder: (_, __, ___) {
+          return Container(
+            width: width,
+            height: height,
+            color: Colors.grey[200],
+            child: const Icon(Icons.broken_image),
+          );
+        },
+      );
+    }
+
+    // unknown type
+    return Container(
+      width: width,
+      height: height,
+      color: Colors.grey[200],
+      child: const Icon(Icons.broken_image),
     );
   }
 
@@ -324,7 +366,10 @@ class _ImmoChatState extends State<ImmoChat>
                   if (index == _messages.length && _isTyping) {
                     return _buildTypingIndicator();
                   }
-                  return _buildMessageBubble(_messages[index]);
+                  final msg = _messages[index];
+                  // protect against invalid list entries
+                  if (msg == null) return const SizedBox.shrink();
+                  return _buildMessageBubble(msg);
                 },
               ),
             ),
@@ -336,6 +381,10 @@ class _ImmoChatState extends State<ImmoChat>
   }
 
   PreferredSizeWidget _buildModernAppBar() {
+    final avatarProvider = widget.presta.imageUrl.isNotEmpty
+        ? _safeNetworkImage(widget.presta.imageUrl.first)
+        : null;
+
     return AppBar(
       elevation: 0,
       backgroundColor: _colors.primary,
@@ -351,8 +400,13 @@ class _ImmoChatState extends State<ImmoChat>
             children: [
               CircleAvatar(
                 radius: 20,
-                backgroundImage: NetworkImage(widget.presta.imageUrl.first),
+                backgroundImage: avatarProvider,
                 backgroundColor: Colors.grey[300],
+                child: avatarProvider == null
+                    ? (widget.presta.companyName.isNotEmpty
+                          ? Text(widget.presta.companyName[0])
+                          : const SizedBox.shrink())
+                    : null,
               ),
               if (_isOnline)
                 Positioned(
@@ -384,7 +438,9 @@ class _ImmoChatState extends State<ImmoChat>
                   ),
                 ),
                 Text(
-                  _isTyping ? "En train d'écrire..." : _lastSeen,
+                  _isTyping
+                      ? "En train d'écrire..."
+                      : (_isOnline ? "En ligne" : _lastSeen),
                   style: TextStyle(
                     fontSize: 12,
                     color: Colors.white.withOpacity(0.8),
@@ -457,18 +513,28 @@ class _ImmoChatState extends State<ImmoChat>
   }
 
   Widget _buildMessageBubble(ChatMessage message) {
+    // use safe helpers to avoid crashes if plugin changes shape
+    final msgType = _safeMessageType(message);
+    final msgFile = _safeMessageFile(message);
+
+    final isMe = (message as dynamic).isMe ?? false;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
-        mainAxisAlignment: message.isMe
+        mainAxisAlignment: isMe
             ? MainAxisAlignment.end
             : MainAxisAlignment.start,
         children: [
-          if (!message.isMe) ...[
+          if (!isMe) ...[
             CircleAvatar(
               radius: 16,
-              backgroundImage: NetworkImage(widget.presta.imageUrl.first),
+              backgroundImage: widget.presta.imageUrl.isNotEmpty
+                  ? _safeNetworkImage(widget.presta.imageUrl.first)
+                  : null,
               backgroundColor: Colors.grey[300],
+              child: widget.presta.imageUrl.isEmpty
+                  ? const Icon(Icons.person)
+                  : null,
             ),
             const SizedBox(width: 8),
           ],
@@ -479,12 +545,12 @@ class _ImmoChatState extends State<ImmoChat>
               ),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: message.isMe ? _colors.primary : Colors.grey[100],
+                color: isMe ? _colors.primary : Colors.grey[100],
                 borderRadius: BorderRadius.only(
                   topLeft: const Radius.circular(18),
                   topRight: const Radius.circular(18),
-                  bottomLeft: Radius.circular(message.isMe ? 18 : 4),
-                  bottomRight: Radius.circular(message.isMe ? 4 : 18),
+                  bottomLeft: Radius.circular(isMe ? 18 : 4),
+                  bottomRight: Radius.circular(isMe ? 4 : 18),
                 ),
                 boxShadow: [
                   BoxShadow(
@@ -497,25 +563,18 @@ class _ImmoChatState extends State<ImmoChat>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (message.messageType == MessageType.image &&
-                      message.imageFile != null) ...[
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Image.file(
-                        message.imageFile!,
-                        width: 200,
-                        height: 200,
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                    if (message.text.isNotEmpty) const SizedBox(height: 8),
+                  // Image handling: support File, String (URL/path), ImageProvider
+                  if (msgType == MessageType.image && msgFile != null) ...[
+                    _imageFromDynamic(msgFile, width: 200, height: 200),
+                    if (((message as dynamic).content?.isNotEmpty) ?? false)
+                      const SizedBox(height: 8),
                   ],
-                  if (message.text.isNotEmpty)
+                  if ((message as dynamic).content?.isNotEmpty ?? false)
                     Text(
-                      message.text,
+                      (message as dynamic).content ?? '',
                       style: TextStyle(
                         fontSize: 15,
-                        color: message.isMe ? Colors.white : _colors.secondary,
+                        color: isMe ? Colors.white : _colors.secondary,
                         height: 1.3,
                       ),
                     ),
@@ -524,17 +583,23 @@ class _ImmoChatState extends State<ImmoChat>
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        DateFormat('HH:mm').format(message.timestamp),
+                        DateFormat(
+                          'HH:mm',
+                        ).format(_getMessageTimestamp(message)),
                         style: TextStyle(
                           fontSize: 11,
-                          color: message.isMe
+                          color: isMe
                               ? Colors.white.withOpacity(0.7)
                               : _colors.tertiary,
                         ),
                       ),
-                      if (message.isMe) ...[
+                      if (isMe) ...[
                         const SizedBox(width: 4),
-                        _buildMessageStatusIcon(message.status),
+                        _buildMessageStatusIcon(
+                          _parseMessageStatus(
+                            (message as dynamic).status ?? 'sent',
+                          ),
+                        ),
                       ],
                     ],
                   ),
@@ -542,13 +607,13 @@ class _ImmoChatState extends State<ImmoChat>
               ),
             ),
           ),
-          if (message.isMe) ...[
+          if (isMe) ...[
             const SizedBox(width: 8),
             CircleAvatar(
               radius: 16,
               backgroundColor: _colors.primary,
               child: Text(
-                widget.presta.companyName[0].toUpperCase(),
+                "M", // Placeholder for "Me" or user initial
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 14,
@@ -560,6 +625,45 @@ class _ImmoChatState extends State<ImmoChat>
         ],
       ),
     );
+  }
+
+  DateTime _getMessageTimestamp(ChatMessage message) {
+    try {
+      final dynamic ts =
+          (message as dynamic).timestamp ??
+          (message as dynamic).createdAt ??
+          (message as dynamic).sentAt;
+      if (ts == null) return DateTime.now();
+      if (ts is DateTime) return ts;
+      if (ts is int) return DateTime.fromMillisecondsSinceEpoch(ts);
+      if (ts is String) {
+        final parsed = DateTime.tryParse(ts);
+        if (parsed != null) return parsed;
+        final ms = int.tryParse(ts);
+        if (ms != null) return DateTime.fromMillisecondsSinceEpoch(ms);
+      }
+    } catch (_) {}
+    return DateTime.now();
+  }
+
+  MessageStatus _parseMessageStatus(dynamic status) {
+    final statusStr = status?.toString() ?? 'sent';
+    switch (statusStr.toLowerCase()) {
+      case 'sending':
+      case 'messagestatus.sending':
+        return MessageStatus.sending;
+      case 'sent':
+      case 'messagestatus.sent':
+        return MessageStatus.sent;
+      case 'delivered':
+      case 'messagestatus.delivered':
+        return MessageStatus.delivered;
+      case 'read':
+      case 'messagestatus.read':
+        return MessageStatus.read;
+      default:
+        return MessageStatus.sent;
+    }
   }
 
   Widget _buildMessageStatusIcon(MessageStatus status) {
@@ -595,8 +699,13 @@ class _ImmoChatState extends State<ImmoChat>
         children: [
           CircleAvatar(
             radius: 16,
-            backgroundImage: NetworkImage(widget.presta.imageUrl.first),
+            backgroundImage: widget.presta.imageUrl.isNotEmpty
+                ? _safeNetworkImage(widget.presta.imageUrl.first)
+                : null,
             backgroundColor: Colors.grey[300],
+            child: widget.presta.imageUrl.isEmpty
+                ? const Icon(Icons.person)
+                : null,
           ),
           const SizedBox(width: 8),
           Container(
@@ -659,7 +768,9 @@ class _ImmoChatState extends State<ImmoChat>
         child: Row(
           children: [
             IconButton(
-              onPressed: _showImageSourceDialog,
+              onPressed: () => _showSnackBar(
+                'Image sending not implemented yet',
+              ), // Placeholder for image sending
               icon: Icon(Icons.attach_file, color: _colors.primary),
             ),
             Expanded(
@@ -683,6 +794,10 @@ class _ImmoChatState extends State<ImmoChat>
                       vertical: 8,
                     ),
                   ),
+                  onChanged: (t) {
+                    _onTypingChanged(t);
+                    setState(() {}); // to update clear button if any in future
+                  },
                   onSubmitted: (text) => _sendMessage(text: text),
                 ),
               ),
@@ -701,97 +816,6 @@ class _ImmoChatState extends State<ImmoChat>
           ],
         ),
       ),
-    );
-  }
-}
-
-class _ImageSourceButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  const _ImageSourceButton({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = ConstColors();
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: colors.primary.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: colors.primary.withOpacity(0.2)),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: colors.primary, size: 32),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 14,
-                color: colors.secondary,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-enum MessageStatus { sending, sent, delivered, read }
-
-enum MessageType { text, image, file, location }
-
-class ChatMessage {
-  final String id;
-  final String text;
-  final bool isMe;
-  final DateTime timestamp;
-  final MessageStatus status;
-  final String senderName;
-  final MessageType messageType;
-  final File? imageFile;
-
-  ChatMessage({
-    required this.id,
-    required this.text,
-    required this.isMe,
-    required this.timestamp,
-    required this.status,
-    required this.senderName,
-    required this.messageType,
-    this.imageFile,
-  });
-
-  ChatMessage copyWith({
-    String? id,
-    String? text,
-    bool? isMe,
-    DateTime? timestamp,
-    MessageStatus? status,
-    String? senderName,
-    MessageType? messageType,
-    File? imageFile,
-  }) {
-    return ChatMessage(
-      id: id ?? this.id,
-      text: text ?? this.text,
-      isMe: isMe ?? this.isMe,
-      timestamp: timestamp ?? this.timestamp,
-      status: status ?? this.status,
-      senderName: senderName ?? this.senderName,
-      messageType: messageType ?? this.messageType,
-      imageFile: imageFile ?? this.imageFile,
     );
   }
 }

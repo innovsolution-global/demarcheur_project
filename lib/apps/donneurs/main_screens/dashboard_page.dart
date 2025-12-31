@@ -1,4 +1,3 @@
-import 'package:demarcheur_app/apps/donneurs/main_screens/houses/immo_page.dart';
 import 'package:demarcheur_app/apps/donneurs/main_screens/jobs/application_page.dart';
 import 'package:demarcheur_app/apps/donneurs/main_screens/jobs/home_page.dart';
 import 'package:demarcheur_app/apps/donneurs/main_screens/jobs/message_page.dart';
@@ -18,7 +17,7 @@ class _DashboardPageState extends State<DashboardPage> {
   ConstColors color = ConstColors();
   List pages = [
     HomePage(),
-    ImmoPage(),
+    // ImmoPage(),
     ApplicationPage(),
     MessagePage(),
     ProfilePage(),
@@ -33,8 +32,7 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      drawer: Drawer(),
-
+      //drawer: Drawer(),
       backgroundColor: color.bg,
       body: pages[currentPage],
       bottomNavigationBar: Container(
@@ -67,15 +65,15 @@ class _DashboardPageState extends State<DashboardPage> {
                 padding: EdgeInsets.all(10),
                 borderRadius: BorderRadius.circular(16),
               ),
-              GButton(
-                iconColor: color.primary,
-                iconActiveColor: color.primary,
-                icon: Icons.real_estate_agent,
-                text: "Immobilier",
-                borderRadius: BorderRadius.circular(16),
+              // GButton(
+              //   iconColor: color.primary,
+              //   iconActiveColor: color.primary,
+              //   icon: Icons.real_estate_agent,
+              //   text: "Immobilier",
+              //   borderRadius: BorderRadius.circular(16),
 
-                padding: EdgeInsets.all(10),
-              ),
+              //   padding: EdgeInsets.all(10),
+              // ),
               GButton(
                 borderRadius: BorderRadius.circular(16),
                 iconColor: color.primary,
