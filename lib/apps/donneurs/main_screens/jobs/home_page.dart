@@ -5,7 +5,6 @@ import 'package:demarcheur_app/apps/donneurs/main_screens/houses/immo_page.dart'
 import 'package:demarcheur_app/consts/color.dart';
 import 'package:demarcheur_app/models/add_vancy_model.dart';
 import 'package:demarcheur_app/models/house_model.dart';
-import 'package:demarcheur_app/models/job_model.dart';
 import 'package:demarcheur_app/providers/compa_profile_provider.dart';
 import 'package:demarcheur_app/services/auth_provider.dart';
 import 'package:demarcheur_app/providers/house_provider.dart';
@@ -101,6 +100,18 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     final search = Provider.of<CompaProfileProvider>(context);
     final houses = Provider.of<HouseProvider>(context);
+    final auth = Provider.of<AuthProvider>(context, listen: false); // Get AuthProvider
+
+
+
+
+    // Filter jobs logic
+    final bool isSearcher = auth.role == 'SEARCHER';
+    final displayedJobs = search.filterVancy.where((job) {
+      if (!isSearcher) return true;
+      // Heuristic: SEARCHERs should not see jobs from other SEARCHERs (assumed to be those without companyName)
+      return job.companyName != null && job.companyName!.trim().isNotEmpty;
+    }).toList();
 
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
@@ -112,8 +123,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             _buildModernAppBar(),
             SliverToBoxAdapter(child: _buildSearchSection(search, houses)),
 
-            // Check if both lists are empty
-            if (search.filterVancy.isEmpty && houses.housefiltered.isEmpty)
+            // Check if both lists are empty (using filtered jobs)
+            if (displayedJobs.isEmpty && houses.housefiltered.isEmpty)
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.only(top: 50),
@@ -151,129 +162,32 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               )
             else ...[
               // Jobs Section
-              if (search.filterVancy.isNotEmpty) ...[
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.only(
-                      right: 8.0,
-                      top: 24.0,
-                      left: 20.0,
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Boulots en vedette',
-                          style: TextStyle(
-                            color: color.primary,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        if (search.filterVancy.length > 2)
-                          Padding(
-                            padding: const EdgeInsets.only(
-                              right: 16.0,
-                              top: 8.0,
-                              bottom: 20.0,
-                            ),
-                            child: Align(
-                              alignment: Alignment.centerRight,
-                              child: TextButton.icon(
-                                icon: Icon(
-                                  Icons.arrow_forward_rounded,
-                                  color: color.primary,
-                                ),
-                                style: TextButton.styleFrom(
-                                  foregroundColor: color.primary,
-                                  backgroundColor: color.primary.withValues(
-                                    alpha: 0.1,
-                                  ),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 8,
-                                  ),
-                                ),
-                                onPressed: () {
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (context) => const SearchPage(),
-                                    ),
-                                  );
-                                },
-                                label: const Text(
-                                  'Tout voir',
-                                  style: TextStyle(fontWeight: FontWeight.bold),
-                                ),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
+              if (displayedJobs.isNotEmpty) ...[
+                _buildSectionHeader(
+                  title: 'Boulots en vedette',
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const SearchPage(),
+                      ),
+                    );
+                  },
+                  showButton: displayedJobs.length > 2,
                 ),
-                _buildJobResults(search, limit: 2),
+                _buildJobResults(displayedJobs, search.isLoading, limit: 2),
               ],
 
               // Houses Section
               if (houses.housefiltered.isNotEmpty) ...[
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Maisons en vedette',
-                          style: TextStyle(
-                            color: color.primary,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        if (houses.housefiltered.length > 2)
-                          Padding(
-                            padding: const EdgeInsets.only(
-                              right: 16.0,
-                              top: 8.0,
-                              bottom: 20.0,
-                            ),
-                            child: TextButton.icon(
-                              style: TextButton.styleFrom(
-                                foregroundColor: color.primary,
-                                backgroundColor: color.primary.withValues(
-                                  alpha: 0.1,
-                                ),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 8,
-                                ),
-                              ),
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => const ImmoPage(),
-                                  ),
-                                );
-                              },
-                              icon: Icon(
-                                Icons.arrow_forward_rounded,
-                                color: color.primary,
-                              ),
-                              label: Text(
-                                'Voir tout',
-                                style: TextStyle(
-                                  color: color.primary,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
+                _buildSectionHeader(
+                  title: 'Maisons en vedette',
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const ImmoPage()),
+                    );
+                  },
+                  showButton: houses.housefiltered.length > 2,
                 ),
                 _buildHouseResults(houses, search, limit: 2),
               ],
@@ -301,6 +215,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             ),
           ),
           child: Stack(
+            
             children: [
               Container(
                 decoration: BoxDecoration(
@@ -457,10 +372,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildJobResults(CompaProfileProvider search, {int? limit}) {
+  Widget _buildJobResults(List<AddVancyModel> jobs, bool isLoading,
+      {int? limit}) {
     // Empty check removed, handled in build method
 
-    if (search.isLoading) {
+    if (isLoading) {
       return SliverPadding(
         padding: const EdgeInsets.symmetric(horizontal: 20),
         sliver: SliverList.builder(
@@ -559,7 +475,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       );
     }
 
-    final total = search.filterVancy.length;
+    final total = jobs.length;
     final count = limit != null ? math.min(limit, total) : total;
 
     return SliverPadding(
@@ -567,7 +483,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       sliver: SliverList.builder(
         itemCount: count,
         itemBuilder: (context, index) {
-          final job = search.filterVancy[index];
+          final job = jobs[index];
           return Padding(
             padding: const EdgeInsets.only(bottom: 16),
             child: _buildModernJobCard(job),
@@ -616,7 +532,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(12),
                       child: Image.network(
-                        (job.companyImage != null && job.companyImage!.isNotEmpty)
+                        (job.companyImage != null &&
+                                job.companyImage!.isNotEmpty)
                             ? job.companyImage!
                             : "https://via.placeholder.com/150",
                         fit: BoxFit.cover,
@@ -642,7 +559,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          job.companyName!,
+                          job.companyName ?? 'Entreprise',
                           style: TextStyle(
                             color: color.secondary,
                             fontSize: 14,
@@ -683,7 +600,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 spacing: 12,
                 runSpacing: 8,
                 children: [
-                  _buildInfoChip(Icons.location_on_outlined, job.city),
+                  _buildInfoChip(
+                    Icons.location_on_outlined,
+                    job.city.trim().isNotEmpty ? job.city : 'Non spécifié',
+                  ),
                   _buildInfoChip(Icons.work_outline, job.typeJobe),
                 ],
               ),
@@ -917,50 +837,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildFilterSection(
-    String title,
-    List<String> options,
-    String? selectedValue,
-    Function(String?) onChanged,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: TextStyle(
-            color: color.primary,
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 12),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey.shade300),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: selectedValue,
-              hint: Text('Sélectionner $title'),
-              isExpanded: true,
-              items: options.map((option) {
-                return DropdownMenuItem<String>(
-                  value: option,
-                  child: Text(option),
-                );
-              }).toList(),
-              onChanged: onChanged,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildHouseResults(
     HouseProvider house,
     CompaProfileProvider search, {
@@ -1091,8 +967,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
-              blurRadius: 8,
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 15,
               offset: const Offset(0, 8),
             ),
           ],
@@ -1100,7 +976,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // image section
+            // Image section
             Stack(
               children: [
                 ClipRRect(
@@ -1114,37 +990,68 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     width: double.infinity,
                     fit: BoxFit.cover,
                     errorBuilder: (context, error, stackTrace) => Container(
-                      height: 200,
+                      height: 220,
                       width: double.infinity,
                       color: Colors.grey[200],
                       child: Icon(
-                        Icons.home,
+                        Icons.home_outlined,
                         size: 50,
                         color: Colors.grey[400],
                       ),
                     ),
                   ),
                 ),
+                // Status Badge
                 Positioned(
                   top: 16,
-                  left: 16,
+                  right: 16,
                   child: Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 12,
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: house.status == "Disponible"
-                          ? color.accepted
-                          : color.error,
+                      color: house.status == 'AVAILABLE'
+                          ? Colors.green
+                          : Colors.red,
                       borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.2),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
                     child: Text(
-                      house.status,
+                      house.status == 'AVAILABLE' ? 'Disponible' : 'Occupé',
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+                // Price Badge Overlay
+                Positioned(
+                  bottom: 16,
+                  left: 16,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: color.primary.withOpacity(0.9),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      "${NumberFormat('#,###').format(house.rent).replaceAll(',', '.')} GNF",
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
@@ -1156,55 +1063,76 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    house.companyName,
-                    style: TextStyle(
-                      color: color.primary,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      HugeIcon(
-                        icon: HugeIcons.strokeRoundedLocation01,
-                        size: 16,
-                        color: color.primary,
-                      ),
-                      const SizedBox(width: 6),
                       Expanded(
                         child: Text(
-                          house.location,
+                          house.title ?? house.countType ?? "Bien Immobilier",
                           style: TextStyle(
-                            color: color.secondary,
-                            fontSize: 14,
+                            color: color.primary,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 18,
+                            letterSpacing: -0.5,
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 4),
+                  Text(
+                    house.companyName ?? "Agence Immobilière",
+                    style: TextStyle(
+                      color: color.secondary.withOpacity(0.7),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.location_on_rounded,
+                        size: 16,
+                        color: color.primary.withOpacity(0.5),
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          house.location ?? "Localisation non spécifiée",
+                          style: TextStyle(
+                            color: color.secondary,
+                            fontSize: 14,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Divider(color: Colors.grey[100], height: 1),
+                  const SizedBox(height: 16),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        'Prix du loyer',
-                        style: TextStyle(
-                          color: color.secondary,
-                          fontWeight: FontWeight.w500,
-                        ),
+                      _buildMiniFeature(
+                        Icons.meeting_room_outlined,
+                        "${house.rooms ?? 0}",
                       ),
-                      Flexible(
-                        child: Text(
-                          "${NumberFormat().format(house.rent)} GNF/mois",
-                          style: TextStyle(
-                            color: color.primary,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                      _buildMiniFeature(
+                        Icons.weekend_outlined,
+                        "${house.livingRooms ?? 0}",
+                      ),
+                      _buildMiniFeature(
+                        Icons.square_foot_outlined,
+                        "${house.area ?? 0}m²",
+                      ),
+                      _buildMiniFeature(
+                        Icons.garage_outlined,
+                        "${house.garage ?? 0}",
                       ),
                     ],
                   ),
@@ -1214,6 +1142,82 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildSectionHeader({
+    required String title,
+    required VoidCallback onPressed,
+    bool showButton = true,
+  }) {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              title,
+              style: TextStyle(
+                color: color.primary,
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.5,
+              ),
+            ),
+            if (showButton)
+              TextButton(
+                onPressed: onPressed,
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  backgroundColor: color.primary.withValues(alpha: 0.05),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Tout voir',
+                      style: TextStyle(
+                        color: color.primary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      size: 12,
+                      color: color.primary,
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMiniFeature(IconData icon, String value) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: Colors.grey[400]),
+        const SizedBox(width: 4),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: color.secondary,
+          ),
+        ),
+      ],
     );
   }
 }

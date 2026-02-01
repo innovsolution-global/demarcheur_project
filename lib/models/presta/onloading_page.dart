@@ -71,10 +71,10 @@ class _OnboardingPageState extends State<OnboardingPage> {
                 width: double.infinity,
                 child: OutlinedButton(
                   onPressed: () {},
-                  child: Text("Commencer"),
                   style: OutlinedButton.styleFrom(
                     backgroundColor: colors.primary,
                   ),
+                  child: Text("Commencer"),
                 ),
               ),
             ],

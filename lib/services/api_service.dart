@@ -80,17 +80,14 @@ class ApiService {
             if (data['token'] != null) {
               await pref.setString('token', data['token'].toString());
             }
-            // initializeChatPlugin(data['userId'], data['token']); // Removed
           }
           return data;
         } catch (jsonError) {
           print('JSON decode error in donneurRegistration: $jsonError');
-          print('Response body: ${response.body}');
           return null;
         }
       } else {
         print('Registration failed: ${response.statusCode}');
-        print('Response body: ${response.body}');
         return null;
       }
     } catch (e) {
@@ -109,11 +106,14 @@ class ApiService {
         body: jsonEncode(service),
       );
       if (response.statusCode == 200) {
-        print('service selectionner avec success');
-        return jsonDecode(response.body);
+        try {
+          return jsonDecode(response.body) as Map<String, dynamic>?;
+        } catch (jsonError) {
+          return null;
+        }
       }
     } catch (e) {
-      print('Exception $e');
+      print('ServiceRegister error: $e');
     }
     return null;
   }
@@ -172,21 +172,16 @@ class ApiService {
             if (data['token'] != null) {
               await pref.setString('token', data['token'].toString());
             }
-            // initializeChatPlugin(data['userId'], data['token']); // Removed
           }
           return data;
         } catch (jsonError) {
-          print('JSON decode error in registerGiver: $jsonError');
-          print('Response body: ${response.body}');
           return null;
         }
       } else {
         print('Registration failed: ${response.statusCode}');
-        print('Response body: ${response.body}');
         return null;
       }
     } catch (e) {
-      print('RegisterGiver error: $e');
       return null;
     }
   }
@@ -216,14 +211,13 @@ class ApiService {
             SharedPreferences pref = await SharedPreferences.getInstance();
             await pref.setString('userId', userIdString);
             await pref.setString('token', tokenString);
-            // initializeChatPlugin(userIdString, tokenString); // Removed
           } else {
             print(
               'DEBUG: setLogin - Missing userId or token in response: data=$data',
             );
           }
         }
-        return data; // Return data even if we couldn't cache it, or let the caller decide
+        return data;
       } else {
         print('Authentification failed: ${response.statusCode}');
       }
@@ -235,15 +229,12 @@ class ApiService {
   //for services
 
   Future<List<ServiceModel>> serviceList() async {
-    print('START CALLING THE LIST');
-
     final response = await http.get(
       Uri.parse('$baseUrl/services'),
       headers: {'Content-Type': 'application/json'},
     );
     try {
       if (response.statusCode == 200) {
-        print('Succes message');
         final List<dynamic> body = jsonDecode(response.body);
         return body.map((e) => ServiceModel.fromJson(e)).toList();
       }
@@ -254,11 +245,7 @@ class ApiService {
   }
 
   Future<EnterpriseModel?> giverProfile(String? token) async {
-    print('DEBUG: ApiService.giverProfile - URL: $baseUrl/auth/profile-giver');
-    print('DEBUG: ApiService.giverProfile - Token: $token');
-
     if (token == null || token.isEmpty) {
-      print('Giver Profile failed: No token provided');
       return null;
     }
 
@@ -271,7 +258,6 @@ class ApiService {
     );
     try {
       if (response.statusCode == 200) {
-        print('DEBUG: Profile RAW: ${response.body}');
         final body = jsonDecode(response.body);
         if (body is Map<String, dynamic>) {
           if (body['data'] != null) {
@@ -281,16 +267,6 @@ class ApiService {
           }
           return EnterpriseModel.fromJson(body);
         }
-      } else if (response.statusCode == 401 || response.statusCode == 403) {
-        print(
-          'Giver Profile failed: ${response.statusCode} - Authentication error',
-        );
-        print('Response: ${response.body}');
-        // Token is invalid, return null to trigger re-authentication
-        return null;
-      } else {
-        print('Giver Profile failed: ${response.statusCode}');
-        print('DEBUG: Giver Profile Raw Response: ${response.body}');
       }
     } catch (e) {
       print('Error parsing giver profile: $e');
@@ -309,7 +285,6 @@ class ApiService {
     );
     try {
       if (response.statusCode == 200) {
-        print('Searcher Profile: Success');
         final body = jsonDecode(response.body);
         if (body is Map<String, dynamic>) {
           if (body['data'] != null) {
@@ -319,9 +294,6 @@ class ApiService {
           }
           return DonneurModel.fromJson(body);
         }
-      } else {
-        print('Searcher Profile failed: ${response.statusCode}');
-        print('DEBUG: Searcher Profile Raw Response: ${response.body}');
       }
     } catch (e) {
       print('Error parsing searcher profile: $e');
@@ -372,7 +344,6 @@ class ApiService {
   ) async {
     try {
       final body = jsonEncode(vancy);
-      print('DEBUG: addVancy request body: $body');
 
       final response = await http.post(
         Uri.parse('$baseUrl/job-offers'),
@@ -382,9 +353,6 @@ class ApiService {
         },
         body: body,
       );
-
-      print('DEBUG: addVancy status: ${response.statusCode}');
-      print('DEBUG: addVancy body: ${response.body}');
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         return jsonDecode(response.body);
@@ -408,9 +376,6 @@ class ApiService {
           if (token != null) 'Authorization': 'Bearer $token',
         },
       );
-
-      print('DEBUG: getMyVacancies status: ${response.statusCode}');
-      print('DEBUG: getMyVacancies body: ${response.body}');
 
       if (response.statusCode == 200) {
         final dynamic decodedBody = jsonDecode(response.body);
@@ -454,8 +419,6 @@ class ApiService {
       request.fields['JobId'] = candidate.jobId;
       request.fields['appliquantId'] = candidate.appliquantId;
 
-      print("DEBUG: Multipart Request Fields: ${request.fields}");
-
       if (candidate.document != null) {
         final file = candidate.document!;
         final mimeType = lookupMimeType(file.path);
@@ -481,7 +444,6 @@ class ApiService {
         return jsonDecode(response.body);
       } else {
         print('AddCandidate failed: ${response.statusCode}');
-        print('Response: ${response.body}');
       }
     } catch (e) {
       print('An exception occurred at $e');
@@ -495,10 +457,8 @@ class ApiService {
     int page = 1,
     int limit = 10,
   }) async {
-    print("DEBUG: ApiService.getJobApplicants ENTERED - jobId: $jobId");
     try {
       final url = '$baseUrl/candidatures/job/$jobId';
-      print("DEBUG: ApiService - Fetching applicants from: $url");
 
       final response = await http.get(
         Uri.parse(url),
@@ -508,39 +468,24 @@ class ApiService {
         },
       );
 
-      print("DEBUG: ApiService - Response status: ${response.statusCode}");
-      print("DEBUG: ApiService - Response body: ${response.body}");
-
       if (response.statusCode == 200) {
         final dynamic decoded = jsonDecode(response.body);
         List<dynamic> data = [];
 
         if (decoded is List) {
           data = decoded;
-          print(
-            "DEBUG: ApiService - Response is a List with ${data.length} items",
-          );
         } else if (decoded is Map<String, dynamic>) {
           data =
               decoded['data'] ??
               decoded['candidatures'] ??
               decoded['results'] ??
               [];
-          print(
-            "DEBUG: ApiService - Response is a Map, extracted ${data.length} items from 'data' key",
-          );
         }
 
         final candidates = data.map((json) {
-          print("DEBUG: ApiService - Parsing candidate JSON: $json");
           return CandidateModel.fromJson(json);
         }).toList();
-        print(
-          "DEBUG: ApiService - Parsed ${candidates.length} CandidateModel objects",
-        );
         return candidates;
-      } else {
-        print("DEBUG: ApiService - Error response: ${response.body}");
       }
     } catch (e) {
       print('ApiService.getJobApplicants error: $e');
@@ -553,8 +498,6 @@ class ApiService {
     String? token,
   ) async {
     try {
-      print("DEBUG: ApiService - Fetching jobs for enterprise: $enterpriseId");
-
       // First, get all jobs for this enterprise
       final allJobs = await getMyVacancies(token);
 
@@ -564,38 +507,18 @@ class ApiService {
           .toList();
 
       if (jobs.isEmpty) {
-        print(
-          "DEBUG: ApiService - No jobs found for this enterprise (ID: $enterpriseId)",
-        );
         return [];
       }
-
-      print(
-        "DEBUG: ApiService - Found ${jobs.length} jobs for enterprise $enterpriseId (filtered from ${allJobs.length} total jobs)",
-      );
 
       // Then, fetch candidates for each job
       List<CandidateModel> allCandidates = [];
 
       for (var job in jobs) {
         if (job.id != null && job.id!.isNotEmpty) {
-          print(
-            "DEBUG: ApiService - Fetching candidates for job: ${job.id} (${job.title})",
-          );
           final jobCandidates = await getJobApplicants(job.id!, token);
-          print(
-            "DEBUG: ApiService - Job ${job.id} returned ${jobCandidates.length} candidates",
-          );
           allCandidates.addAll(jobCandidates);
-          print(
-            "DEBUG: ApiService - Total candidates so far: ${allCandidates.length}",
-          );
         }
       }
-
-      print(
-        "DEBUG: ApiService - Total candidates found: ${allCandidates.length}",
-      );
       return allCandidates;
     } catch (e) {
       print('ApiService.getEnterpriseCandidates error: $e');
@@ -609,7 +532,6 @@ class ApiService {
   ) async {
     try {
       final url = '$baseUrl/candidatures/$jobId';
-      print("DEBUG: ApiService - Fetching applicants from: $url");
 
       final response = await http.get(
         Uri.parse(url),
@@ -619,39 +541,24 @@ class ApiService {
         },
       );
 
-      print("DEBUG: ApiService - Response status: ${response.statusCode}");
-      print("DEBUG: ApiService - Response body: ${response.body}");
-
       if (response.statusCode == 200) {
         final dynamic decoded = jsonDecode(response.body);
         List<dynamic> data = [];
 
         if (decoded is List) {
           data = decoded;
-          print(
-            "DEBUG: ApiService - Response is a List with ${data.length} items",
-          );
         } else if (decoded is Map<String, dynamic>) {
           data =
               decoded['data'] ??
               decoded['candidatures'] ??
               decoded['results'] ??
               [];
-          print(
-            "DEBUG: ApiService - Response is a Map, extracted ${data.length} items from 'data' key",
-          );
         }
 
         final candidates = data.map((json) {
-          print("DEBUG: ApiService - Parsing candidate JSON: $json");
           return CandidateModel.fromJson(json);
         }).toList();
-        print(
-          "DEBUG: ApiService - Parsed ${candidates.length} CandidateModel objects",
-        );
         return candidates;
-      } else {
-        print("DEBUG: ApiService - Error response: ${response.body}");
       }
     } catch (e) {
       print('ApiService.getJobApplicants error: $e');
@@ -664,8 +571,6 @@ class ApiService {
     String newStatus,
     String token,
   ) async {
-    print('START CALLING THE UPDATE');
-
     final response = await http.patch(
       Uri.parse('$baseUrl/candidatures/$candidatureId'),
       headers: {
@@ -676,8 +581,6 @@ class ApiService {
     );
 
     if (response.statusCode == 200) {
-      print('Updated successfully the new status is: $newStatus');
-
       return jsonDecode(response.body);
     } else {
       print('Update failed: ${response.body}');
@@ -693,7 +596,6 @@ class ApiService {
 
     try {
       final url = '$baseUrl/candidatures/$userId';
-      print("DEBUG: ApiService - Fetching applications from: $url");
 
       final response = await http.get(
         Uri.parse(url),
@@ -702,8 +604,6 @@ class ApiService {
           'Accept': 'application/json',
         },
       );
-
-      print("DEBUG: Status: ${response.statusCode} for $url");
 
       if (response.statusCode == 200) {
         final dynamic decoded = jsonDecode(response.body);
@@ -719,11 +619,7 @@ class ApiService {
               [];
         }
 
-        print("DEBUG: ApiService - Found ${list.length} applications");
         return List<Map<String, dynamic>>.from(list);
-      } else {
-        print("DEBUG: ApiService - Failed with status ${response.statusCode}");
-        print("DEBUG: Response body: ${response.body}");
       }
     } catch (e) {
       print('ApiService.getUserApplications error: $e');
@@ -780,8 +676,6 @@ class ApiService {
         }
       });
 
-      print("DEBUG: addProperties fields being sent: ${request.fields}");
-
       // Add images
       for (var file in images) {
         final mimeType = lookupMimeType(file.path);
@@ -800,9 +694,6 @@ class ApiService {
 
       final streamedResponse = await request.send();
       final response = await http.Response.fromStream(streamedResponse);
-
-      print('Add Property status: ${response.statusCode}');
-      print('Add Property body: ${response.body}');
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         return jsonDecode(response.body);
@@ -823,10 +714,6 @@ class ApiService {
           if (token != null) 'Authorization': 'Bearer $token',
         },
       );
-      // ignore: avoid_print
-      print('DEBUG: types status: ${response.statusCode}');
-      // ignore: avoid_print
-      print('DEBUG: types body: ${response.body}');
 
       if (response.statusCode == 200) {
         final dynamic decoded = jsonDecode(response.body);
@@ -840,7 +727,6 @@ class ApiService {
         return body.map((e) => TypeProperties.fromJson(e)).toList();
       } else {
         // If API fails, return hardcoded list for now
-        print('DEBUG: API failed, returning hardcoded property types');
         return [
           TypeProperties(
             id: '1',
@@ -895,33 +781,10 @@ class ApiService {
         ];
       }
     } catch (e) {
-      // ignore: avoid_print
       print('DEBUG: types exception: $e');
     }
     return [];
   }
-  // Future<Map<String, dynamic>?> giverProfile(String? token) async {
-  //   try {
-  //     final response = await http.get(
-  //       Uri.parse('$baseUrl/auth/profile-giver'),
-  //       headers: {
-  //         'Authorization':' Bearer $token',
-  //         'Content-Type': 'application/json',
-  //       },
-  //     );
-  //     // ignore: avoid_print
-  //     print('DEBUG: giverProfile status: ${response.statusCode}');
-  //     // ignore: avoid_print
-  //     print('DEBUG: giverProfile body: ${response.body}');
-
-  //     if (response.statusCode == 200) {
-  //       return jsonDecode(response.body);
-  //     }
-  //   } catch (e) {
-  //     // ignore: avoid_print
-  //     print('DEBUG: giverProfile exception: $e');
-  //   }
-  //   return null;
 
   Future<List<HouseModel>> getProperties(
     String? token, {
@@ -935,10 +798,6 @@ class ApiService {
           if (token != null) 'Authorization': 'Bearer $token',
         },
       );
-      // ignore: avoid_print
-      print('DEBUG: getProperties status: ${response.statusCode}');
-      // ignore: avoid_print
-      print('DEBUG: getProperties body: ${response.body}');
 
       if (response.statusCode == 200) {
         final dynamic decoded = jsonDecode(response.body);
@@ -962,7 +821,6 @@ class ApiService {
         return all;
       }
     } catch (e) {
-      // ignore: avoid_print
       print('DEBUG: getProperties exception: $e');
     }
     return [];
@@ -976,16 +834,6 @@ class ApiService {
       final url = '$baseUrl/chats';
       final request = http.MultipartRequest('POST', Uri.parse(url));
 
-      print('DEBUG: sendMessage - URL: $url');
-      print(
-        'DEBUG: sendMessage - Token present: ${token != null && token.isNotEmpty}',
-      );
-      if (token != null && token.length > 20) {
-        print(
-          'DEBUG: sendMessage - Token snippet: ${token.substring(0, 20)}...',
-        );
-      }
-
       if (token != null && token.isNotEmpty) {
         request.headers['Authorization'] = 'Bearer $token';
       }
@@ -996,38 +844,35 @@ class ApiService {
         request.fields[key] = value.toString();
       });
 
-      if (chat.image != null) {
-        final file = chat.image!;
-        final mimeType = lookupMimeType(file.path);
-        final contentType = mimeType != null
-            ? MediaType.parse(mimeType)
-            : MediaType('image', 'jpeg');
+      if (chat.attachments != null && chat.attachments!.isNotEmpty) {
+        for (var file in chat.attachments!) {
+          final mimeType = lookupMimeType(file.path);
+          final contentType = mimeType != null
+              ? MediaType.parse(mimeType)
+              : MediaType('image', 'jpeg');
 
-        request.files.add(
-          await http.MultipartFile.fromPath(
-            'image',
-            file.path,
-            contentType: contentType,
-          ),
-        );
+          request.files.add(
+            await http.MultipartFile.fromPath(
+              'image', // Keeping 'image' as the field name as per backend expectation, multiple files with same key are usually handled as an array
+              file.path,
+              contentType: contentType,
+            ),
+          );
+        }
       }
 
       // 4. Send the request
-      print('Sending request to: $url');
       var streamedResponse = await request.send();
       // 5. Read the response
       var response = await http.Response.fromStream(streamedResponse);
 
       // 6. Handle the status code
       if (response.statusCode >= 200 && response.statusCode < 300) {
-        // Success response (e.g., 200, 201)
-        print('DEBUG: sendMessage SUCCESS - Status: ${response.statusCode}');
-        print('DEBUG: sendMessage body: ${response.body}');
+        print('DEBUG: sendMessage SUCCESS BODY: ${response.body}');
         return jsonDecode(response.body);
       } else {
-        // Error response (e.g., 400, 500)
-        print('Failed to send message Status: ${response.statusCode}');
-        print('Response Body: ${response.body}');
+        print('DEBUG: sendMessage FAILED Status: ${response.statusCode}');
+        print('DEBUG: sendMessage error body: ${response.body}');
         return null;
       }
     } catch (e) {
@@ -1036,123 +881,13 @@ class ApiService {
     }
   }
 
-  // Future<List<SendMessageModel>> fetchMessagesBetweenUsers(
-  //   String userId,
-  //   String otherUserId,
-  //   String? token, {
-  //   int page = 1,
-  //   int limit = 30,
-  // }) async {
-  //   try {
-  //     final List<String> urlVariations = [
-  //       '$baseUrl/chats?id=$userId',
-  //       '$baseUrl/chats?id=$userId&otherId=$otherUserId',
-  //       '$baseUrl/chats?userId=$userId&otherUserId=$otherUserId',
-  //       '$baseUrl/chats?senderId=$userId&receiverId=$otherUserId',
-  //       '$baseUrl/chats?user_id=$userId&other_user_id=$otherUserId',
-  //       '$baseUrl/chats?receiverId=$userId&senderId=$otherUserId',
-  //       '$baseUrl/chats?sender=$userId&receiver=$otherUserId',
-  //       '$baseUrl/chats?receiver=$userId&sender=$otherUserId',
-  //       '$baseUrl/chats?userId=me&otherUserId=$otherUserId',
-  //       '$baseUrl/chats/$otherUserId',
-  //       '$baseUrl/chats/$userId/$otherUserId',
-  //       '$baseUrl/chats/user/$otherUserId',
-  //       '$baseUrl/chats/messages/$otherUserId',
-  //     ];
-
-  //     List<dynamic> data = [];
-
-  //     final List<String> authHeaders = [];
-  //     if (token != null && token.isNotEmpty) {
-  //       final cleanToken =
-  //           token.startsWith('Bearer ') || token.startsWith('BEARER ')
-  //           ? token.substring(token.indexOf(' ') + 1)
-  //           : token;
-  //       authHeaders.add('Bearer $cleanToken');
-  //     }
-
-  //     for (var variantUrl in urlVariations) {
-  //       for (var currentAuth in (authHeaders.isNotEmpty ? authHeaders : [''])) {
-  //         try {
-  //           print(
-  //             'DEBUG: fetchMessagesBetweenUsers - Attempting: $variantUrl${currentAuth.isNotEmpty ? " with $currentAuth" : ""}',
-  //           );
-  //           final response = await http.get(
-  //             Uri.parse(variantUrl),
-  //             headers: {
-  //               if (currentAuth.isNotEmpty) 'Authorization': currentAuth,
-  //               'Accept': 'application/json',
-  //             },
-  //           );
-
-  //           if (response.statusCode == 200) {
-  //             final decoded = jsonDecode(response.body);
-  //             if (decoded is List) {
-  //               print(
-  //                 'DEBUG: fetchMessagesBetweenUsers - SUCCESS (List) with $variantUrl',
-  //               );
-  //               data = decoded;
-  //             } else if (decoded is Map) {
-  //               final List<dynamic> currentData =
-  //                   decoded['data'] ??
-  //                   decoded['messages'] ??
-  //                   decoded['results'] ??
-  //                   decoded['items'] ??
-  //                   [];
-  //               if (currentData.isNotEmpty) {
-  //                 print(
-  //                   'DEBUG: fetchMessagesBetweenUsers - SUCCESS (Map) with $variantUrl',
-  //                 );
-  //                 data = currentData;
-  //               }
-  //             }
-
-  //             if (data.isNotEmpty) break;
-  //           } else {
-  //             print(
-  //               'DEBUG: fetchMessagesBetweenUsers - Status: ${response.statusCode} for $variantUrl',
-  //             );
-  //           }
-  //         } catch (e) {
-  //           print(
-  //             'DEBUG: fetchMessagesBetweenUsers - Error for $variantUrl: $e',
-  //           );
-  //         }
-  //       }
-  //       if (data.isNotEmpty) break;
-  //     }
-
-  //     if (data.isEmpty) {
-  //       print(
-  //         'DEBUG: fetchMessagesBetweenUsers - All variations returned empty. This might mean the user has no messages or the query is wrong.',
-  //       );
-  //     }
-
-  //     // Client-side filtering as fallback if backend doesn't filter
-  //     final messages = data.map((e) => SendMessageModel.fromJson(e)).toList();
-  //     return messages.where((msg) {
-  //       return (msg.senderId == userId && msg.receiverId == otherUserId) ||
-  //           (msg.senderId == otherUserId && msg.receiverId == userId);
-  //     }).toList();
-  //   } catch (e) {
-  //     print('Error fetching messages: $e');
-  //   }
-  //   return [];
-  // }
-
-  //retrieve messages by id
-  Future<Map<String, dynamic>?> fetchMessagesById(
-    String conversationId,
+  // Retrieve a message by its ID
+  Future<List<SendMessageModel>> fetchMessagesById(
+    String messageId,
     String? token,
   ) async {
     try {
-      final url = '$baseUrl/chats/$conversationId';
-
-      print('DEBUG: fetchMessagesById - URL: $url');
-      print(
-        'DEBUG: fetchMessagesById - Token present: ${token != null && token.isNotEmpty}',
-      );
-
+      final url = '$baseUrl/chats/$messageId';
       final response = await http.get(
         Uri.parse(url),
         headers: {
@@ -1164,362 +899,291 @@ class ApiService {
 
       if (response.statusCode == 200) {
         final decoded = jsonDecode(response.body);
-        return decoded['data'] ?? decoded['messages'] ?? decoded;
+        return decoded['data'] ?? decoded['message'] ?? decoded;
       } else {
-        print('Failed to fetch messages: ${response.statusCode}');
-        print('Response Body: ${response.body}');
+        print('Failed to fetch message by ID: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error fetching messages: $e');
+      print('Error fetching message by ID: $e');
     }
-    return null;
+    return [];
   }
 
-  // Future<List<dynamic>> fetchConversations(
-  //   String? token, {
-  //   String? userId,
-  //   String? otherId,
-  // }) async {
-  //   try {
-  //     print('DEBUG: fetchConversations - userId passed: $userId');
-  //     print('DEBUG: fetchConversations - token present: ${token != null}');
+  Future<List<SendMessageModel>> allConversation(
+    String userId, {
+    String? token,
+  }) async {
+    try {
+      print(
+        'DEBUG: ApiService.allConversation - Requesting for userId: $userId',
+      );
+      final response = await http.get(
+        Uri.parse('$baseUrl/chats/by-user/$userId'),
+        headers: {
+          'Accept': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        }..addAll(_headers),
+      );
 
-  //     // Diagnostic: Check what the backend thinks our profile is
-  //     String? giverId;
-  //     String? searcherId;
-  //     try {
-  //       final giver = await giverProfile(token);
-  //       if (giver != null) {
-  //         giverId = giver.id;
-  //         print('DEBUG: fetchConversations - GIVER Profile ID: $giverId');
-  //       }
-  //       final searcher = await searcherProfile(token);
-  //       if (searcher != null) {
-  //         searcherId = searcher.id;
-  //         print('DEBUG: fetchConversations - SEARCHER Profile ID: $searcherId');
-  //       }
-  //     } catch (e) {
-  //       print('DEBUG: fetchConversations - Profile check failed: $e');
-  //     }
+      List<SendMessageModel> allMessages = [];
 
-  //     final List<String> allUserIds = {
-  //       if (userId != null && userId.isNotEmpty) userId,
-  //       if (giverId != null && giverId.isNotEmpty) giverId,
-  //       if (searcherId != null && searcherId.isNotEmpty) searcherId,
-  //     }.toList();
+      if (response.statusCode == 200) {
+        final dynamic decoded = jsonDecode(response.body);
+        List<dynamic> list = [];
 
-  //     print('DEBUG: fetchConversations - IDs to probe: $allUserIds');
+        if (decoded is List) {
+          list = decoded;
+        } else if (decoded is Map<String, dynamic>) {
+          list =
+              decoded['data'] ??
+              decoded['chats'] ??
+              decoded['messages'] ??
+              decoded['results'] ??
+              [];
+        }
 
-  //     final List<String> urlVariations = [];
+        allMessages = list
+            .map((json) => SendMessageModel.fromJson(json))
+            .toList();
+      }
 
-  //     // PRIORITY 1: Plain /chats (standard)
-  //     urlVariations.add('$baseUrl/chats');
+      // Fallback Strategy: If targeted fetch empty or failed, try more exhaustive search
+      if (allMessages.isEmpty) {
+        final fallbackData = await fetchConversations(token, userId: userId);
 
-  //     // PRIORITY 2: User specific variations
-  //     for (var uId in allUserIds) {
-  //       urlVariations.addAll([
-  //         '$baseUrl/chats?userId=$uId',
-  //         '$baseUrl/chats?id=$uId',
-  //         '$baseUrl/chats/user/$uId',
-  //         '$baseUrl/chats?user_id=$uId',
-  //         '$baseUrl/chats?senderId=$uId',
-  //         '$baseUrl/chats?receiverId=$uId',
-  //       ]);
-  //     }
+        final List<SendMessageModel> fallbackModels = [];
+        for (final e in fallbackData) {
+          if (e is Map<String, dynamic>) {
+            final partnerId =
+                (e['receiverId'] ?? e['otherUserId'] ?? e['id'])?.toString() ??
+                '';
+            if (partnerId.isEmpty || partnerId == 'null') continue;
 
-  //     // PRIORITY 3: Role and Alias variations
-  //     urlVariations.addAll([
-  //       '$baseUrl/chats?userId=me',
-  //       '$baseUrl/chats/me',
-  //       '$baseUrl/chats/conversations',
-  //       '$baseUrl/chats/searcher',
-  //       '$baseUrl/chats/giver',
-  //       '$baseUrl/messages',
-  //     ]);
+            fallbackModels.add(
+              SendMessageModel(
+                id: partnerId,
+                content: e['lastMessage'] ?? '',
+                senderId: userId,
+                receiverId: partnerId,
+                userName: e['name'] ?? 'Utilisateur',
+                userPhoto: e['image'],
+                timestamp: e['timestamp'] != null
+                    ? DateTime.tryParse(e['timestamp'])
+                    : null,
+              ),
+            );
+          } else if (e is SendMessageModel) {
+            fallbackModels.add(e);
+          }
+        }
+        return fallbackModels;
+      }
 
-  //     List<dynamic> messages = [];
+      // Grouping Logic: If endpoint returned raw messages, we must group them by conversation partner
+      final Map<String, SendMessageModel> conversationsMap = {};
 
-  //     final List<String> authHeaders = [];
-  //     if (token != null && token.isNotEmpty) {
-  //       final cleanToken =
-  //           token.startsWith('Bearer ') || token.startsWith('BEARER ')
-  //           ? token.substring(token.indexOf(' ') + 1)
-  //           : token;
+      print('DEBUG: ApiService.allConversation - Total messages to group: ${allMessages.length}');
+      for (var msg in allMessages) {
+        // Identify the partner ID.
+        // Logic: The partner is the ID that is NOT mine.
+        // If one is empty, the other is the partner.
+        String partnerId = '';
+        if (msg.senderId.isNotEmpty && msg.senderId != userId) {
+          partnerId = msg.senderId;
+        } else if (msg.receiverId.isNotEmpty && msg.receiverId != userId) {
+          partnerId = msg.receiverId;
+        }
 
-  //       authHeaders.add('Bearer $cleanToken');
+        print('DEBUG: ApiService.allConversation - msg: s="${msg.senderId}", r="${msg.receiverId}", partnerId="$partnerId"');
 
-  //       if (token.length > 20) {
-  //         print(
-  //           'DEBUG: fetchConversations - Token snippet: ${cleanToken.substring(0, 20)}...',
-  //         );
-  //       }
-  //     }
+        if (partnerId.isEmpty || partnerId == userId) {
+          continue;
+        }
 
-  //     for (var variantUrl in urlVariations) {
-  //       for (var currentAuth in (authHeaders.isNotEmpty ? authHeaders : [''])) {
-  //         try {
-  //           print(
-  //             'DEBUG: fetchConversations - Attempting: $variantUrl${currentAuth.isNotEmpty ? " with $currentAuth" : ""}',
-  //           );
-  //           final response = await http.get(
-  //             Uri.parse(variantUrl),
-  //             headers: {
-  //               if (currentAuth.isNotEmpty) 'Authorization': currentAuth,
-  //               'Accept': 'application/json',
-  //             },
-  //           );
+        // Identify if I was the sender of the last message
+        final wasMe = (msg.senderId == userId || msg.senderId.trim().isEmpty);
 
-  //           if (response.statusCode == 200) {
-  //             final decoded = jsonDecode(response.body);
-  //             if (decoded is Map && decoded.containsKey('total')) {
-  //               print(
-  //                 'DEBUG: fetchConversations - Found ${decoded['total']} items for $variantUrl',
-  //               );
-  //             }
+        // Create a normalized message where IDs are guaranteed for the UI
+        final normalizedMsg = SendMessageModel(
+          id: msg.id,
+          content: msg.content,
+          senderId: wasMe ? userId : partnerId,
+          receiverId: wasMe ? partnerId : userId,
+          userName: msg.userName,
+          userPhoto: msg.userPhoto,
+          timestamp: msg.timestamp,
+        );
+        
+        print('DEBUG: ApiService.allConversation - Produced normalized: s="${normalizedMsg.senderId}", r="${normalizedMsg.receiverId}"');
 
-  //             final List<dynamic> currentData = decoded is List
-  //                 ? decoded
-  //                 : (decoded['data'] ??
-  //                       decoded['messages'] ??
-  //                       decoded['conversations'] ??
-  //                       decoded['results'] ??
-  //                       decoded['items'] ??
-  //                       []);
+        if (!conversationsMap.containsKey(partnerId)) {
+          conversationsMap[partnerId] = normalizedMsg;
+        } else {
+          // Keep the newest message for the conversation
+          final existing = conversationsMap[partnerId]!;
+          if (normalizedMsg.timestamp != null &&
+              (existing.timestamp == null ||
+                  normalizedMsg.timestamp!.isAfter(existing.timestamp!))) {
+            conversationsMap[partnerId] = normalizedMsg;
+          }
+        }
+      }
 
-  //             if (currentData.isNotEmpty) {
-  //               print('DEBUG: fetchConversations - SUCCESS with $variantUrl');
+      final result = conversationsMap.values.toList();
+      // Sort newest first
+      result.sort(
+        (a, b) =>
+            (b.timestamp ?? DateTime(0)).compareTo(a.timestamp ?? DateTime(0)),
+      );
 
-  //               final first = currentData.first;
-  //               final isAlreadyConversation =
-  //                   first is Map &&
-  //                   (first.containsKey('receiverId') ||
-  //                       first.containsKey('otherUser') ||
-  //                       first.containsKey('participants'));
-
-  //               if (isAlreadyConversation) {
-  //                 print(
-  //                   'DEBUG: fetchConversations - Data detected as PRE-GROUPED CONVERSATIONS',
-  //                 );
-  //                 return currentData;
-  //               }
-
-  //               messages = currentData;
-  //               break; // Break from inner loop (auth headers)
-  //             } else {
-  //               print(
-  //                 'DEBUG: fetchConversations - Body was empty or zero items: ${response.body}',
-  //               );
-  //             }
-  //           } else {
-  //             print(
-  //               'DEBUG: fetchConversations - Status Code: ${response.statusCode} for $variantUrl',
-  //             );
-  //             if (response.statusCode != 404) {
-  //               print('DEBUG: fetchConversations - Response: ${response.body}');
-  //             }
-  //           }
-  //         } catch (e) {
-  //           print(
-  //             'DEBUG: fetchConversations - Probe Error for $variantUrl: $e',
-  //           );
-  //         }
-  //       }
-  //       if (messages.isNotEmpty) break;
-  //     }
-
-  //     if (messages.isNotEmpty) {
-  //       print(
-  //         'DEBUG: fetchConversations - Final selection has ${messages.length} messages',
-  //       );
-  //       print(
-  //         'DEBUG: fetchConversations - First message sample: ${messages.first}',
-  //       );
-  //     }
-
-  //     // Group messages by conversation (unique sender/receiver pairs)
-  //     final Map<String, dynamic> conversationsMap = {};
-
-  //     for (var message in messages) {
-  //       final senderId =
-  //           (message['senderId'] ??
-  //                   message['sender_id'] ??
-  //                   message['sender']?['id'] ??
-  //                   message['sender']?['_id'])
-  //               ?.toString();
-
-  //       final receiverId =
-  //           (message['receiverId'] ??
-  //                   message['receiver_id'] ??
-  //                   message['receiver']?['id'] ??
-  //                   message['receiver']?['_id'])
-  //               ?.toString();
-
-  //       if (senderId == null || receiverId == null) {
-  //         print('DEBUG: fetchConversations - Skipping message: missing IDs');
-  //         continue;
-  //       }
-
-  //       // Only include messages where the current user is involved
-  //       if (allUserIds.isNotEmpty &&
-  //           !allUserIds.contains(senderId) &&
-  //           !allUserIds.contains(receiverId)) {
-  //         continue;
-  //       }
-
-  //       // Determine who the "other" person in the conversation is
-  //       final isSenderMe = allUserIds.contains(senderId);
-  //       final otherUserId = isSenderMe ? receiverId : senderId;
-
-  //       String otherName = 'Utilisateur';
-  //       String? otherImage;
-
-  //       if (senderId == otherUserId) {
-  //         otherName =
-  //             message['senderName'] ??
-  //             message['sender']?['name'] ??
-  //             'Utilisateur';
-  //         otherImage = message['senderImage'] ?? message['sender']?['image'];
-  //       } else {
-  //         otherName =
-  //             message['receiverName'] ??
-  //             message['receiver']?['name'] ??
-  //             'Utilisateur';
-  //         otherImage =
-  //             message['receiverImage'] ?? message['receiver']?['image'];
-  //       }
-
-  //       // Create a unique key for this conversation (sorted to ensure consistency)
-  //       final participants = [senderId, receiverId]..sort();
-  //       final conversationKey = participants.join('_');
-
-  //       if (!conversationsMap.containsKey(conversationKey)) {
-  //         conversationsMap[conversationKey] = {
-  //           'receiverId': otherUserId,
-  //           'receiverName': otherName,
-  //           'receiverImage': otherImage,
-  //           'lastMessage': message,
-  //           'unreadCount':
-  //               (message['isRead'] == false || message['read'] == false)
-  //               ? 1
-  //               : 0,
-  //         };
-  //       } else {
-  //         // Update if this message is newer
-  //         final existing = conversationsMap[conversationKey];
-  //         final existingTime = existing['lastMessage']?['createdAt'];
-  //         final newTime = message['createdAt'];
-
-  //         if (newTime != null &&
-  //             (existingTime == null ||
-  //                 DateTime.parse(
-  //                   newTime,
-  //                 ).isAfter(DateTime.parse(existingTime)))) {
-  //           conversationsMap[conversationKey]!['lastMessage'] = message;
-  //         }
-  //       }
-  //     }
-
-  //     return conversationsMap.values.toList();
-  //   } catch (e) {
-  //     print('Error fetching conversations: $e');
-  //   }
-  //   return [];
-  // }
-
-  // Future<String?> getToken() async {
-  //   return await storage.read(key: 'token');
-  // }
-
-  // Future<void> logout() async {
-  //   await storage.delete(key: 'token');
-  // }
+      print(
+        'DEBUG: ApiService.allConversation - Final grouped conversations: ${result.length}',
+      );
+      return result;
+    } catch (e) {
+      print('DEBUG: ApiService.allConversation - Exception: $e');
+    }
+    return [];
+  }
 
   Future<List<dynamic>> fetchConversations(
     String? token, {
     String? userId,
   }) async {
     try {
-      final String baseWithoutV1 = baseUrl.replaceAll('/v1', '');
-      final List<String> urlVariations = [
-        // Primary variations (v1)
-        if (userId != null) '$baseUrl/chats/$userId',
-        '$baseUrl/chats',
-        if (userId != null) '$baseUrl/chats?id=$userId',
-        if (userId != null) '$baseUrl/chats?user_id=$userId',
-        if (userId != null) '$baseUrl/chats?senderId=$userId',
-        if (userId != null) '$baseUrl/chats?receiverId=$userId',
-        if (userId != null) '$baseUrl/chats?receiver_id=$userId',
+      // Since there is no DIRECT conversation endpoint in Swagger, we simulate it
+      // by fetching ALL messages for the user and grouping them.
 
-        // Root Variations (likely for some backends)
-        '$baseWithoutV1/chats',
-        if (userId != null) '$baseWithoutV1/chats?userId=$userId',
+      List<SendMessageModel> allMessages = [];
 
-        // Endpoint Variations
-        '$baseUrl/messages',
-        if (userId != null) '$baseUrl/chats/$userId',
-        '$baseUrl/conversations',
-        if (userId != null) '$baseUrl/conversations?userId=$userId',
-
-        // Identity Variations
-        '$baseUrl/chats/me',
-        '$baseUrl/chats?userId=me',
-      ];
-
-      for (var variantUrl in urlVariations) {
-        print('DEBUG: ApiService.fetchConversations - Attempting: $variantUrl');
-        final response = await http.get(
-          Uri.parse(variantUrl),
-          headers: {
-            'Authorization': 'Bearer $token',
-            'Content-Type': 'application/json',
-          },
-        );
-
-        print(
-          'DEBUG: ApiService.fetchConversations - Status: ${response.statusCode}',
-        );
-        if (response.statusCode == 200) {
-          print(
-            'DEBUG: ApiService.fetchConversations Body: ${response.body.length > 300 ? response.body.substring(0, 300) : response.body}',
+      Future<void> fetchAndAdd(String url) async {
+        try {
+          print('DEBUG: fetchConversations - Requesting $url');
+          final resp = await http.get(
+            Uri.parse(url),
+            headers: {
+              if (token != null) 'Authorization': 'Bearer $token',
+              'Accept': 'application/json',
+            },
           );
+          if (resp.statusCode == 200) {
+            final d = jsonDecode(resp.body);
+            List l = [];
+            if (d is List) {
+              l = d;
+            } else if (d is Map) {
+              l =
+                  d['data'] ??
+                  d['messages'] ??
+                  d['chats'] ??
+                  d['results'] ??
+                  [];
+            }
+            print(
+              'DEBUG: fetchConversations - Fetched ${l.length} messages from $url',
+            );
+            if (l.isEmpty) {
+              print('DEBUG: fetchConversations - Empty Body: ${resp.body}');
+            }
+
+            allMessages.addAll(l.map((e) => SendMessageModel.fromJson(e)));
+          } else {
+            print(
+              'DEBUG: fetchConversations - Failed $url status: ${resp.statusCode} Body: ${resp.body}',
+            );
+          }
+        } catch (e) {
+          print('Error fetching messages: $e');
+        }
+      }
+
+      // Use CamelCase parameters as per Swagger documentation
+      // Swagger says /chats requires senderId and receiverId.
+      // We try to request with just one to get all conversations.
+      await fetchAndAdd('$baseUrl/chats?senderId=$userId&limit=100');
+      await fetchAndAdd('$baseUrl/chats?receiverId=$userId&limit=100');
+
+      if (allMessages.isEmpty) {
+        // Fallback: Fetch ALL chats for the user (assuming /chats returns the authenticated user's messages)
+        print(
+          'DEBUG: fetchConversations - Targeted fetch empty. Trying generic /chats endpoint',
+        );
+        await fetchAndAdd('$baseUrl/chats?limit=100');
+
+        // If still empty, try without limit
+        if (allMessages.isEmpty) {
+          await fetchAndAdd('$baseUrl/chats');
+        }
+      }
+
+      if (allMessages.isEmpty && userId == null) {
+        // Fallback if userId wasn't provided, try the old endpoint just in case it exists undocumented
+        print('DEBUG: fetchConversations - userId null, trying /chat fallback');
+        final fallbackUrl = '$baseUrl/chat';
+        try {
+          final resp = await http.get(
+            Uri.parse(fallbackUrl),
+            headers: {
+              if (token != null) 'Authorization': 'Bearer $token',
+              'Accept': 'application/json',
+            },
+          );
+          if (resp.statusCode == 200) {
+            final decoded = jsonDecode(resp.body);
+            List<dynamic> list = (decoded is List)
+                ? decoded
+                : (decoded['data'] ?? []);
+            return list;
+          }
+        } catch (_) {}
+        return [];
+      }
+
+      // Group by partner ID
+      final Map<String, Map<String, dynamic>> conversations = {};
+
+      for (var msg in allMessages) {
+        String partnerId;
+        String partnerName = "Utilisateur"; // Default
+
+        // Determine who is the partner
+        if (msg.senderId == userId) {
+          partnerId = msg.receiverId;
+        } else {
+          partnerId = msg.senderId;
         }
 
-        if (response.statusCode == 200) {
-          final dynamic decoded = jsonDecode(response.body);
+        if (partnerId.isEmpty || partnerId == 'null') continue;
 
-          // Flexible extraction: Look for any List if typical keys are missing
-          List<dynamic> currentData = [];
-          if (decoded is List) {
-            currentData = decoded;
-          } else if (decoded is Map<String, dynamic>) {
-            currentData =
-                decoded['data'] ??
-                decoded['conversations'] ??
-                decoded['results'] ??
-                decoded['chats'] ??
-                decoded['messages'] ??
-                decoded['items'] ??
-                [];
-
-            // If still empty but map has other lists, pick the first one
-            if (currentData.isEmpty) {
-              for (var val in decoded.values) {
-                if (val is List && val.isNotEmpty) {
-                  currentData = val;
-                  break;
-                }
-              }
-            }
-          }
-
-          if (currentData.isNotEmpty) {
-            print(
-              'DEBUG: ApiService.fetchConversations - SUCCESS with $variantUrl (${currentData.length} items)',
-            );
-            return currentData;
+        // Add to map if not present or update if this message is newer
+        if (!conversations.containsKey(partnerId)) {
+          conversations[partnerId] = {
+            'id': partnerId,
+            'name': msg.userName.isNotEmpty ? msg.userName : partnerName,
+            'lastMessage': msg.content,
+            'timestamp': msg.timestamp?.toIso8601String(),
+            'receiverId': partnerId,
+            'otherUserId': partnerId,
+            'image': msg.userPhoto,
+          };
+        } else {
+          // Update if newer
+          final existing = conversations[partnerId];
+          final oldTime = DateTime.tryParse(existing?['timestamp'] ?? '');
+          final newTime = msg.timestamp;
+          if (oldTime == null ||
+              (newTime != null && newTime.isAfter(oldTime))) {
+            conversations[partnerId]!['lastMessage'] = msg.content;
+            conversations[partnerId]!['timestamp'] = msg.timestamp
+                ?.toIso8601String();
           }
         }
       }
+
+      print(
+        'DEBUG: fetchConversations - Constructed ${conversations.length} conversations from messages',
+      );
+      return conversations.values.toList();
     } catch (e) {
       print('ApiService.fetchConversations error: $e');
     }
@@ -1527,143 +1191,173 @@ class ApiService {
   }
 
   // Fetch messages between two users
-
   Future<List<SendMessageModel>> fetchMessagesBetweenUsers(
-    String userId,
-    String otherUserId,
+    String senderId,
+    String receiverId,
     String? token, {
     int page = 1,
     int limit = 30,
   }) async {
     try {
-      final List<String> urlVariations = [
-        '$baseUrl/chats?userId=$userId&otherUserId=$otherUserId&page=$page&limit=$limit',
-        '$baseUrl/chats?senderId=$userId&receiverId=$otherUserId',
-        '$baseUrl/chats?senderId=$otherUserId&receiverId=$userId',
-        '$baseUrl/chats?userId=$userId&otherId=$otherUserId',
-        '$baseUrl/chats',
-      ];
+      // Normalize IDs
+      final String myId = senderId.trim();
+      final String otherId = receiverId.trim();
+      print('The token is: $token');
+      print(
+        'DEBUG: fetchMessages - Starting fetch for Me=$myId, Other=$otherId',
+      );
 
-      for (var variantUrl in urlVariations) {
-        print(
-          'DEBUG: ApiService.fetchMessagesBetweenUsers - Attempting: $variantUrl',
-        );
-        final response = await http.get(
-          Uri.parse(variantUrl),
-          headers: {
-            'Authorization': 'Bearer $token',
-            'Content-Type': 'application/json',
-          },
-        );
+      List<SendMessageModel> allRelevantMessages = [];
 
-        print(
-          'DEBUG: ApiService.fetchMessagesBetweenUsers - Status: ${response.statusCode}',
-        );
+      Future<void> fetchAndAdd(String url) async {
+        try {
+          print('DEBUG: fetchMessages - Requesting $url');
+          final resp = await http.get(
+            Uri.parse(url),
+            headers: {
+              if (token != null) 'Authorization': 'Bearer $token',
+              'Accept': 'application/json',
+            },
+          );
+          if (resp.statusCode == 200) {
+            final d = jsonDecode(resp.body);
+            List l = [];
+            if (d is List) {
+              l = d;
+            } else if (d is Map) {
+              l =
+                  d['data'] ??
+                  d['messages'] ??
+                  d['chats'] ??
+                  d['results'] ??
+                  [];
+            }
+            if (l.isEmpty && d is Map) {
+              print(
+                'DEBUG: fetchMessages - Empty list from $url. Body keys: ${d.keys}',
+              );
+            } else {
+              print(
+                'DEBUG: fetchMessages - Fetched ${l.length} messages from $url',
+              );
+            }
+            if (l.isEmpty) {
+              print('DEBUG: fetchMessages - Empty Body: ${resp.body}');
+            }
 
-        if (response.statusCode == 200) {
-          final dynamic decoded = jsonDecode(response.body);
-          List<dynamic> messagesList =
-              (decoded is Map
-                  ? (decoded['data'] ?? decoded['messages'])
-                  : (decoded is List ? decoded : [])) ??
-              [];
-
-          if (messagesList.isNotEmpty) {
-            print(
-              'DEBUG: ApiService.fetchMessagesBetweenUsers - SUCCESS with $variantUrl (${messagesList.length} items)',
+            if (l.isNotEmpty) {
+              print('DEBUG: fetchMessages - Sample JSON from $url: ${l.first}');
+            }
+            allRelevantMessages.addAll(
+              l.map((e) => SendMessageModel.fromJson(e)),
             );
-            return messagesList
-                .map((msg) => SendMessageModel.fromJson(msg))
-                .toList();
+          } else {
+            print(
+              'DEBUG: fetchMessages - Failed $url status: ${resp.statusCode}',
+            );
           }
+        } catch (e) {
+          print('DEBUG: fetchMessages - Error fetching from $url: $e');
         }
       }
+
+      // Use confirmed parameters from Swagger
+      // 1. Direction Me -> Other
+      await fetchAndAdd(
+        '$baseUrl/chats?senderId=$myId&receiverId=$otherId&limit=100',
+      );
+
+      // 2. Direction Other -> Me (just in case the endpoint is directional)
+      await fetchAndAdd(
+        '$baseUrl/chats?senderId=$otherId&receiverId=$myId&limit=100',
+      );
+
+      // PROBE: If still empty, try to fetch ANY messages to debug the endpoint
+      if (allRelevantMessages.isEmpty) {
+        print(
+          'DEBUG: fetchMessages - Targeted fetch empty. Trying generic /chats endpoint and filtering locally.',
+        );
+
+        List<SendMessageModel> genericList = [];
+        // Use a temporary list to fetch generic
+        Future<void> fetchGeneric(String url) async {
+          try {
+            final resp = await http.get(
+              Uri.parse(url),
+              headers: {if (token != null) 'Authorization': 'Bearer $token'},
+            );
+            if (resp.statusCode == 200) {
+              final d = jsonDecode(resp.body);
+              List l = [];
+              if (d is List)
+                l = d;
+              else if (d is Map)
+                l = d['data'] ?? d['messages'] ?? d['chats'] ?? [];
+              if (l.isNotEmpty) {
+                print(
+                  'DEBUG: fetchMessages - Generic fetch found ${l.length} messages',
+                );
+                genericList.addAll(l.map((e) => SendMessageModel.fromJson(e)));
+              }
+            }
+          } catch (e) {
+            print('DEBUG: fetchMessages - Generic error $e');
+          }
+        }
+
+        await fetchGeneric('$baseUrl/chats?limit=300'); // Fetch more to be safe
+        if (genericList.isEmpty) await fetchGeneric('$baseUrl/chats');
+
+        // Filter locally
+        final filtered = genericList.where((m) {
+          final s = m.senderId;
+          final r = m.receiverId;
+          return (s == myId && r == otherId) || (s == otherId && r == myId);
+        }).toList();
+
+        print(
+          'DEBUG: fetchMessages - Locally filtered ${filtered.length} relevant messages from ${genericList.length} total.',
+        );
+        allRelevantMessages.addAll(filtered);
+      }
+
+      // 3. Filter for the specific conversation partner
+      print(
+        'DEBUG: fetchMessages - Filtering ${allRelevantMessages.length} candidates...',
+      );
+
+      final filtered = allRelevantMessages.where((msg) {
+        final s = msg.senderId.trim();
+        final r = msg.receiverId.trim();
+
+        // Check for direction 1: Me -> Other
+        final match1 = (s == myId && r == otherId);
+        // Check for direction 2: Other -> Me
+        final match2 = (s == otherId && r == myId);
+
+        if (match1 || match2) {
+          return true;
+        }
+        return false;
+      }).toList();
+
+      // Deduplicate based on ID
+      final uniqueMessages = {for (var m in filtered) m.id: m}.values.toList();
+
+      // Sort by timestamp (newest first)
+      uniqueMessages.sort((a, b) {
+        final tA = a.timestamp ?? DateTime(0);
+        final tB = b.timestamp ?? DateTime(0);
+        return tB.compareTo(tA);
+      });
+
+      print(
+        'DEBUG: fetchMessages - Found ${uniqueMessages.length} final messages for conversation',
+      );
+      return uniqueMessages;
     } catch (e) {
       print('ApiService.fetchMessagesBetweenUsers error: $e');
     }
     return [];
-  }
-
-  Future<void> initializeChatPlugin(String userId, String token) async {
-    // Commented out - chat_plugin package has bugs
-    // try {
-    //   if (ChatConfig.instance.userId == userId) {
-    //     ChatPlugin.chatService.refreshGlobalConnection();
-    //     return;
-    //   }
-    //   ChatPlugin.initialize(
-    //     config: ChatConfig(
-    //       apiUrl: Config.baseUrl,
-    //       userId: userId,
-    //       token: token,
-    //       enableOnlineStatus: true,
-    //       maxReconnectionAttempts: 5,
-    //       enableReadReceipts: true,
-    //       enableTypingIndicators: true,
-    //       autoMarkAsRead: true,
-    //       debugMode: true,
-    //     ),
-    //   );
-    // } catch (e) {
-    //   print(e);
-    // }
-    print('ChatPlugin disabled - using direct API calls instead');
-  }
-
-  Future<void> setupChatApiHandler(String userId, String token) async {
-    // Commented out - chat_plugin package has bugs
-    //   final handlers = ChatApiHandlers(
-    //     loadMessagesHandler: ({limit = 30, page = 1, searchText = ''}) async {
-    //       final receiverId = ChatPlugin.chatService.receiverId;
-    //       if (receiverId.isEmpty) {
-    //         return [];
-    //       }
-    //       try {
-    //         var url =
-    //             '${Config.baseUrl}/chat/userId=$userId&otherUserId=$receiverId&page=$page&limit=$limit';
-    //         if (searchText.isNotEmpty) {
-    //           url += '&searchText=${Uri.decodeComponent(searchText)}';
-    //         }
-    //         final response = await http.get(
-    //           Uri.parse(url),
-    //           headers: {
-    //             'Authorization': 'Bearer$token',
-    //             'Content-Type': 'application/json',
-    //           },
-    //         );
-    //         if (response.statusCode == 200) {
-    //           final List<dynamic> data = jsonDecode(response.body);
-    //           return data.map((msg) => ChatMessage.fromMap(msg, userId)).toList();
-    //         } else {
-    //           return [];
-    //         }
-    //       } catch (e) {
-    //         return [];
-    //       }
-    //     },
-    //     loadChatRoomsHandler: () async {
-    //       try {
-    //         var url = '${Config.baseUrl}/chat';
-
-    //         final response = await http.get(
-    //           Uri.parse(url),
-    //           headers: {
-    //             'Authorization': 'Bearer$token',
-    //             'Content-Type': 'application/json',
-    //           },
-    //         );
-    //         if (response.statusCode == 200) {
-    //           final List<dynamic> data = jsonDecode(response.body);
-    //           return data.map((room) => ChatRoom.fromMap(room)).toList();
-    //         } else {
-    //           return [];
-    //         }
-    //       } catch (e) {
-    //         return [];
-    //       }
-    //     },
-    //   );
-    //   ChatPlugin.chatService.setApiHandlers(handlers);
-    //   print('ChatPlugin API handlers disabled - using direct API calls instead');
   }
 }

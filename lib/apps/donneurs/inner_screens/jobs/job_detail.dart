@@ -1,12 +1,18 @@
+import 'package:demarcheur_app/apps/donneurs/inner_screens/jobs/job_applicants_page.dart';
 import 'package:demarcheur_app/apps/donneurs/inner_screens/jobs/upload.dart';
 import 'package:demarcheur_app/consts/color.dart';
 import 'package:demarcheur_app/models/add_vancy_model.dart';
 import 'package:demarcheur_app/models/job_model.dart';
+import 'package:demarcheur_app/models/send_message_model.dart';
+import 'package:demarcheur_app/widgets/chat_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:icons_plus/icons_plus.dart';
+import 'package:demarcheur_app/services/auth_provider.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 class JobDetail extends StatefulWidget {
   final AddVancyModel job;
@@ -21,12 +27,7 @@ class _JobDetailState extends State<JobDetail> with TickerProviderStateMixin {
   bool isFavorite = false;
   bool isApplied = false;
 
-  final List<String> requirements = [
-    "Avoir une connaissance des logiciels comptables",
-    "Être toujours à jour sur les nouvelles tendances",
-    "Être capable de travailler dans une petite ou large équipe",
-    "Avoir une expérience de 3 ans minimum",
-  ];
+  // Removed hardcoded requirements
 
   ConstColors color = ConstColors();
 
@@ -87,6 +88,18 @@ class _JobDetailState extends State<JobDetail> with TickerProviderStateMixin {
     _fabController.dispose();
     _shareController.dispose();
     super.dispose();
+  }
+
+  void _shareJob() {
+    final String shareText =
+        'Découvrez cette offre d\'emploi : ${widget.job.title} chez ${widget.job.companyName}.\n\n'
+        'Lieu : ${widget.job.city}\n'
+        'Salaire : ${NumberFormat('#,###').format(widget.job.salary)} GNF\n'
+        'Type : ${widget.job.typeJobe}\n'
+        'Lien : https://demarcheur.com/share?type=job&id=${widget.job.id}\n\n'
+        'Postulez via Demarcheur !';
+
+    Share.share(shareText, subject: 'Offre d\'emploi : ${widget.job.title}');
   }
 
   @override
@@ -261,7 +274,29 @@ class _JobDetailState extends State<JobDetail> with TickerProviderStateMixin {
           const SizedBox(height: 24),
           _buildJobInformation(),
           const SizedBox(height: 24),
-          _buildRequirementsSection(),
+          _buildDynamicSection(
+            'Missions',
+            widget.job.missions,
+            HugeIcons.strokeRoundedTaskDaily01,
+          ),
+          const SizedBox(height: 24),
+          _buildDynamicSection(
+            'Profil requis',
+            widget.job.reqProfile,
+            HugeIcons.strokeRoundedCheckList,
+          ),
+          const SizedBox(height: 24),
+          _buildDynamicSection(
+            'Conditions',
+            widget.job.conditions,
+            HugeIcons.strokeRoundedDocumentValidation,
+          ),
+          const SizedBox(height: 24),
+          _buildDynamicSection(
+            'Avantages',
+            widget.job.benefits,
+            HugeIcons.strokeRoundedGift,
+          ),
           const SizedBox(height: 32),
           _buildActionButtons(),
           const SizedBox(height: 24),
@@ -310,7 +345,10 @@ class _JobDetailState extends State<JobDetail> with TickerProviderStateMixin {
                     ],
                     image: DecorationImage(
                       fit: BoxFit.cover,
-                      image: NetworkImage(widget.job.companyImage!),
+                      image: NetworkImage(
+                        widget.job.companyImage ??
+                            "https://via.placeholder.com/150",
+                      ),
                     ),
                   ),
                 ),
@@ -331,7 +369,7 @@ class _JobDetailState extends State<JobDetail> with TickerProviderStateMixin {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      widget.job.title,
+                      widget.job.companyName!,
                       style: TextStyle(
                         color: color.secondary,
                         fontSize: 16,
@@ -349,7 +387,7 @@ class _JobDetailState extends State<JobDetail> with TickerProviderStateMixin {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        widget.job.createdAt!,
+                        widget.job.createdAt?.split('T')[0] ?? "Récemment",
                         style: TextStyle(
                           color: color.primary,
                           fontSize: 12,
@@ -461,15 +499,9 @@ class _JobDetailState extends State<JobDetail> with TickerProviderStateMixin {
           ),
           const SizedBox(height: 16),
           _buildInfoRow(
-            'Localisation',
+            'Adresse',
             widget.job.city,
             HugeIcons.strokeRoundedLocation01,
-          ),
-          const SizedBox(height: 16),
-          _buildInfoRow(
-            'Catégorie',
-            widget.job.city,
-            HugeIcons.strokeRoundedTag01,
           ),
         ],
       ),
@@ -517,7 +549,13 @@ class _JobDetailState extends State<JobDetail> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildRequirementsSection() {
+  Widget _buildDynamicSection(
+    String title,
+    List items,
+    List<List<dynamic>> icon,
+  ) {
+    if (items.isEmpty) return const SizedBox.shrink();
+
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -542,15 +580,11 @@ class _JobDetailState extends State<JobDetail> with TickerProviderStateMixin {
                   color: color.primary.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: HugeIcon(
-                  icon: HugeIcons.strokeRoundedCheckList,
-                  color: color.primary,
-                  size: 24,
-                ),
+                child: HugeIcon(icon: icon, color: color.primary, size: 24),
               ),
               const SizedBox(width: 16),
               Text(
-                'Exigences du poste',
+                title,
                 style: TextStyle(
                   color: color.primary,
                   fontSize: 20,
@@ -560,12 +594,12 @@ class _JobDetailState extends State<JobDetail> with TickerProviderStateMixin {
             ],
           ),
           const SizedBox(height: 24),
-          ...requirements.asMap().entries.map((entry) {
+          ...items.asMap().entries.map((entry) {
             int index = entry.key;
-            String requirement = entry.value;
+            String item = entry.value.toString();
             return Container(
               margin: EdgeInsets.only(
-                bottom: index == requirements.length - 1 ? 0 : 12,
+                bottom: index == items.length - 1 ? 0 : 12,
               ),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -594,7 +628,7 @@ class _JobDetailState extends State<JobDetail> with TickerProviderStateMixin {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      requirement,
+                      item,
                       style: TextStyle(
                         color: color.primary,
                         fontSize: 15,
@@ -606,7 +640,7 @@ class _JobDetailState extends State<JobDetail> with TickerProviderStateMixin {
                 ],
               ),
             );
-          }).toList(),
+          }),
         ],
       ),
     );
@@ -623,7 +657,7 @@ class _JobDetailState extends State<JobDetail> with TickerProviderStateMixin {
                 : () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => const Upload()),
+                      MaterialPageRoute(builder: (context) => Upload(job: widget.job)),
                     ).then((_) {
                       setState(() {
                         isApplied = true;
@@ -652,11 +686,74 @@ class _JobDetailState extends State<JobDetail> with TickerProviderStateMixin {
           ),
         ),
         const SizedBox(height: 16),
+        if (context.watch<AuthProvider>().role == 'GIVER' && 
+            context.watch<AuthProvider>().userId == widget.job.companyId)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => JobApplicantsPage(
+                        jobId: widget.job.id!,
+                        jobTitle: widget.job.title,
+                      ),
+                    ),
+                  );
+                },
+                icon: const HugeIcon(
+                  icon: HugeIcons.strokeRoundedUserGroup,
+                  color: Colors.white,
+                  size: 20,
+                ),
+                label: const Text(
+                  'Voir les candidatures',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: color.secondary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        const SizedBox(height: 16),
         Row(
           children: [
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: () {},
+                onPressed: () {
+                    final authProvider = context.read<AuthProvider>();
+                    final myId = authProvider.userId;
+                    if (myId == null) return;
+                    
+                    final receiverId = widget.job.companyId;
+                    if (receiverId == null || receiverId.isEmpty) return;
+
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ChatWidget(
+                          pageType: 'Job',
+                          message: SendMessageModel(
+                            senderId: myId,
+                            receiverId: receiverId,
+                            userName: widget.job.companyName ?? 'Entreprise',
+                            userPhoto: widget.job.companyImage,
+                            content: '',
+                            timestamp: DateTime.now(),
+                          ),
+                        ),
+                      ),
+                    );
+                },
                 icon: const HugeIcon(
                   icon: HugeIcons.strokeRoundedMessage01,
                   color: Colors.grey,
@@ -755,7 +852,10 @@ class _JobDetailState extends State<JobDetail> with TickerProviderStateMixin {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           GestureDetector(
-                            onTap: () => Navigator.pop(context),
+                            onTap: () {
+                              Navigator.pop(context);
+                              _shareJob();
+                            },
                             child: _buildShareOption(
                               Brands.whatsapp,
                               'WhatsApp',
@@ -763,7 +863,10 @@ class _JobDetailState extends State<JobDetail> with TickerProviderStateMixin {
                             ),
                           ),
                           GestureDetector(
-                            onTap: () => Navigator.pop(context),
+                            onTap: () {
+                              Navigator.pop(context);
+                              _shareJob();
+                            },
                             child: _buildShareOption(
                               Brands.twitterx_2,
                               'X',
@@ -771,7 +874,10 @@ class _JobDetailState extends State<JobDetail> with TickerProviderStateMixin {
                             ),
                           ),
                           GestureDetector(
-                            onTap: () => Navigator.pop(context),
+                            onTap: () {
+                              Navigator.pop(context);
+                              _shareJob();
+                            },
                             child: _buildShareOption(
                               Brands.facebook,
                               'Facebook',
@@ -779,7 +885,10 @@ class _JobDetailState extends State<JobDetail> with TickerProviderStateMixin {
                             ),
                           ),
                           GestureDetector(
-                            onTap: () => Navigator.pop(context),
+                            onTap: () {
+                              Navigator.pop(context);
+                              _shareJob();
+                            },
                             child: _buildShareOption(
                               Brands.instagram,
                               'Instagram',
@@ -793,7 +902,10 @@ class _JobDetailState extends State<JobDetail> with TickerProviderStateMixin {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           GestureDetector(
-                            onTap: () => Navigator.pop(context),
+                            onTap: () {
+                              Navigator.pop(context);
+                              _shareJob();
+                            },
                             child: _buildShareOption(
                               Brands.tiktok,
                               'TikTok',
@@ -801,7 +913,10 @@ class _JobDetailState extends State<JobDetail> with TickerProviderStateMixin {
                             ),
                           ),
                           GestureDetector(
-                            onTap: () => Navigator.pop(context),
+                            onTap: () {
+                              Navigator.pop(context);
+                              _shareJob();
+                            },
                             child: _buildShareOption(
                               Brands.gmail,
                               'Gmail',
@@ -809,7 +924,10 @@ class _JobDetailState extends State<JobDetail> with TickerProviderStateMixin {
                             ),
                           ),
                           GestureDetector(
-                            onTap: () => Navigator.pop(context),
+                            onTap: () {
+                              Navigator.pop(context);
+                              _shareJob();
+                            },
                             child: _buildShareOption(
                               Brands.facebook_messenger,
                               'Messenger',
@@ -817,7 +935,10 @@ class _JobDetailState extends State<JobDetail> with TickerProviderStateMixin {
                             ),
                           ),
                           GestureDetector(
-                            onTap: () => Navigator.pop(context),
+                            onTap: () {
+                              Navigator.pop(context);
+                              _shareJob();
+                            },
                             child: _buildShareOption(
                               Brands.messages,
                               'Messages',

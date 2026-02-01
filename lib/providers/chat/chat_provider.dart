@@ -4,6 +4,8 @@ import 'package:demarcheur_app/services/api_service.dart';
 import 'package:demarcheur_app/services/socket_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_chat_types/flutter_chat_types.dart' as types;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 class Conversation {
   final PrestaModel presta;
@@ -23,263 +25,126 @@ class ChatProvider extends ChangeNotifier {
   final SocketService _socketService = SocketService();
   List<Conversation> _conversations = [];
   List<dynamic> _conversationsData = [];
-  
+
   // Use a map to guarantee uniqueness by ID
   final Map<String, SendMessageModel> _messageMap = {};
-  
+
   // Derived lists for UI
   List<SendMessageModel> _messages = [];
   List<types.Message> _chatMessages = [];
-  
+
+  // List of conversations for the message list page
+  List<SendMessageModel> _conversationList = [];
+  List<SendMessageModel> get conversations => _conversationList;
+
   String? _activeConversationId;
   bool _isLoading = false;
+
+  bool get isloading => _isLoading;
+  List<types.Message> get chatMessages => _chatMessages;
+
+  ChatProvider() {
+    print(
+      'DEBUG: ChatProvider - Constructor called, setting up socket listener',
+    );
+    _loadMessagesFromCache();
+
+    // Subscribe to socket messages
+    _socketService.messageStream.listen((event) {
+      try {
+        print('DEBUG: ChatProvider - Received socket event: $event');
+
+        if (event == null) {
+          print('DEBUG: ChatProvider - Event is null, skipping');
+          return;
+        }
+
+        final eventName = event['event'];
+        final data = event['data'];
+
+        print(
+          'DEBUG: ChatProvider - Event name: $eventName, Data type: ${data.runtimeType}',
+        );
+
+        if (eventName == 'receive_message' && data is Map<String, dynamic>) {
+          print('DEBUG: ChatProvider - Processing receive_message from socket');
+          final message = SendMessageModel.fromJson(data);
+          final msgId = message.id;
+
+          if (msgId != null && msgId.isNotEmpty) {
+            if (!_messageMap.containsKey(msgId)) {
+              print(
+                'DEBUG: ChatProvider - Adding NEW message from socket: $msgId',
+              );
+              _messageMap[msgId] = message;
+              _saveMessagesToCache();
+              _syncDerivedLists();
+              notifyListeners();
+            } else {
+              print(
+                'DEBUG: ChatProvider - Message already exists in map: $msgId',
+              );
+            }
+          } else {
+            print('DEBUG: ChatProvider - Message has no ID, skipping');
+          }
+        } else {
+          print(
+            'DEBUG: ChatProvider - Event not receive_message or data not Map (event: $eventName)',
+          );
+        }
+      } catch (e, stackTrace) {
+        print('DEBUG: ChatProvider - Error processing socket event: $e');
+        print('DEBUG: ChatProvider - Stack trace: $stackTrace');
+      }
+    });
+  }
 
   void clearMessages() {
     _messageMap.clear();
     _messages = [];
     _chatMessages = [];
+    _conversationList = [];
     _activeConversationId = null;
     notifyListeners();
   }
 
   void _syncDerivedLists() {
+    print('DEBUG: ChatProvider._syncDerivedLists - Map keys: ${_messageMap.keys.length}, ActiveConv: $_activeConversationId');
     _messages = _messageMap.values.where((m) {
       if (_activeConversationId == null) return true;
-      final ids = [m.senderId, m.receiverId]..sort();
-      return ids.join('_') == _activeConversationId;
+      final ids = [m.senderId.trim(), m.receiverId.trim()]..sort();
+      final currentConvId = ids.join('_');
+      final match = currentConvId == _activeConversationId;
+      if (!match && _messageMap.length < 5) {
+         print('DEBUG: ChatProvider._syncDerivedLists - Mismatch: msgConv=$currentConvId vs active=$_activeConversationId');
+      }
+      return match;
     }).toList();
-    
-    // Map to UI types and sort
+    print('DEBUG: ChatProvider._syncDerivedLists - Filtered count: ${_messages.length}');
+
+    // Map to types.Message and sort descending
     final mapped = _messages.map((m) => _mapToChatType(m)).toList();
     mapped.sort((a, b) => (b.createdAt ?? 0).compareTo(a.createdAt ?? 0));
     _chatMessages = mapped;
   }
 
   void setActiveConversation(String userId1, String userId2) {
-    final ids = [userId1, userId2]..sort();
+    final ids = [userId1.trim(), userId2.trim()]..sort();
     final conversationId = ids.join('_');
-    
+
     if (_activeConversationId != conversationId) {
-      print('DEBUG: ChatProvider - Switching active conversation to: $conversationId');
+      print(
+        'DEBUG: ChatProvider - Switching active conversation to: $conversationId',
+      );
       _activeConversationId = conversationId;
-      _messageMap.clear();
+      // We don't necessarily clear _messageMap here to allow caching,
+      // but we do need to refresh derived lists
       _messages = [];
       _chatMessages = [];
+      _syncDerivedLists(); // Re-filter based on new ID
       notifyListeners();
     }
-  }
-
-  ChatProvider() {
-    _listenToSocket();
-  }
-
-  void _listenToSocket() {
-    _socketService.messageStream.listen((payload) {
-      print('DEBUG: ChatProvider - RECEIVED SOCKET PAYLOAD: $payload');
-      final data = payload['data'];
-
-      // Attempt to parse as message if it looks like one
-      try {
-        if (data is Map<String, dynamic>) {
-          final message = SendMessageModel.fromJson(data);
-          final msgId = message.id;
-          
-          if (msgId != null && msgId.isNotEmpty) {
-            if (!_messageMap.containsKey(msgId)) {
-              print('DEBUG: ChatProvider - Adding message from socket: $msgId');
-              _messageMap[msgId] = message;
-              _syncDerivedLists();
-              notifyListeners();
-            }
-          }
-        }
-      } catch (e) {
-        print('DEBUG: ChatProvider - Error parsing socket data: $e');
-      }
-    });
-  }
-
-  void initSocket(String? token, String? userId) {
-    if (token != null && userId != null) {
-      _socketService.connect(token, userId);
-    }
-  }
-
-  List<Conversation> get conversations => List.unmodifiable(_conversations);
-  List<dynamic> get conversationsData => List.unmodifiable(_conversationsData);
-  List<SendMessageModel> get messages => List.unmodifiable(_messages);
-  List<types.Message> get chatMessages => List.unmodifiable(_chatMessages);
-
-  bool get isLoading => _isLoading;
-
-  void seedFromJobs(List<PrestaModel> jobs) {
-    if (_conversations.isNotEmpty) return;
-    final samples = [
-      "Bonjour, êtes-vous disponible cette semaine ?",
-      "Merci pour votre retour.",
-      "Pouvez-vous partager un devis ?",
-      "Nous pouvons intervenir demain.",
-      "Je vous appelle dans 10 minutes.",
-    ];
-    final times = ["09:41", "Hier", "09 Nov", "08 Nov", "07 Nov"];
-    for (int i = 0; i < jobs.length; i++) {
-      _conversations.add(
-        Conversation(
-          presta: jobs[i],
-          lastMessage: samples[i % samples.length],
-          timeLabel: i < times.length ? times[i] : "Récemment",
-          unreadCount: i % 3 == 0 ? 2 : 0,
-        ),
-      );
-    }
-    notifyListeners();
-  }
-
-  Future<void> fetchConversations(String? token, {String? userId}) async {
-    _isLoading = true;
-    notifyListeners();
-    try {
-      final rawData = await _apiService.fetchConversations(
-        token,
-        userId: userId,
-      );
-      
-      // Normalize conversation data to ensure consistent structure
-      _conversationsData = _normalizeConversations(rawData, userId);
-      print('Fetched ${_conversationsData.length} conversations');
-    } catch (e) {
-      print('ChatProvider.fetchConversations error: $e');
-      _conversationsData = [];
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
-
-  /// Normalizes conversation data from API to ensure consistent structure
-  /// that all message pages can use
-  List<Map<String, dynamic>> _normalizeConversations(
-    List<dynamic> rawData,
-    String? currentUserId,
-  ) {
-    if (rawData.isEmpty) return [];
-
-    final Map<String, Map<String, dynamic>> conversationsMap = {};
-
-    for (var item in rawData) {
-      if (item is! Map<String, dynamic>) continue;
-
-      // Check if it's already a normalized conversation object
-      if (item.containsKey('receiverId') && item.containsKey('receiverName')) {
-        conversationsMap[item['receiverId']?.toString() ?? ''] = Map<String, dynamic>.from(item);
-        continue;
-      }
-
-      // If it's a message, extract conversation info
-      String? senderId = _extractId(item, ['senderId', 'sender_id', 'sender']);
-      String? receiverId = _extractId(item, ['receiverId', 'receiver_id', 'receiver']);
-      
-      if (senderId == null || receiverId == null) continue;
-
-      // Determine the "other" user in the conversation
-      final String otherUserId;
-      if (currentUserId != null) {
-        otherUserId = senderId == currentUserId ? receiverId : senderId;
-      } else {
-        otherUserId = receiverId; // Default to receiver if no current user
-      }
-
-      // Get or create conversation entry
-      if (!conversationsMap.containsKey(otherUserId)) {
-        conversationsMap[otherUserId] = {
-          'receiverId': otherUserId,
-          'receiverName': _extractName(item, otherUserId == senderId ? 'sender' : 'receiver') ?? 'Utilisateur',
-          'receiverImage': _extractImage(item, otherUserId == senderId ? 'sender' : 'receiver'),
-          'senderId': senderId,
-          'lastMessage': {
-            'content': item['content'] ?? item['message'] ?? item['text'] ?? '',
-            'timestamp': item['timestamp'] ?? item['createdAt'],
-            'createdAt': item['createdAt'] ?? item['timestamp'],
-          },
-          'unreadCount': (item['isRead'] == false || item['read'] == false) ? 1 : 0,
-        };
-      } else {
-        // Update with latest message if this one is newer
-        final existing = conversationsMap[otherUserId]!;
-        final existingTime = existing['lastMessage']?['createdAt'] ?? existing['lastMessage']?['timestamp'];
-        final newTime = item['createdAt'] ?? item['timestamp'];
-        
-        if (_isNewer(newTime, existingTime)) {
-          existing['lastMessage'] = {
-            'content': item['content'] ?? item['message'] ?? item['text'] ?? '',
-            'timestamp': item['timestamp'] ?? item['createdAt'],
-            'createdAt': item['createdAt'] ?? item['timestamp'],
-          };
-          if (item['isRead'] == false || item['read'] == false) {
-            existing['unreadCount'] = (existing['unreadCount'] as int? ?? 0) + 1;
-          }
-        }
-      }
-    }
-
-    return conversationsMap.values.toList();
-  }
-
-  String? _extractId(dynamic item, List<String> keys) {
-    if (item is! Map) return null;
-    for (var key in keys) {
-      final value = item[key];
-      if (value == null) continue;
-      if (value is String) return value;
-      if (value is Map) {
-        return value['id']?.toString() ?? value['_id']?.toString();
-      }
-    }
-    return null;
-  }
-
-  String? _extractName(Map<String, dynamic> item, String type) {
-    final userKey = type == 'sender' ? 'senderName' : 'receiverName';
-    final userObj = item[type] ?? item[userKey];
-    
-    if (userObj is String) return userObj;
-    if (userObj is Map) {
-      return userObj['name']?.toString() ?? 
-             userObj['userName']?.toString() ?? 
-             userObj['companyName']?.toString();
-    }
-    return item[userKey]?.toString();
-  }
-
-  String? _extractImage(Map<String, dynamic> item, String type) {
-    final userObj = item[type];
-    if (userObj is Map) {
-      return userObj['image']?.toString() ?? 
-             userObj['imageUrl']?.toString() ?? 
-             userObj['photo']?.toString();
-    }
-    return item['${type}Image']?.toString() ?? 
-           item['${type}_image']?.toString();
-  }
-
-  bool _isNewer(dynamic newTime, dynamic existingTime) {
-    if (newTime == null) return false;
-    if (existingTime == null) return true;
-
-    DateTime? newDate = _parseDateTime(newTime);
-    DateTime? existingDate = _parseDateTime(existingTime);
-
-    if (newDate == null) return false;
-    if (existingDate == null) return true;
-
-    return newDate.isAfter(existingDate);
-  }
-
-  DateTime? _parseDateTime(dynamic value) {
-    if (value is DateTime) return value;
-    if (value is String) return DateTime.tryParse(value);
-    if (value is int) return DateTime.fromMillisecondsSinceEpoch(value);
-    return null;
   }
 
   Future<void> fetchMessages(
@@ -292,10 +157,13 @@ class ChatProvider extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
     try {
-      print('DEBUG: ChatProvider - Fetching messages for $userId and $otherUserId');
+      final uId = userId.trim();
+      final oId = otherUserId.trim();
+
+      print('DEBUG: ChatProvider - Fetching messages for $uId and $oId');
       final rawMessages = await _apiService.fetchMessagesBetweenUsers(
-        userId,
-        otherUserId,
+        uId,
+        oId,
         token,
         page: page,
         limit: limit,
@@ -305,16 +173,22 @@ class ChatProvider extends ChangeNotifier {
       for (final msg in rawMessages) {
         final id = msg.id;
         if (id != null && id.isNotEmpty) {
-           _messageMap[id] = msg;
+          _messageMap[id] = msg;
         }
       }
 
       // Ensure active conversation ID is set if we just fetched messages for a specific pair
-      final ids = [userId, otherUserId]..sort();
-      _activeConversationId = ids.join('_');
-      
-      _syncDerivedLists();
+      final ids = [uId, oId]..sort();
+      final newConvId = ids.join('_');
 
+      if (_activeConversationId != newConvId) {
+        print(
+          'DEBUG: ChatProvider - Updating active conversation ID to $newConvId',
+        );
+        _activeConversationId = newConvId;
+      }
+
+      _syncDerivedLists();
     } catch (e) {
       print('ChatProvider.fetchMessages error: $e');
     } finally {
@@ -330,13 +204,14 @@ class ChatProvider extends ChangeNotifier {
     if (result != null) {
       final sentMsg = SendMessageModel.fromJson(result);
       final msgId = sentMsg.id;
-      
+
       if (msgId != null && msgId.isNotEmpty) {
         if (!_messageMap.containsKey(msgId)) {
-           print('DEBUG: ChatProvider - Adding message from API: $msgId');
-           _messageMap[msgId] = sentMsg;
-           _syncDerivedLists();
-           notifyListeners();
+          print('DEBUG: ChatProvider - Adding message from API: $msgId');
+          _messageMap[msgId] = sentMsg;
+          _saveMessagesToCache();
+          _syncDerivedLists();
+          notifyListeners();
         }
       }
       return true;
@@ -350,12 +225,41 @@ class ChatProvider extends ChangeNotifier {
         msg.timestamp?.millisecondsSinceEpoch ??
         DateTime.now().millisecondsSinceEpoch;
 
-    // The ID MUST be stable and unique. If SendMessageModel has no ID,
-    // we should have generated one before adding to the map.
     final msgId = msg.id ?? 'msg_${timestamp}_${msg.content.hashCode}';
+    final author = types.User(id: authorId);
+
+    // If we have attachment URLs, check if it's an image or other file
+    if (msg.attachmentUrls != null && msg.attachmentUrls!.isNotEmpty) {
+      final url = msg.attachmentUrls!.first; // For now handle first; UI can be improved for carousel
+      final isImage = url.toLowerCase().contains('.jpg') || 
+                      url.toLowerCase().contains('.jpeg') || 
+                      url.toLowerCase().contains('.png') || 
+                      url.toLowerCase().contains('.gif') ||
+                      url.toLowerCase().contains('.webp');
+
+      if (isImage) {
+        return types.ImageMessage(
+          author: author,
+          createdAt: timestamp,
+          id: msgId,
+          name: url.split('/').last,
+          size: 0,
+          uri: url,
+        );
+      } else {
+        return types.FileMessage(
+          author: author,
+          createdAt: timestamp,
+          id: msgId,
+          name: url.split('/').last,
+          size: 0,
+          uri: url,
+        );
+      }
+    }
 
     return types.TextMessage(
-      author: types.User(id: authorId),
+      author: author,
       createdAt: timestamp,
       id: msgId,
       text: msg.content,
@@ -370,6 +274,91 @@ class ChatProvider extends ChangeNotifier {
       _conversations[idx].lastMessage = message;
       _conversations[idx].timeLabel = timeLabel;
       notifyListeners();
+    }
+  }
+
+  Future<void> fetchConversations(String userId, {String? token}) async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      print('DEBUG: ChatProvider.fetchConversations - Fetching for $userId');
+      final parsedList = await _apiService.allConversation(userId, token: token);
+      
+      _conversationList = parsedList;
+      print('DEBUG: ChatProvider.fetchConversations - Loaded ${_conversationList.length} conversations');
+    } catch (e) {
+      print('DEBUG: ChatProvider.fetchConversations error: $e');
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> _saveMessagesToCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final messagesJson = _messageMap.values.map((m) {
+        return {
+          'id': m.id,
+          'content': m.content,
+          'senderId': m.senderId,
+          'receiverId': m.receiverId,
+          'userName': m.userName,
+          'userPhoto': m.userPhoto,
+          'attachmentUrls': m.attachmentUrls,
+          'timestamp': m.timestamp?.toIso8601String(),
+        };
+      }).toList();
+
+      await prefs.setString('cached_messages', jsonEncode(messagesJson));
+      print(
+        'DEBUG: ChatProvider - Saved ${messagesJson.length} messages to cache',
+      );
+    } catch (e) {
+      print('DEBUG: ChatProvider - Error saving messages to cache: $e');
+    }
+  }
+
+  Future<void> _loadMessagesFromCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedData = prefs.getString('cached_messages');
+
+      if (cachedData != null) {
+        final List<dynamic> messagesJson = jsonDecode(cachedData);
+        print(
+          'DEBUG: ChatProvider - Loading ${messagesJson.length} messages from cache',
+        );
+
+        for (var msgData in messagesJson) {
+          final message = SendMessageModel(
+            id: msgData['id'],
+            content: msgData['content'] ?? '',
+            senderId: msgData['senderId'] ?? '',
+            receiverId: msgData['receiverId'] ?? '',
+            userName: msgData['userName'] ?? '',
+            userPhoto: msgData['userPhoto'],
+            attachmentUrls: msgData['attachmentUrls'] != null ? List<String>.from(msgData['attachmentUrls']) : null,
+            timestamp: msgData['timestamp'] != null
+                ? DateTime.tryParse(msgData['timestamp'])
+                : null,
+          );
+
+          if (message.id != null && message.id!.isNotEmpty) {
+            _messageMap[message.id!] = message;
+          }
+        }
+
+        _syncDerivedLists();
+        notifyListeners();
+        print(
+          'DEBUG: ChatProvider - Loaded ${_messageMap.length} messages from cache',
+        );
+      } else {
+        print('DEBUG: ChatProvider - No cached messages found');
+      }
+    } catch (e) {
+      print('DEBUG: ChatProvider - Error loading messages from cache: $e');
     }
   }
 }

@@ -1,23 +1,25 @@
 import 'dart:io';
-import 'package:demarcheur_app/apps/immo/immo_dashboard.dart';
-import 'package:demarcheur_app/apps/prestataires/presta_dashboard.dart';
+import 'package:demarcheur_app/auths/donneurs/login_page.dart';
 import 'package:demarcheur_app/consts/color.dart';
 import 'package:demarcheur_app/methods/my_methodes.dart';
+import 'package:demarcheur_app/models/enterprise/enterprise_model.dart';
+import 'package:demarcheur_app/services/auth_provider.dart';
 import 'package:demarcheur_app/widgets/header_page.dart';
 import 'package:demarcheur_app/widgets/sub_title.dart';
 import 'package:demarcheur_app/widgets/title_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
 
 class PrestataireRegister extends StatefulWidget {
   const PrestataireRegister({super.key});
 
   @override
-  State<PrestataireRegister> createState() => PrestataireRegisterState();
+  State<PrestataireRegister> createState() => _PrestataireRegisterState();
 }
 
-class PrestataireRegisterState extends State<PrestataireRegister>
+class _PrestataireRegisterState extends State<PrestataireRegister>
     with SingleTickerProviderStateMixin {
   final MyMethodes methodes = MyMethodes();
   final _formKey = GlobalKey<FormState>();
@@ -38,9 +40,14 @@ class PrestataireRegisterState extends State<PrestataireRegister>
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
 
+  String? selectedItem;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<AuthProvider>().loadService();
+    });
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,
@@ -148,31 +155,73 @@ class PrestataireRegisterState extends State<PrestataireRegister>
     );
   }
 
+  final color = ConstColors();
+
   Future<void> _submitForm() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
 
     if (selectedImage == null) {
-      _showSnackBar('Veuillez sélectionner votre de profil', isError: true);
+      _showSnackBar(
+        'Veuillez sélectionner le logo de l\'entreprise',
+        isError: true,
+      );
       return;
     }
 
     setState(() {
       isSubmitting = true;
     });
+    final enterprise = EnterpriseModel(
+      name: _companyNameController.text,
+      email: _emailController.text,
+      phone: _phoneController.text,
+      image: selectedImage,
+      adress: _locationController.text,
+      city: _locationController.text,
+      password: _passwordController.text,
+      serviceId: selectedItem,
+      role: 'SERVICE',
+    );
+    final succes = await AuthProvider().registerGiver(enterprise);
 
     // Simulate API call
-    await Future.delayed(const Duration(seconds: 2));
+    //await Future.delayed(const Duration(seconds: 2));
 
     if (mounted) {
       setState(() {
         isSubmitting = false;
       });
+    }
+    if (succes) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.green,
 
-      Navigator.pushReplacement(
+          content: Center(
+            child: Text(
+              'Votre compte a été créé avec succès',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ),
+      );
+      Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => const PrestaDashboard()),
+        MaterialPageRoute(builder: (context) => LoginPage()),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.red,
+          content: Center(
+            child: Text(
+              'Une erreur s\'est produite lors de l\'inscription',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ),
       );
     }
   }
@@ -365,13 +414,70 @@ class PrestataireRegisterState extends State<PrestataireRegister>
             validator: (value) => _validateRequired(value, "Le nom"),
           ),
           const SizedBox(height: 20),
-          _CustomTextField(
-            controller: _domainController,
-            textCapitalization: TextCapitalization.sentences,
-            label: "Domaine d'activité",
-            icon: HugeIcons.strokeRoundedBriefcase01,
+          DropdownButtonFormField<String>(
+            dropdownColor: color.bg,
+            hint: Text(
+              'Selectionnez votre domaine d\'acti...',
+              overflow: TextOverflow.clip,
+              style: TextStyle(
+                color: color.primary,
+                fontSize: 16,
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+            items: context
+                .watch<AuthProvider>()
+                .serviceList
+                .map(
+                  (service) => DropdownMenuItem<String>(
+                    value: service.id,
+                    child: Text(
+                      service.service_name,
+                      style: TextStyle(
+                        color: color.secondary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                  ),
+                )
+                .toList(),
+            initialValue: selectedItem,
+
             validator: (value) =>
                 _validateRequired(value, "Le domaine d'activité"),
+            onChanged: (value) {
+              setState(() {
+                selectedItem = value;
+              });
+            },
+            decoration: InputDecoration(
+              //labelText: '',
+              labelStyle: TextStyle(color: color.primary, fontSize: 16),
+              // prefixIcon: HugeIcon(icon: icon, color: color.primary, size: 10),
+              filled: true,
+              fillColor: color.bgSubmit,
+              border: OutlineInputBorder(
+                borderSide: BorderSide.none,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: color.primary, width: 2),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              errorBorder: OutlineInputBorder(
+                borderSide: const BorderSide(color: Colors.red, width: 2),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              focusedErrorBorder: OutlineInputBorder(
+                borderSide: const BorderSide(color: Colors.red, width: 2),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              // contentPadding: const EdgeInsets.symmetric(
+              //   horizontal: 16,
+              //   vertical: 16,
+              // ),
+            ),
           ),
           const SizedBox(height: 20),
           _CustomTextField(
@@ -421,7 +527,7 @@ class PrestataireRegisterState extends State<PrestataireRegister>
       padding: const EdgeInsets.only(right: 20.0, left: 20),
       child: SizedBox(
         width: double.infinity,
-        height: 56,
+        height: 55,
         child: ElevatedButton(
           onPressed: isSubmitting ? null : _submitForm,
           style: ElevatedButton.styleFrom(

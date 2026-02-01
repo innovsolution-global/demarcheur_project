@@ -1,11 +1,8 @@
-import 'package:demarcheur_app/apps/demandeurs/main_screens/dem_home_page.dart';
 import 'package:demarcheur_app/apps/demandeurs/main_screens/dem_onboarding_page.dart';
-import 'package:demarcheur_app/apps/demandeurs/main_screens/vancy.dart';
 import 'package:demarcheur_app/apps/donneurs/main_screens/dashboard_page.dart';
-import 'package:demarcheur_app/apps/immo/immo_home_page.dart';
-import 'package:demarcheur_app/apps/prestataires/presta_home_page.dart';
+import 'package:demarcheur_app/apps/immo/immo_dashboard.dart';
+import 'package:demarcheur_app/apps/prestataires/presta_dashboard.dart';
 import 'package:provider/provider.dart';
-import 'package:demarcheur_app/apps/donneurs/main_screens/jobs/home_page.dart';
 import 'package:demarcheur_app/consts/color.dart';
 import 'package:demarcheur_app/screens/decision_page.dart';
 import 'package:demarcheur_app/services/auth_provider.dart';
@@ -94,7 +91,7 @@ class _LoginPageState extends State<LoginPage> {
       );
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => ImmoHomePage()),
+        MaterialPageRoute(builder: (context) => ImmoDashboard()),
       );
     } else if (succes && role == 'SERVICE') {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -110,7 +107,7 @@ class _LoginPageState extends State<LoginPage> {
       );
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => PrestaHomePage()),
+        MaterialPageRoute(builder: (context) => PrestaDashboard()),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(

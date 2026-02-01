@@ -21,7 +21,7 @@ class _PrestataireSelectPageState extends State<PrestataireSelectPage>
   late Animation<double> _fadeAnimation;
   late Animation<double> _slideAnimation;
 
-  Set<String> _selectedSpecialties = {};
+  final Set<String> _selectedSpecialties = {};
   String? _selectedCategory;
 
   final Map<String, List<Map<String, dynamic>>> _specialtyCategories = {

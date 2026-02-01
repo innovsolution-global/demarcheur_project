@@ -1,6 +1,6 @@
-import 'dart:ui';
 import 'package:demarcheur_app/consts/color.dart';
 import 'package:demarcheur_app/models/house_model.dart';
+import 'package:demarcheur_app/services/config.dart';
 import 'package:demarcheur_app/widgets/immo_header.dart';
 import 'package:demarcheur_app/widgets/title_widget.dart';
 import 'package:demarcheur_app/widgets/sub_title.dart';
@@ -120,6 +120,11 @@ class _ImmoBoostPageState extends State<ImmoBoostPage>
 
     _cardAnimationController = AnimationController(
       duration: const Duration(milliseconds: 600),
+      vsync: this,
+    );
+
+    _uploadController = AnimationController(
+      duration: const Duration(milliseconds: 500),
       vsync: this,
     );
 
@@ -335,7 +340,12 @@ class _ImmoBoostPageState extends State<ImmoBoostPage>
                   top: Radius.circular(16),
                 ),
                 child: Image.network(
-                  widget.boost.imageUrl.first,
+                  Config.getImgUrl(
+                        widget.boost.imageUrl.isNotEmpty
+                            ? widget.boost.imageUrl.first
+                            : null,
+                      ) ??
+                      "https://via.placeholder.com/400x200",
                   width: double.infinity,
                   height: 200,
                   fit: BoxFit.cover,
@@ -376,7 +386,10 @@ class _ImmoBoostPageState extends State<ImmoBoostPage>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  "${widget.boost.type} • ${widget.boost.category}",
+                  widget.boost.title ??
+                      widget.boost.countType ??
+                      widget.boost.category ??
+                      'Propriété',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -390,7 +403,7 @@ class _ImmoBoostPageState extends State<ImmoBoostPage>
                     const SizedBox(width: 4),
                     Expanded(
                       child: Text(
-                        widget.boost.location,
+                        '${widget.boost.city ?? widget.boost.location ?? 'Conakry'}${widget.boost.district != null ? ', ${widget.boost.district}' : ''}',
                         style: TextStyle(color: _colors.primary),
                       ),
                     ),
@@ -398,7 +411,7 @@ class _ImmoBoostPageState extends State<ImmoBoostPage>
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  "${NumberFormat('#,###').format(widget.boost.rent).replaceAll(',', '.')} GNF/mois",
+                  "${NumberFormat('#,###').format((widget.boost.price ?? widget.boost.rent ?? 0)).replaceAll(',', '.')} GNF/mois",
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,

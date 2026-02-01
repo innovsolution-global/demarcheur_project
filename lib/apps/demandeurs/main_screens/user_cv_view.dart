@@ -3,10 +3,15 @@ import 'package:demarcheur_app/models/user_model.dart';
 import 'package:demarcheur_app/widgets/btn.dart';
 import 'package:demarcheur_app/widgets/sub_title.dart';
 import 'package:demarcheur_app/widgets/title_widget.dart';
+import 'package:demarcheur_app/models/send_message_model.dart';
+import 'package:demarcheur_app/services/auth_provider.dart';
+import 'package:demarcheur_app/widgets/chat_widget.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:hugeicons/hugeicons.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 
 class UserCvView extends StatefulWidget {
@@ -21,15 +26,13 @@ class _UserCvViewState extends State<UserCvView> with TickerProviderStateMixin {
   bool _isLoading = true;
   bool _hasError = false;
   bool _isFullscreen = false;
-  double _zoomLevel = 1.0;
-  int _currentPage = 1;
-  int _totalPages = 0;
+  final double _zoomLevel = 1.0;
+  final int _currentPage = 1;
+  final int _totalPages = 0;
 
   late PdfViewerController _pdfViewerController;
   late AnimationController _fadeController;
-  late AnimationController _slideController;
   late Animation<double> _fadeAnimation;
-  late Animation<Offset> _slideAnimation;
 
   ConstColors colors = ConstColors();
 
@@ -38,37 +41,27 @@ class _UserCvViewState extends State<UserCvView> with TickerProviderStateMixin {
     super.initState();
     _pdfViewerController = PdfViewerController();
 
-    // Animation controllers
     _fadeController = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,
     );
 
-    _slideController = AnimationController(
-      duration: const Duration(milliseconds: 600),
-      vsync: this,
+    _fadeAnimation = CurvedAnimation(
+      parent: _fadeController,
+      curve: Curves.easeOut,
     );
 
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _fadeController, curve: Curves.easeInOut),
-    );
+    // Initial check for document validity
+    if (widget.userCv.document == null || widget.userCv.document!.isEmpty) {
+      _isLoading = false;
+    }
 
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.1),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _slideController, curve: Curves.easeOut));
-
-    // Start animations
-    Future.delayed(const Duration(milliseconds: 100), () {
-      _fadeController.forward();
-      _slideController.forward();
-    });
+    _fadeController.forward();
   }
 
   @override
   void dispose() {
     _fadeController.dispose();
-    _slideController.dispose();
     _pdfViewerController.dispose();
     super.dispose();
   }
@@ -79,7 +72,7 @@ class _UserCvViewState extends State<UserCvView> with TickerProviderStateMixin {
         content: Row(
           children: [
             Icon(
-              isError ? Icons.error_outline : Icons.info_outline,
+              isError ? Icons.error_outline : Icons.check_circle_outline,
               color: colors.bg,
               size: 20,
             ),
@@ -96,20 +89,17 @@ class _UserCvViewState extends State<UserCvView> with TickerProviderStateMixin {
             ),
           ],
         ),
-        backgroundColor: isError ? colors.error : colors.primary,
+        backgroundColor: isError ? colors.error : colors.secondary,
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        duration: Duration(seconds: isError ? 4 : 3),
+        duration: const Duration(seconds: 3),
       ),
     );
   }
 
   void _toggleFullscreen() {
-    setState(() {
-      _isFullscreen = !_isFullscreen;
-    });
-
+    setState(() => _isFullscreen = !_isFullscreen);
     if (_isFullscreen) {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
     } else {
@@ -117,260 +107,174 @@ class _UserCvViewState extends State<UserCvView> with TickerProviderStateMixin {
     }
   }
 
-  void _zoomIn() {
-    if (_zoomLevel < 3.0) {
-      setState(() {
-        _zoomLevel += 0.25;
-      });
-      _pdfViewerController.zoomLevel = _zoomLevel;
+  // --- Logic for Actions ---
+
+  void _handleDownload() {
+    if (widget.userCv.document != null &&
+        widget.userCv.document!.isNotEmpty &&
+        widget.userCv.document!.startsWith('http')) {
+      Share.share(
+        'CV de ${widget.userCv.name}: ${widget.userCv.document}',
+        subject: 'Document CV',
+      );
+    } else {
+      _showMessage("Aucun lien de document à partager", isError: true);
     }
   }
 
-  void _zoomOut() {
-    if (_zoomLevel > 0.5) {
-      setState(() {
-        _zoomLevel -= 0.25;
-      });
-      _pdfViewerController.zoomLevel = _zoomLevel;
+  void _handleContact() {
+    final authProvider = context.read<AuthProvider>();
+    final myId = authProvider.userId;
+
+    if (myId != null) {
+      final receiverId = widget.userCv.id;
+      if (receiverId != null && receiverId.isNotEmpty) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ChatWidget(
+              pageType: 'CV',
+              message: SendMessageModel(
+                senderId: myId,
+                receiverId: receiverId,
+                userName: widget.userCv.name,
+                userPhoto: widget.userCv.photo,
+                content: '',
+                timestamp: DateTime.now(),
+              ),
+            ),
+          ),
+        );
+        return;
+      }
+    }
+
+    // Fallback to clipboard if not logged in or no receiverId
+    String contactInfo = "";
+    if (widget.userCv.phone != null) {
+      contactInfo += "Tel: ${widget.userCv.phone}\n";
+    }
+    if (widget.userCv.email != null) {
+      contactInfo += "Email: ${widget.userCv.email}";
+    }
+
+    if (contactInfo.isNotEmpty) {
+      Clipboard.setData(ClipboardData(text: contactInfo));
+      _showMessage("Coordonnées copiées dans le presse-papier !");
+    } else {
+      _showMessage("Aucune coordonnée disponible", isError: true);
     }
   }
 
-  void _previousPage() {
-    if (_currentPage > 1) {
-      _pdfViewerController.previousPage();
-    }
-  }
-
-  void _nextPage() {
-    if (_currentPage < _totalPages) {
-      _pdfViewerController.nextPage();
-    }
-  }
+  // --- UI Components ---
 
   Widget _buildUserInfoCard() {
     final user = widget.userCv;
     return Container(
-      margin: const EdgeInsets.all(16),
+      margin: const EdgeInsets.all(20),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: colors.bg,
-        borderRadius: BorderRadius.circular(16),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: colors.secondary.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: colors.primary.withOpacity(0.08),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
-      child: Row(
+      child: Column(
         children: [
-          // Profile Picture
-          Container(
-            width: 60,
-            height: 60,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: colors.tertiary, width: 2),
-              image: DecorationImage(
-                image: NetworkImage(user.photo),
-                fit: BoxFit.cover,
-                onError: (error, stackTrace) {},
+          Row(
+            children: [
+              Container(
+                width: 70,
+                height: 70,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: colors.primary.withOpacity(0.1),
+                    width: 3,
+                  ),
+                  image: DecorationImage(
+                    image: NetworkImage(user.photo),
+                    fit: BoxFit.cover,
+                    onError: (_, __) {},
+                  ),
+                ),
               ),
-            ),
-            child: user.photo.isEmpty
-                ? Center(
-                    child: HugeIcon(
-                      icon: HugeIcons.strokeRoundedUser,
-                      color: colors.primary,
-                      size: 24,
-                    ),
-                  )
-                : null,
-          ),
-          const SizedBox(width: 16),
-
-          // User Info
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TitleWidget(
-                  text: user.gender == "Masculin"
-                      ? "Mr ${user.name}"
-                      : "Mme ${user.name}",
-                  fontSize: 18,
-                ),
-                const SizedBox(height: 4),
-                SubTitle(
-                  text: user.speciality,
-                  fontsize: 14,
-                  color: colors.primary,
-                  fontWeight: FontWeight.w600,
-                ),
-                const SizedBox(height: 8),
-                Row(
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    HugeIcon(
-                      icon: HugeIcons.strokeRoundedLocation01,
-                      color: colors.secondary.withOpacity(0.7),
-                      size: 14,
+                    Text(
+                      user.name,
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                        color: colors.secondary,
+                        letterSpacing: -0.5,
+                      ),
                     ),
-                    const SizedBox(width: 4),
-                    SubTitle(
-                      text: user.location,
-                      fontsize: 12,
-                      color: colors.secondary.withOpacity(0.7),
-                    ),
-                    const SizedBox(width: 16),
-                    HugeIcon(
-                      icon: HugeIcons.strokeRoundedBriefcase01,
-                      color: colors.secondary.withOpacity(0.7),
-                      size: 14,
-                    ),
-                    const SizedBox(width: 4),
-                    SubTitle(
-                      text: "${user.exp} d'expérience",
-                      fontsize: 12,
-                      color: colors.secondary.withOpacity(0.7),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _buildBadge(
+                          HugeIcons.strokeRoundedLocation01,
+                          user.location,
+                        ),
+                        if (user.phone != null)
+                          _buildBadge(
+                            HugeIcons.strokeRoundedCall02,
+                            user.phone!,
+                          ),
+                        if (user.email != null)
+                          _buildBadge(
+                            HugeIcons.strokeRoundedMail01,
+                            user.email!,
+                          ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
-          ),
-
-          // Status Badge
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: user.status == "Disponible"
-                  ? colors.accepted.withOpacity(0.1)
-                  : colors.impression.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              user.status,
-              style: TextStyle(
-                color: user.status == "Disponible"
-                    ? colors.accepted
-                    : colors.cour,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
               ),
-            ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildPdfControls() {
-    if (_isFullscreen) return const SizedBox.shrink();
-
+  Widget _buildBadge(dynamic icon, String text) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: colors.bgSubmit,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: colors.tertiary),
+        color: colors.bgSubmit.withOpacity(0.4),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // Page Navigation
-          Row(
-            children: [
-              IconButton(
-                onPressed: _currentPage > 1 ? _previousPage : null,
-                icon: HugeIcon(
-                  icon: HugeIcons.strokeRoundedArrowLeft02,
-                  color: _currentPage > 1
-                      ? colors.primary
-                      : colors.secondary.withOpacity(0.5),
-                  size: 20,
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: colors.bg,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  "$_currentPage / $_totalPages",
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: colors.primary,
-                  ),
-                ),
-              ),
-              IconButton(
-                onPressed: _currentPage < _totalPages ? _nextPage : null,
-                icon: HugeIcon(
-                  icon: HugeIcons.strokeRoundedArrowRight02,
-                  color: _currentPage < _totalPages
-                      ? colors.primary
-                      : colors.secondary.withOpacity(0.5),
-                  size: 20,
-                ),
-              ),
-            ],
+          HugeIcon(
+            icon: icon,
+            size: 14,
+            color: colors.secondary.withOpacity(0.6),
           ),
-
-          // Zoom Controls
-          Row(
-            children: [
-              IconButton(
-                onPressed: _zoomLevel > 0.5 ? _zoomOut : null,
-                icon: HugeIcon(
-                  icon: HugeIcons.strokeRoundedZoomOutArea,
-                  color: _zoomLevel > 0.5
-                      ? colors.primary
-                      : colors.secondary.withOpacity(0.5),
-                  size: 20,
-                ),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: colors.secondary.withOpacity(0.7),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: colors.bg,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  "${(_zoomLevel * 100).toInt()}%",
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: colors.primary,
-                  ),
-                ),
-              ),
-              IconButton(
-                onPressed: _zoomLevel < 3.0 ? _zoomIn : null,
-                icon: HugeIcon(
-                  icon: HugeIcons.strokeRoundedZoom,
-                  color: _zoomLevel < 3.0
-                      ? colors.primary
-                      : colors.secondary.withOpacity(0.5),
-                  size: 20,
-                ),
-              ),
-            ],
-          ),
-
-          // Fullscreen Toggle
-          IconButton(
-            onPressed: _toggleFullscreen,
-            icon: HugeIcon(
-              icon: HugeIcons.strokeRoundedFullScreen,
-              color: colors.primary,
-              size: 20,
             ),
           ),
         ],
@@ -378,172 +282,150 @@ class _UserCvViewState extends State<UserCvView> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildPdfViewer() {
-    if (widget.userCv.document == null || widget.userCv.document!.isEmpty) {
-      return Container(
-        height: 400,
-        margin: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: colors.bgSubmit,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: colors.tertiary),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            HugeIcon(
-              icon: HugeIcons.strokeRoundedFile02,
-              color: colors.secondary.withOpacity(0.5),
-              size: 64,
-            ),
-            const SizedBox(height: 16),
-            TitleWidget(
-              text: "Aucun CV disponible",
-              fontSize: 18,
-              color: colors.secondary,
-            ),
-            const SizedBox(height: 8),
-            SubTitle(
-              text: "Ce candidat n'a pas encore téléchargé son CV",
-              fontsize: 14,
-              color: colors.secondary.withOpacity(0.7),
-            ),
-          ],
-        ),
-      );
+  Widget _buildPdfView() {
+    String? docUrl = widget.userCv.document;
+    bool hasDoc = docUrl != null && docUrl.isNotEmpty;
+
+    // Fallback PDF for testing if none provided
+    if (!hasDoc) {
+      // Using a standard sample PDF so the user can "try" the viewer
+      docUrl =
+          "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf";
+      hasDoc = true;
     }
 
+    // Logic for relative paths
+    String finalUrl = docUrl;
+    if (!finalUrl.startsWith('http')) {
+      // Assuming it's a relative path from the server root
+      finalUrl = "https://demarcheur-backend.onrender.com$finalUrl";
+    }
+
+    final isNetwork = finalUrl.startsWith('http');
+
     return Container(
-      height: _isFullscreen ? MediaQuery.of(context).size.height : 600,
-      margin: _isFullscreen ? EdgeInsets.zero : const EdgeInsets.all(16),
+      height: _isFullscreen ? MediaQuery.of(context).size.height : 500,
+      width: double.infinity,
+      margin: _isFullscreen
+          ? EdgeInsets.zero
+          : const EdgeInsets.symmetric(horizontal: 20),
       decoration: BoxDecoration(
-        color: colors.bg,
+        color: Colors.white,
         borderRadius: _isFullscreen
             ? BorderRadius.zero
-            : BorderRadius.circular(16),
+            : BorderRadius.circular(24),
         boxShadow: _isFullscreen
             ? null
             : [
                 BoxShadow(
-                  color: colors.secondary.withOpacity(0.1),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
+                  color: colors.secondary.withOpacity(0.05),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
                 ),
               ],
       ),
       child: ClipRRect(
         borderRadius: _isFullscreen
             ? BorderRadius.zero
-            : BorderRadius.circular(16),
+            : BorderRadius.circular(24),
         child: Stack(
           children: [
-            SfPdfViewer.asset(
-              "assets/mypdf.pdf",
-              controller: _pdfViewerController,
-              onDocumentLoaded: (details) {
-                setState(() {
-                  _isLoading = false;
-                  _totalPages = details.document.pages.count;
-                });
-              },
-              onDocumentLoadFailed: (details) {
-                setState(() {
-                  _isLoading = false;
-                  _hasError = true;
-                });
-                _showMessage("Erreur lors du chargement du CV", isError: true);
-              },
-              onPageChanged: (details) {
-                setState(() {
-                  _currentPage = details.newPageNumber;
-                });
-              },
-            ),
-
-            // Loading Overlay
+            isNetwork
+                ? SfPdfViewer.network(
+                    finalUrl,
+                    controller: _pdfViewerController,
+                    onDocumentLoaded: (_) {
+                      setState(() {
+                        _isLoading = false;
+                      });
+                    },
+                    onDocumentLoadFailed: (details) {
+                      print("PDF LOAD FAILED: ${details.description}");
+                      setState(() {
+                        _isLoading = false;
+                        _hasError = true;
+                      });
+                      _showMessage("Erreur chargement PDF", isError: true);
+                    },
+                  )
+                : SfPdfViewer.asset(
+                    "assets/mypdf.pdf",
+                    controller: _pdfViewerController,
+                  ),
             if (_isLoading)
               Container(
-                color: colors.bg.withOpacity(0.9),
+                color: Colors.white,
                 child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      SpinKitFadingCircle(color: colors.primary, size: 50.0),
-                      const SizedBox(height: 16),
-                      SubTitle(
-                        text: "Chargement du CV...",
-                        fontsize: 16,
-                        color: colors.secondary,
-                      ),
-                    ],
-                  ),
+                  child: SpinKitFadingCircle(color: colors.primary, size: 50.0),
                 ),
               ),
-
-            // Error Overlay
-            if (_hasError && !_isLoading)
+            if (_hasError)
               Container(
-                color: colors.bg.withOpacity(0.9),
+                color: Colors.white,
                 child: Center(
                   child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      HugeIcon(
-                        icon: HugeIcons.strokeRoundedAlert01,
-                        color: colors.error,
-                        size: 48,
+                      Icon(
+                        Icons.broken_image_rounded,
+                        size: 64,
+                        color: colors.error.withOpacity(0.5),
                       ),
                       const SizedBox(height: 16),
-                      TitleWidget(
-                        text: "Erreur de chargement",
-                        fontSize: 18,
-                        color: colors.error,
+                      Text(
+                        "Impossible d'afficher le document",
+                        style: TextStyle(color: colors.secondary),
                       ),
                       const SizedBox(height: 8),
-                      SubTitle(
-                        text: "Impossible de charger le CV",
-                        fontsize: 14,
-                        color: colors.secondary,
-                      ),
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: () {
-                          setState(() {
-                            _isLoading = true;
-                            _hasError = false;
-                          });
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: colors.primary,
-                          foregroundColor: colors.bg,
-                        ),
-                        child: Text("Réessayer"),
+                      Text(
+                        "URL: $finalUrl",
+                        style: TextStyle(fontSize: 10, color: Colors.grey),
                       ),
                     ],
                   ),
                 ),
               ),
-
-            // Fullscreen Exit Button
             if (_isFullscreen)
               Positioned(
                 top: 40,
-                right: 16,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: colors.secondary.withOpacity(0.8),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: IconButton(
-                    onPressed: _toggleFullscreen,
-                    icon: HugeIcon(
-                      icon: HugeIcons.strokeRoundedCancel01,
-                      color: colors.bg,
-                      size: 20,
-                    ),
-                  ),
+                right: 20,
+                child: FloatingActionButton.small(
+                  backgroundColor: Colors.white,
+                  onPressed: _toggleFullscreen,
+                  child: Icon(Icons.close, color: colors.secondary),
                 ),
               ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(String msg) {
+    return Container(
+      height: 300,
+      margin: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            HugeIcon(
+              icon: HugeIcons.strokeRoundedFile02,
+              size: 48,
+              color: colors.secondary.withOpacity(0.2),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              msg,
+              style: TextStyle(
+                color: colors.secondary.withOpacity(0.5),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ],
         ),
       ),
@@ -553,55 +435,53 @@ class _UserCvViewState extends State<UserCvView> with TickerProviderStateMixin {
   Widget _buildActionButtons() {
     if (_isFullscreen) return const SizedBox.shrink();
 
-    return Container(
-      margin: const EdgeInsets.all(16),
+    return Padding(
+      padding: const EdgeInsets.all(20),
       child: Row(
         children: [
           Expanded(
-            child: OutlinedButton.icon(
-              onPressed: () {
-                // TODO: Implement download functionality
-                _showMessage(
-                  "Fonctionnalité de téléchargement bientôt disponible",
-                );
-              },
-              icon: HugeIcon(
-                icon: HugeIcons.strokeRoundedDownload01,
-                color: colors.primary,
-                size: 18,
-              ),
-              label: Text(
-                "Télécharger",
-                style: TextStyle(color: colors.primary),
-              ),
-              style: OutlinedButton.styleFrom(
-                side: BorderSide(color: colors.primary),
-                padding: const EdgeInsets.symmetric(vertical: 14),
+            child: ElevatedButton.icon(
+              onPressed: _handleDownload,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: colors.bg,
+                foregroundColor: colors.secondary,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                side: BorderSide(color: colors.secondary.withOpacity(0.1)),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(16),
                 ),
               ),
+              icon: const HugeIcon(
+                icon: HugeIcons.strokeRoundedShare08,
+                size: 20,
+                color: Colors.black,
+              ),
+              label: const Text("Partager / DL"),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 16),
           Expanded(
             child: ElevatedButton.icon(
-              onPressed: () {
-                // TODO: Implement contact functionality
-                _showMessage("Fonctionnalité de contact bientôt disponible");
-              },
-              icon: HugeIcon(
-                icon: HugeIcons.strokeRoundedMail01,
-                color: colors.bg,
-                size: 18,
-              ),
-              label: Text("Contacter", style: TextStyle(color: colors.bg)),
+              onPressed: _handleContact,
               style: ElevatedButton.styleFrom(
                 backgroundColor: colors.primary,
-                padding: const EdgeInsets.symmetric(vertical: 14),
+                foregroundColor: Colors.white,
+                elevation: 4,
+                shadowColor: colors.primary.withOpacity(0.4),
+                padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(16),
                 ),
+              ),
+              icon: const HugeIcon(
+                icon: HugeIcons.strokeRoundedCall02,
+                size: 20,
+                color: Colors.white,
+              ),
+              label: const Text(
+                "Contacter",
+                style: TextStyle(fontWeight: FontWeight.bold),
               ),
             ),
           ),
@@ -613,107 +493,71 @@ class _UserCvViewState extends State<UserCvView> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: colors.bg,
+      backgroundColor: const Color(0xFFF8FAFC), // Light grey background
       body: _isFullscreen
-          ? _buildPdfViewer()
-          : CustomScrollView(
-              slivers: [
-                // Custom App Bar
-                SliverAppBar(
-                  expandedHeight: 200,
+          ? _buildPdfView()
+          : NestedScrollView(
+              headerSliverBuilder: (context, innerBoxIsScrolled) => [
+                SliverAppBar.large(
+                  expandedHeight: 180,
                   pinned: true,
                   leading: IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: HugeIcon(
-                      icon: HugeIcons.strokeRoundedArrowTurnBackward,
-                      color: colors.bg,
-                      size: 24,
-                    ),
+                    onPressed: () {},
+                    icon: Icon(Icons.arrow_back_ios),
                   ),
                   backgroundColor: colors.primary,
+                  foregroundColor: Colors.white,
                   flexibleSpace: FlexibleSpaceBar(
-                    title: FadeTransition(
-                      opacity: _fadeAnimation,
-                      child: Text(
-                        "CV - ${widget.userCv.name}",
-                        style: TextStyle(
-                          color: colors.bg,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
+                    title: const Text(
+                      "Détails Candidat",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
                       ),
                     ),
-                    background: Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            colors.primary,
-                            colors.primary.withOpacity(0.8),
-                          ],
+                    centerTitle: true,
+                    background: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        Image.network(
+                          "https://www.shutterstock.com/image-photo/job-search-human-resources-recruitment-260nw-1292578582.jpg",
+                          fit: BoxFit.cover,
                         ),
-                      ),
-                      child: Center(
-                        child: FadeTransition(
-                          opacity: _fadeAnimation,
-                          child: HugeIcon(
-                            icon: HugeIcons.strokeRoundedFile02,
-                            color: colors.bg.withOpacity(0.3),
-                            size: 80,
-                          ),
-                        ),
+                        Container(color: colors.primary.withOpacity(0.85)),
+                      ],
+                    ),
+                  ),
+                  actions: [
+                    IconButton(
+                      onPressed: _toggleFullscreen,
+                      icon: const Icon(
+                        Icons.fullscreen_rounded,
+                        color: Colors.white,
                       ),
                     ),
-                  ),
-                ),
-
-                // User Info Card
-                SliverToBoxAdapter(
-                  child: FadeTransition(
-                    opacity: _fadeAnimation,
-                    child: SlideTransition(
-                      position: _slideAnimation,
-                      child: _buildUserInfoCard(),
-                    ),
-                  ),
-                ),
-
-                // PDF Controls
-                SliverToBoxAdapter(
-                  child: FadeTransition(
-                    opacity: _fadeAnimation,
-                    child: _buildPdfControls(),
-                  ),
-                ),
-
-                // PDF Viewer
-                SliverToBoxAdapter(
-                  child: FadeTransition(
-                    opacity: _fadeAnimation,
-                    child: _buildPdfViewer(),
-                  ),
-                ),
-
-                // Action Buttons
-                SliverToBoxAdapter(
-                  child: FadeTransition(
-                    opacity: _fadeAnimation,
-                    child: _buildActionButtons(),
-                  ),
-                ),
-
-                // Back Button
-                SliverToBoxAdapter(
-                  child: Container(
-                    margin: const EdgeInsets.all(16),
-                    child: Btn(
-                      texte: "Retour",
-                      function: () => Navigator.pop(context),
-                    ),
-                  ),
+                  ],
                 ),
               ],
+              body: SingleChildScrollView(
+                child: Column(
+                  children: [
+                    FadeTransition(
+                      opacity: _fadeAnimation,
+                      child: _buildUserInfoCard(),
+                    ),
+                    FadeTransition(
+                      opacity: _fadeAnimation,
+                      child: _buildPdfView(),
+                    ),
+                    FadeTransition(
+                      opacity: _fadeAnimation,
+                      child: _buildActionButtons(),
+                    ),
+                    const SizedBox(height: 40),
+                  ],
+                ),
+              ),
             ),
     );
   }

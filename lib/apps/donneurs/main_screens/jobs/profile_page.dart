@@ -1,4 +1,3 @@
-import 'package:demarcheur_app/apps/demandeurs/main_screens/statistics_page.dart';
 import 'package:demarcheur_app/apps/donneurs/inner_screens/jobs/job_posting.dart';
 import 'package:demarcheur_app/consts/color.dart';
 import 'package:demarcheur_app/providers/donnor_user_provider.dart';
@@ -140,11 +139,11 @@ class _ProfilePageState extends State<ProfilePage>
                               title: "Informations personnelles",
                               icon: Icons.person_outline_rounded,
                               children: [
-                                if (user?.nameOrganization != null)
+                                if (user?.name != null)
                                   _ModernInfoTile(
                                     icon: Icons.business_outlined,
                                     label: "Organisation",
-                                    value: user!.nameOrganization!,
+                                    value: user!.name,
                                     colors: colors,
                                   ),
                                 _ModernInfoTile(
@@ -161,11 +160,8 @@ class _ProfilePageState extends State<ProfilePage>
                                 ),
                                 _ModernInfoTile(
                                   icon: Icons.location_on_outlined,
-                                  label: "Localisation",
-                                  value:
-                                      user?.adress ??
-                                      user?.city ??
-                                      "Non renseigné",
+                                  label: "Adresse",
+                                  value: user?.city ?? "Non renseigné",
                                   colors: colors,
                                 ),
                               ],
@@ -632,7 +628,7 @@ class _QuickActionsSection extends StatelessWidget {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => const JobPosting(),
+                        builder: (context) => const JobPostings(),
                       ),
                     );
                   },
@@ -645,12 +641,12 @@ class _QuickActionsSection extends StatelessWidget {
                   icon: Icons.analytics_outlined,
                   label: "Statistiques",
                   onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const StatisticsPage(),
-                      ),
-                    );
+                    // Navigator.push(
+                    //   context,
+                    //   MaterialPageRoute(
+                    //     builder: (context) => const StatisticsPage(),
+                    //   ),
+                    // );
                   },
                 ),
               ),

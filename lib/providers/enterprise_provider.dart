@@ -35,7 +35,9 @@ class EnterpriseProvider extends ChangeNotifier {
       // Load cached user first
       final userJson = prefs.getString('giver_user_data');
       if (userJson != null) {
-        print("DEBUG: EnterpriseProvider - Cached JSON mapping from: $userJson");
+        print(
+          "DEBUG: EnterpriseProvider - Cached JSON mapping from: $userJson",
+        );
         try {
           final cachedUser = EnterpriseModel.fromJson(jsonDecode(userJson));
           _user = cachedUser;
@@ -49,29 +51,48 @@ class EnterpriseProvider extends ChangeNotifier {
       final token = prefs.getString('token');
       if (token != null) {
         _token = token;
-        print("DEBUG: EnterpriseProvider - Fetching fresh profile from /auth/profile-giver...");
-        final freshUser = await ApiService().giverProfile(token);
-        if (freshUser != null) {
-          print("DEBUG: EnterpriseProvider - freshUser DETAILS: ID=${freshUser.id}, Name=${freshUser.name}");
-          
-          // CRITICAL: Merge data to avoid overwriting good login/cache data with nulls from profile endpoint
-          if (_user != null) {
-            _user = _user!.mergeFrom(freshUser);
-            print("DEBUG: EnterpriseProvider - ID after merge: ${_user?.id}");
+        
+        // Check user role before calling giverProfile (Support both keys for resilience)
+        final userRole = prefs.getString('user_role') ?? prefs.getString('role');
+        print("DEBUG: EnterpriseProvider - Resolved role: $userRole");
+        
+        // Only call giverProfile if user is actually a GIVER
+        if (userRole == 'GIVER') {
+          print(
+            "DEBUG: EnterpriseProvider - Fetching fresh profile from /auth/profile-giver...",
+          );
+          final freshUser = await ApiService().giverProfile(token);
+          if (freshUser != null) {
+            print(
+              "DEBUG: EnterpriseProvider - freshUser DETAILS: ID=${freshUser.id}, Name=${freshUser.name}",
+            );
+
+            // CRITICAL: Merge data to avoid overwriting good login/cache data with nulls from profile endpoint
+            if (_user != null) {
+              _user = _user!.mergeFrom(freshUser);
+              print("DEBUG: EnterpriseProvider - ID after merge: ${_user?.id}");
+            } else {
+              _user = freshUser;
+            }
+
+            // Update cache
+            final updatedJson = jsonEncode(_user!.toJson());
+            await prefs.setString('giver_user_data', updatedJson);
+            notifyListeners();
           } else {
-            _user = freshUser;
+            print(
+              "DEBUG: EnterpriseProvider - freshUser is NULL from ApiService",
+            );
           }
-          
-          // Update cache
-          final updatedJson = jsonEncode(_user!.toJson());
-          print("DEBUG: EnterpriseProvider - Final merged user saved to cache: $updatedJson");
-          await prefs.setString('giver_user_data', updatedJson);
-          notifyListeners();
         } else {
-          print("DEBUG: EnterpriseProvider - freshUser is NULL from ApiService");
+          print(
+            "DEBUG: EnterpriseProvider - Skipping giverProfile call for role: $userRole",
+          );
         }
       } else {
-        print("DEBUG: EnterpriseProvider - No token found in SharedPreferences");
+        print(
+          "DEBUG: EnterpriseProvider - No token found in SharedPreferences",
+        );
       }
     } catch (e) {
       print(e);
@@ -121,11 +142,13 @@ class EnterpriseProvider extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
 
-    await Future.delayed(const Duration(milliseconds: 200));
+    // In a real app, this would be an API call
+    await Future.delayed(const Duration(milliseconds: 500));
+    //_user = _user!.copyWith(isVerified: !_user!.isVerified);
 
-    // _user = _user!.copyWith(isVerified: !_user!.isVerified);
-
-    //await saveUser();
+    // Save to cache
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('giver_user_data', jsonEncode(_user!.toJson()));
 
     _isLoading = false;
     notifyListeners();

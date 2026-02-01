@@ -1,12 +1,21 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:demarcheur_app/consts/color.dart';
+import 'package:demarcheur_app/services/auth_provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path/path.dart' as path;
 
+import 'package:demarcheur_app/models/add_vancy_model.dart';
+import 'package:demarcheur_app/models/candidate_model.dart';
+import 'package:demarcheur_app/providers/compa_profile_provider.dart';
+import 'package:provider/provider.dart';
+
 class Upload extends StatefulWidget {
-  const Upload({super.key});
+  final AddVancyModel job;
+  const Upload({super.key, required this.job});
 
   @override
   _UploadState createState() => _UploadState();
@@ -603,14 +612,79 @@ class _UploadState extends State<Upload> with TickerProviderStateMixin {
       isUploading = true;
     });
 
-    // Simulate upload process
-    await Future.delayed(const Duration(seconds: 2));
+    try {
+      final token = Provider.of<AuthProvider>(context, listen: false).token;
+      // Depending on auth implementation, ID might be in AuthProvider or EnterpriseProvider
+      // Assuming EnterpriseProvider loads the user profile which contains the ID
+      // If EnterpriseProvider is for Givers, and Searchers use another provider, adjust accordingly.
+      // Based on previous context, AnnounceList uses EnterpriseProvider to get user ID.
+      // However, if the user is a Candidate (Searcher), they might be loaded via AuthProvider or similar.
+      // Let's try to get ID from EnterpriseProvider as seen in AnnounceList, or AuthProvider user object.
 
-    setState(() {
-      isUploading = false;
-    });
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      String? userId =
+          authProvider.userId; // Use the global userId from AuthProvider
 
-    _showSuccessDialog();
+      if (userId == null) {
+        print(
+          "DEBUG: User ID is null in AuthProvider. Attempting to retrieve from SharedPreferences.",
+        );
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          final userDataString = prefs.getString('last_user_data');
+          if (userDataString != null) {
+            final userData = jsonDecode(userDataString);
+            userId =
+                (userData['id'] ??
+                        userData['_id'] ??
+                        userData['user_id'] ??
+                        userData['userId'])
+                    ?.toString();
+            print("DEBUG: Retrieved User ID from SharedPreferences: $userId");
+          }
+        } catch (e) {
+          print("DEBUG: Error retrieving user ID from prefs: $e");
+        }
+      }
+
+      if (userId == null) {
+        _showSnackBar(
+          "Erreur: Impossible d'identifier l'utilisateur. Veuillez vous reconnecter.",
+          false,
+        );
+        setState(() {
+          isUploading = false;
+        });
+        return;
+      }
+
+      final candidate = CandidateModel(
+        jobId: widget.job.id!,
+        appliquantId: userId,
+        document: _selectedPdf,
+      );
+
+      final success = await Provider.of<CompaProfileProvider>(
+        context,
+        listen: false,
+      ).sendCandidature(candidate, token!);
+
+      setState(() {
+        isUploading = false;
+      });
+
+      if (success) {
+        _showSuccessDialog();
+      } else {
+        _showSnackBar("Échec de l'envoi de la candidature", false);
+      }
+    } catch (e) {
+      print("Upload error: $e");
+      setState(() {
+        isUploading = false;
+      });
+      _showSnackBar("Une erreur est survenue", false);
+    }
   }
 
   void _showSuccessDialog() {

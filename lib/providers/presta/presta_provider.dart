@@ -1,5 +1,6 @@
-// lib/providers/job_provider.dart
 import 'package:demarcheur_app/models/presta/presta_model.dart';
+import 'package:demarcheur_app/services/api_service.dart';
+import 'package:demarcheur_app/services/config.dart';
 import 'package:flutter/foundation.dart';
 
 class PrestaProvider extends ChangeNotifier {
@@ -12,100 +13,38 @@ class PrestaProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
 
   /// Load local (mock) data for now
-  Future<void> loadVancies() async {
+  /// Load real vacancies from API
+  Future<void> loadVancies(String? token) async {
     _isLoading = true;
     notifyListeners();
 
-    // 🧩 You can later replace this section with an API call
-    await Future.delayed(const Duration(seconds: 1)); // simulate network delay
+    try {
+      final realVancies = await ApiService().getMyVacancies(token);
 
-    _allJobs = [
-      PrestaModel(
-        id: '1',
-        title: 'Besoin d\'un mecanicien',
-        companyName: 'Alphonse loua',
-        imageUrl: [
-          "https://sammechanical.com/wp-content/uploads/2022/11/General-Mechanic-in-Industrial-Facility.jpg",
-        ],
-        postDate: 'il y a 10 minutes',
-        location: 'Zaly',
+      _allJobs = realVancies.map((v) => PrestaModel(
+        id: v.id,
+        ownerId: v.companyId,
+        title: v.title,
+        companyName: v.companyName ?? 'Entreprise',
+        imageUrl: [(Config.getImgUrl(v.companyImage ?? '') ?? '')],
+        postDate: v.createdAt ?? 'Récent',
+        location: v.city,
         status: 'Disponible',
-        categorie: 'Mecanique',
-        exigences: [
-          "Avoir une connaissance des outils de mecanique",
-          "Être toujours à jour sur les nouvelles tendances",
-          "Être capable de travailler dans une petite ou large équipe",
-          "Avoir une expérience de 3 ans minimum",
-        ],
-        about: "Nous sommes une entreprise specialise dans la production",
-        salary: "1.500.000 GNF",
-      ),
-      PrestaModel(
-        id: '2',
-        title: 'Besoin d\'un macon',
-        companyName: 'Alphonse loua',
-        imageUrl: [
-          "https://tse4.mm.bing.net/th/id/OIP.NXdTT1tLRK7x548fJmY7bAHaFj?cb=ucfimgc2&rs=1&pid=ImgDetMain&o=7&rm=3",
-        ],
-        postDate: 'il y a 10 minutes',
-        location: 'Zaly',
-        status: 'Disponible',
-        categorie: 'Macon',
-        exigences: [
-          "Avoir une connaissance des outils de maconnerie",
-          "Être toujours à jour sur les nouvelles tendances",
-          "Être capable de travailler dans une petite ou large équipe",
-          "Avoir une expérience de 3 ans minimum",
-        ],
-        about: "Nous sommes une entreprise specialise dans la production",
-        salary: "500.000 GNF",
-      ),
-      PrestaModel(
-        id: '3',
-        title: 'Besoin d\'un electricien',
-        companyName: 'PlomPresta',
-        imageUrl: [
-          "https://th.bing.com/th/id/R.9926fc26263686ff691771e95d9ce011?rik=oXskjusCqtQC2w&riu=http%3a%2f%2fclipground.com%2fimages%2felectricity-clipart-12.jpg&ehk=zhJExsCcpK%2fZxZWpz9KiBSv4y8JWKi%2f8ZSGZGKJAatY%3d&risl=&pid=ImgRaw&r=0",
-        ],
-        postDate: 'il y a 28 minutes',
-        location: 'Zaly',
-        status: 'Disponible',
-        categorie: 'Electricite',
-        exigences: [
-          "Avoir une connaissance des outils d'electricite",
-          "Être toujours à jour sur les nouvelles tendances",
-          "Être capable de travailler dans une petite ou large équipe",
-          "Avoir une expérience de 3 ans minimum",
-        ],
-        about: "Nous sommes une entreprise specialise dans la production",
-        salary: "A negocier",
-      ),
-      PrestaModel(
-        id: '4',
-        title: 'Besoin d\'un plombier',
-        companyName: 'PlomPresta',
-        imageUrl: [
-          "https://tse1.mm.bing.net/th/id/OIP.fsJ7hcriyOCxJKTr-nU8-QHaE8?cb=ucfimgc2&rs=1&pid=ImgDetMain&o=7&rm=3",
-        ],
-        postDate: 'il y a 28 minutes',
-        location: 'Zaly',
-        status: 'Disponible',
-        categorie: 'Plomberie',
-        exigences: [
-          "Avoir une connaissance des outils de plomberie",
-          "Être toujours à jour sur les nouvelles tendances",
-          "Être capable de travailler dans une petite ou large équipe",
-          "Avoir une expérience de 3 ans minimum",
-        ],
-        about: "Nous sommes une entreprise specialise dans la production",
-        salary: "250.000 GNF",
-      ),
-    ];
+        categorie: v.typeJobe,
+        exigences: v.reqProfile.map((e) => e.toString()).toList(),
+        about: v.description,
+        salary: "${v.salary} GNF",
+        originalVancy: v,
+      )).toList();
+    } catch (e) {
+      debugPrint('Error loading vacancies in PrestaProvider: $e');
+      _allJobs = [];
+    }
 
     _filteredJobs = _allJobs;
-
     _isLoading = false;
     notifyListeners();
+  
   }
 
   // 🔹 Dynamic categories list (always up-to-date)

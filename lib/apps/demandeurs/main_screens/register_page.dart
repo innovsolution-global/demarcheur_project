@@ -1,11 +1,8 @@
 import 'dart:io';
-import 'package:demarcheur_app/apps/demandeurs/main_screens/dem_onboarding_page.dart';
-import 'package:demarcheur_app/apps/donneurs/main_screens/dashboard_page.dart';
 import 'package:demarcheur_app/auths/donneurs/login_page.dart';
 import 'package:demarcheur_app/consts/color.dart';
 import 'package:demarcheur_app/methods/my_methodes.dart';
 import 'package:demarcheur_app/models/enterprise/enterprise_model.dart';
-import 'package:demarcheur_app/models/services/service_model.dart';
 import 'package:demarcheur_app/services/auth_provider.dart';
 import 'package:demarcheur_app/widgets/header_page.dart';
 import 'package:demarcheur_app/widgets/sub_title.dart';

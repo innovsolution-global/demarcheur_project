@@ -1,12 +1,9 @@
 import 'package:demarcheur_app/consts/color.dart';
 import 'package:demarcheur_app/providers/dem_job_provider.dart';
-import 'package:demarcheur_app/widgets/btn_page.dart';
 import 'package:demarcheur_app/widgets/header_page.dart';
-import 'package:demarcheur_app/widgets/sub_title.dart';
-import 'package:demarcheur_app/widgets/title_widget.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:provider/provider.dart';
+import 'package:shimmer/shimmer.dart';
 
 class Applicants extends StatefulWidget {
   const Applicants({super.key});
@@ -44,158 +41,173 @@ class _ApplicantsState extends State<Applicants> {
           slivers: [
             Header(auto: true),
             search.isLoading
-                ? SliverToBoxAdapter(
-                    child: Center(
-                      child: SpinKitThreeBounce(
-                        color: colors.primary,
-                        size: 30.0,
-                      ),
-                    ),
+                ? SliverList.builder(
+                    itemCount: 3,
+                    itemBuilder: (context, index) => _buildShimmerItem(),
                   )
                 : SliverList.builder(
                     itemCount: applicant.length,
                     itemBuilder: (context, index) {
                       final dem = applicant[index];
                       return Padding(
-                        padding: const EdgeInsets.all(10),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
                         child: Container(
-                          width: MediaQuery.of(context).size.width,
-                          height: 208,
                           decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: colors.tertiary),
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.05),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
                           ),
                           child: Padding(
-                            padding: const EdgeInsets.all(10.0),
+                            padding: const EdgeInsets.all(16.0),
                             child: Column(
                               children: [
                                 Row(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Container(
-                                      width: 100,
-                                      height: 100,
+                                      width: 80,
+                                      height: 80,
                                       decoration: BoxDecoration(
-                                        border: Border.all(
-                                          color: colors.tertiary,
-                                        ),
-                                        borderRadius: BorderRadius.circular(8),
+                                        borderRadius: BorderRadius.circular(16),
                                         image: DecorationImage(
                                           fit: BoxFit.cover,
                                           image: NetworkImage(dem.imageUrl),
                                         ),
                                       ),
                                     ),
-                                    SizedBox(width: 10),
-                                    Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          children: [
-                                            TitleWidget(
-                                              text: dem.title,
+                                    const SizedBox(width: 16),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            dem.title,
+                                            style: TextStyle(
+                                              color: colors.primary,
                                               fontSize: 18,
+                                              fontWeight: FontWeight.w700,
                                             ),
-                                            SizedBox(width: 5),
-                                          ],
-                                        ),
-                                        SubTitle(
-                                          text: dem.companyName,
-                                          fontsize: 16,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-
-                                        SubTitle(
-                                          text: dem.postDate,
-                                          fontsize: 12,
-                                        ),
-                                        SizedBox(height: 5),
-                                        Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            SizedBox(
-                                              height: 30,
-                                              child: OutlinedButton(
-                                                onPressed: () {
-                                                  setState(() {
-                                                    dispo != nonDispo;
-                                                  });
-                                                },
-                                                style: OutlinedButton.styleFrom(
-                                                  side: BorderSide.none,
-                                                  backgroundColor:
-                                                      dem.status == "Disponible"
-                                                      ? colors.bgA
-                                                      : colors.errorBg,
-                                                ),
-                                                child:
-                                                    dem.status == "Disponible"
-                                                    ? Center(
-                                                        child: TitleWidget(
-                                                          text: "Disponible",
-                                                          fontSize: 12,
-                                                          color:
-                                                              colors.accepted,
-                                                        ),
-                                                      )
-                                                    : Center(
-                                                        child: SizedBox(
-                                                          width: 60,
-                                                          child: Text(
-                                                            overflow:
-                                                                TextOverflow
-                                                                    .ellipsis,
-                                                            "Plus disponible",
-                                                            style: TextStyle(
-                                                              fontSize: 12,
-                                                              color:
-                                                                  colors.error,
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            dem.companyName,
+                                            style: TextStyle(
+                                              color: colors.secondary,
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Row(
+                                            children: [
+                                              Icon(
+                                                Icons.access_time_rounded,
+                                                size: 14,
+                                                color: colors.secondary
+                                                    .withOpacity(0.6),
                                               ),
-                                            ),
-                                            SizedBox(width: 10),
-                                            SizedBox(
-                                              height: 30,
-                                              width: 90,
-                                              child: OutlinedButton(
-                                                onPressed: () {},
-                                                style: OutlinedButton.styleFrom(
-                                                  side: BorderSide.none,
-                                                  backgroundColor:
-                                                      colors.errorBg,
-                                                ),
-                                                child: Center(
-                                                  child: Text(
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                    "Supprimer",
-                                                    style: TextStyle(
-                                                      fontSize: 12,
-                                                      color: colors.error,
-                                                    ),
-                                                  ),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                dem.postDate,
+                                                style: TextStyle(
+                                                  color: colors.secondary
+                                                      .withOpacity(0.6),
+                                                  fontSize: 12,
                                                 ),
                                               ),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
+                                            ],
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ],
                                 ),
-                                SizedBox(height: 15),
-                                Divider(color: colors.tertiary, height: 2),
-                                SizedBox(height: 17),
+                                const SizedBox(height: 16),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 8,
+                                          horizontal: 12,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: dem.status == "Disponible"
+                                              ? colors.accepted.withOpacity(0.1)
+                                              : colors.error.withOpacity(0.1),
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                        ),
+                                        child: Center(
+                                          child: Text(
+                                            dem.status == "Disponible"
+                                                ? "Disponible"
+                                                : "Fermé",
+                                            style: TextStyle(
+                                              color: dem.status == "Disponible"
+                                                  ? colors.accepted
+                                                  : colors.error,
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 13,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        color: colors.error.withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: IconButton(
+                                        onPressed: () {},
+                                        icon: Icon(
+                                          Icons.delete_outline_rounded,
+                                          color: colors.error,
+                                          size: 20,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 16),
                                 SizedBox(
-                                  height: 45,
-                                  child: BtnPage(
-                                    texte: "Booster",
-                                    route: "/boost",
+                                  width: double.infinity,
+                                  height: 48,
+                                  child: ElevatedButton.icon(
+                                    onPressed: () {
+                                      Navigator.pushNamed(context, "/boost");
+                                    },
+                                    icon: const Icon(
+                                      Icons.rocket_launch_rounded,
+                                      size: 18,
+                                      color: Colors.white,
+                                    ),
+                                    label: const Text(
+                                      "Booster l'annonce",
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: colors.primary,
+                                      elevation: 0,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ],
@@ -206,6 +218,87 @@ class _ApplicantsState extends State<Applicants> {
                     },
                   ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildShimmerItem() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Shimmer.fromColors(
+          baseColor: Colors.grey[200]!,
+          highlightColor: Colors.grey[50]!,
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(width: 150, height: 18, color: Colors.white),
+                          const SizedBox(height: 8),
+                          Container(width: 100, height: 14, color: Colors.white),
+                          const SizedBox(height: 12),
+                          Container(width: 80, height: 12, color: Colors.white),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  width: double.infinity,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

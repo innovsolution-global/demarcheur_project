@@ -1,12 +1,14 @@
-import 'package:demarcheur_app/apps/prestataires/chat_page.dart';
+import 'package:demarcheur_app/models/send_message_model.dart';
+import 'package:demarcheur_app/widgets/chat_widget.dart';
 import 'package:demarcheur_app/apps/prestataires/presta_detail.dart';
 import 'package:demarcheur_app/apps/prestataires/presta_list.dart';
 import 'package:demarcheur_app/consts/color.dart';
 import 'package:demarcheur_app/models/presta/presta_model.dart';
 import 'package:demarcheur_app/providers/presta/presta_provider.dart';
+import 'package:demarcheur_app/services/auth_provider.dart';
 import 'package:flutter/material.dart';
-import 'package:hugeicons/hugeicons.dart';
 import 'package:provider/provider.dart';
+import 'package:hugeicons/hugeicons.dart';
 
 class PrestaHomePage extends StatefulWidget {
   const PrestaHomePage({super.key});
@@ -24,9 +26,10 @@ class _PrestaHomePageState extends State<PrestaHomePage> {
   void initState() {
     super.initState();
     Future.microtask(() {
-      final provider = context.read<PrestaProvider>();
-      provider.loadVancies().then((_) {
-        provider.setJobs(provider.allJobs);
+      final authProvider = context.read<AuthProvider>();
+      final prestaProvider = context.read<PrestaProvider>();
+      prestaProvider.loadVancies(authProvider.token).then((_) {
+        prestaProvider.setJobs(prestaProvider.allJobs);
       });
     });
   }
@@ -41,24 +44,27 @@ class _PrestaHomePageState extends State<PrestaHomePage> {
   Widget build(BuildContext context) {
     final provider = context.watch<PrestaProvider>();
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      body: CustomScrollView(
-        physics: const BouncingScrollPhysics(),
-        slivers: [
-          _buildHeader(),
-          SliverToBoxAdapter(child: _buildSearchBar()),
-          _buildStatsSection(),
-          _buildCategorySection(provider.categories),
-          _buildSectionTitle("Opportunités récentes", () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const PrestaList()),
-            );
-          }),
-          _buildJobList(provider),
-          const SliverToBoxAdapter(child: SizedBox(height: 80)),
-        ],
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF8FAFC),
+        body: CustomScrollView(
+          physics: const BouncingScrollPhysics(),
+          slivers: [
+            _buildHeader(),
+            SliverToBoxAdapter(child: _buildSearchBar()),
+            _buildStatsSection(),
+            _buildCategorySection(provider.categories),
+            _buildSectionTitle("Opportunités récentes", () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const PrestaList()),
+              );
+            }),
+            _buildJobList(provider),
+            const SliverToBoxAdapter(child: SizedBox(height: 80)),
+          ],
+        ),
       ),
     );
   }
@@ -335,8 +341,13 @@ class _PrestaHomePageState extends State<PrestaHomePage> {
 
   Widget _buildJobList(PrestaProvider provider) {
     final jobs = provider.allJobs;
-    // Filter logic here if needed based on _selectedCategoryIndex and _searchController
-    List<PrestaModel> filteredJobs = jobs;
+    // Only show vacancies posted by SEARCHERs (heuristic: no company name)
+    List<PrestaModel> filteredJobs = jobs.where((job) {
+      final original = job.originalVancy;
+      if (original == null) return false;
+      return original.companyName == null ||
+          original.companyName!.trim().isEmpty;
+    }).toList();
 
     if (_selectedCategoryIndex != 0 &&
         _selectedCategoryIndex < provider.categories.length) {
@@ -495,7 +506,14 @@ class _ModernJobCard extends StatelessWidget {
                   children: [
                     Expanded(
                       child: OutlinedButton(
-                        onPressed: () {},
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => PrestaDetail(presta: job),
+                            ),
+                          );
+                        },
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           side: BorderSide(
@@ -518,10 +536,27 @@ class _ModernJobCard extends StatelessWidget {
                     Expanded(
                       child: ElevatedButton(
                         onPressed: () {
+                          final authProvider = context.read<AuthProvider>();
+                          final myId = authProvider.userId;
+                          if (myId == null) return;
+                          
+                          final receiverId = job.ownerId ?? job.id;
+                          if (receiverId!.isEmpty) return;
+
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => ChatPage(presta: job),
+                              builder: (context) => ChatWidget(
+                                pageType: 'Presta',
+                                message: SendMessageModel(
+                                  senderId: myId,
+                                  receiverId: receiverId,
+                                  userName: job.companyName,
+                                  userPhoto: job.imageUrl.isNotEmpty ? job.imageUrl[0] : null,
+                                  content: '',
+                                  timestamp: DateTime.now(),
+                                ),
+                              ),
                             ),
                           );
                         },

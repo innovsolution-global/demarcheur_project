@@ -1,15 +1,15 @@
 import 'dart:convert';
-import 'package:demarcheur_app/models/donneur/donneur_model.dart';
+import 'package:demarcheur_app/models/enterprise/enterprise_model.dart';
 import 'package:demarcheur_app/services/api_service.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class DonnorUserProvider extends ChangeNotifier {
-  DonneurModel? _user;
+  EnterpriseModel? _user;
   bool _isLoading = false;
   String? _token;
   String? get token => _token;
-  DonneurModel? get user => _user;
+  EnterpriseModel? get user => _user;
   bool get isLoading => _isLoading;
 
   // ------------------------------
@@ -33,14 +33,14 @@ class DonnorUserProvider extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
 
       // Load cached user first
-      final userJson = prefs.getString('searcher_user_data');
+      String? userJson = prefs.getString('giver_user_data');
+      userJson ??= prefs.getString('last_user_data');
+
       if (userJson != null) {
         try {
-          final cachedUser = DonneurModel.fromJson(jsonDecode(userJson));
-          if (cachedUser.phone != null) {
-            _user = cachedUser;
-            notifyListeners();
-          }
+          final cachedUser = EnterpriseModel.fromJson(jsonDecode(userJson));
+          _user = cachedUser;
+          notifyListeners();
         } catch (e) {
           print('Error parsing cached user: $e');
         }
@@ -49,15 +49,41 @@ class DonnorUserProvider extends ChangeNotifier {
       final token = prefs.getString('token');
       if (token != null) {
         _token = token;
-        final freshUser = await ApiService().searcherProfile(token);
-        if (freshUser != null) {
-          _user = freshUser;
-          // Update cache
-          await prefs.setString('searcher_user_data', jsonEncode(_user!.toJson()));
+        
+        // Check user role before calling giverProfile
+        final userRole = prefs.getString('user_role');
+        print("DEBUG: DonnorUserProvider - User role: $userRole");
+        
+        // Only call giverProfile if user is actually a GIVER
+        if (userRole == 'GIVER') {
+          final freshUser = await ApiService().giverProfile(token);
+          if (freshUser != null) {
+            _user = freshUser;
+            // Update cache
+            await prefs.setString('giver_user_data', jsonEncode(_user!.toJson()));
+          } else {
+            // API call failed, token might be invalid
+            // Clear invalid token and cached user
+            await prefs.remove('token');
+            await prefs.remove('giver_user_data');
+            _token = null;
+            _user = null;
+            print('Token invalid, cleared authentication data');
+          }
+        } else {
+          print(
+            "DEBUG: DonnorUserProvider - Skipping giverProfile call for role: $userRole",
+          );
         }
       }
     } catch (e) {
-      print(e);
+      print('Error in loadUser: $e');
+      // Clear data on error
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('token');
+      await prefs.remove('giver_user_data');
+      _token = null;
+      _user = null;
     }
     _isLoading = false;
     notifyListeners();

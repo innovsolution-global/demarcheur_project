@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:demarcheur_app/services/config.dart';
 
 class EnterpriseModel {
   String? id;
@@ -12,6 +13,8 @@ class EnterpriseModel {
   String? profile;
   File? image;
   String? role;
+  double? rate;
+  bool isVerified;
 
   EnterpriseModel({
     this.id,
@@ -25,11 +28,13 @@ class EnterpriseModel {
     this.profile,
     this.image,
     this.role,
+    this.rate = 0.0,
+    this.isVerified = false,
   });
 
   factory EnterpriseModel.fromJson(Map<String, dynamic> json) {
     print("DEBUG: EnterpriseModel parsing JSON with keys: ${json.keys.toList()}");
-    final mappedId = (json['id'] ?? json['_id'] ?? json['user_id'] ?? json['userId'] ?? json['entreprise_id'])?.toString();
+    final mappedId = (json['entreprise_id'] ?? json['id'] ?? json['_id'] ?? json['user_id'] ?? json['userId'])?.toString();
     print("DEBUG: EnterpriseModel - Mapped ID: $mappedId");
     
     return EnterpriseModel(
@@ -41,8 +46,13 @@ class EnterpriseModel {
       adress: (json['adress'] ?? json['address'] ?? json['location'])?.toString(),
       city: json['city']?.toString(),
       serviceId: json['serviceId']?.toString(),
-      profile: json['profile']?.toString(),
+      profile: Config.getImgUrl(json['profile']?.toString() ??
+               json['photoPath']?.toString() ??
+               json['photo_path']?.toString() ??
+               json['profilePath']?.toString()),
       role: json['role']?.toString(),
+      rate: (json['rate'] ?? 0.0).toDouble(),
+      isVerified: json['isVerified'] ?? false,
     );
   }
 
@@ -71,6 +81,8 @@ class EnterpriseModel {
       profile: profile ?? this.profile,
       image: image ?? this.image,
       role: role ?? this.role,
+      rate: rate ?? rate,
+      isVerified: isVerified ?? isVerified,
     );
   }
 
@@ -89,6 +101,8 @@ class EnterpriseModel {
       profile: (other.profile != null && other.profile!.isNotEmpty) ? other.profile : profile,
       image: other.image ?? image,
       role: (other.role != null && other.role!.isNotEmpty) ? other.role : role,
+      rate: (other.rate != null && other.rate! > 0) ? other.rate : rate,
+      isVerified: other.isVerified,
     );
   }
 
@@ -103,5 +117,7 @@ class EnterpriseModel {
     "serviceId": serviceId,
     "profile": profile,
     "role": role,
+    "rate": rate,
+    "isVerified": isVerified,
   };
 }

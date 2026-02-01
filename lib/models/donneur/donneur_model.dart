@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:demarcheur_app/services/config.dart';
+
 class DonneurModel {
   String? id;
   String name;
@@ -28,7 +30,13 @@ class DonneurModel {
   factory DonneurModel.fromJson(Map<String, dynamic> json) {
     print("DEBUG: DonneurModel.fromJson called with: $json");
     return DonneurModel(
-      id: json['id']?.toString(),
+      id:
+          (json['userId'] ??
+                  json['id'] ??
+                  json['_id'] ??
+                  json['user_id'] ??
+                  json['donneur_id'])
+              ?.toString(),
       name: json['name']?.toString() ?? '',
       phone: json['phone']?.toString() ?? json['phoneNumber']?.toString(),
       email: json['email']?.toString() ?? '',
@@ -38,7 +46,15 @@ class DonneurModel {
           json['address']?.toString() ??
           json['location']?.toString(),
       city: json['city']?.toString(),
-      profile: json['profile']?.toString(),
+      profile: Config.getImgUrl(
+        json['profile']?.toString() ??
+            json['image']?.toString() ??
+            json['photo']?.toString() ??
+            json['photoPath']?.toString() ??
+            json['photo_path']?.toString() ??
+            json['profilePath']?.toString(),
+      ),
+
       nameOrganization: json['name_organization']?.toString(),
     );
   }
@@ -50,7 +66,7 @@ class DonneurModel {
     "password": password,
     "adress": adress,
     "city": city,
-    "profile": profile,
+    "image": profile,
     "name_organization": nameOrganization,
   };
 }

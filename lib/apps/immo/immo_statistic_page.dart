@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:demarcheur_app/consts/color.dart';
 import 'package:demarcheur_app/models/house_model.dart';
+import 'package:demarcheur_app/services/config.dart';
 import 'package:demarcheur_app/widgets/immo_header.dart';
 import 'package:demarcheur_app/widgets/title_widget.dart';
 import 'package:demarcheur_app/widgets/sub_title.dart';
@@ -199,7 +200,7 @@ class _ImmoStatisticPageState extends State<ImmoStatisticPage>
                   top: Radius.circular(20),
                 ),
                 child: Image.network(
-                  widget.house.imageUrl.first,
+                  Config.getImgUrl(widget.house.imageUrl.isNotEmpty ? widget.house.imageUrl.first : null) ?? "https://via.placeholder.com/400x200",
                   width: double.infinity,
                   height: 200,
                   fit: BoxFit.cover,
@@ -240,7 +241,10 @@ class _ImmoStatisticPageState extends State<ImmoStatisticPage>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  "${widget.house.type} • ${widget.house.category}",
+                  widget.house.title ?? 
+                  widget.house.countType ?? 
+                  widget.house.category ?? 
+                  'Propriété',
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -254,7 +258,7 @@ class _ImmoStatisticPageState extends State<ImmoStatisticPage>
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        widget.house.location,
+                        widget.house.location!,
                         style: TextStyle(fontSize: 16, color: _colors.primary),
                       ),
                     ),

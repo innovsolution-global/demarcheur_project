@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:demarcheur_app/consts/color.dart';
 import 'package:demarcheur_app/models/house_model.dart';
 import 'package:demarcheur_app/widgets/immo_header.dart';
@@ -390,7 +389,7 @@ class _BoostPageState extends State<BoostPage>
                     const SizedBox(width: 4),
                     Expanded(
                       child: Text(
-                        widget.boost.location,
+                        widget.boost.location!,
                         style: TextStyle(color: _colors.primary),
                       ),
                     ),

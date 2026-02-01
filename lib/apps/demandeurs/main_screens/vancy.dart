@@ -4,12 +4,15 @@ import 'package:demarcheur_app/consts/color.dart';
 import 'package:demarcheur_app/providers/compa_profile_provider.dart';
 import 'package:demarcheur_app/providers/enterprise_provider.dart';
 import 'package:demarcheur_app/providers/user_provider.dart';
+import 'package:demarcheur_app/services/auth_provider.dart';
 import 'package:demarcheur_app/widgets/header_page.dart';
 import 'package:demarcheur_app/widgets/sub_title.dart';
 import 'package:demarcheur_app/widgets/title_widget.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:provider/provider.dart';
+import 'package:shimmer/shimmer.dart';
 
 class Vancy extends StatefulWidget {
   const Vancy({super.key});
@@ -25,6 +28,8 @@ class _VancyState extends State<Vancy> with TickerProviderStateMixin {
   late AnimationController _slideController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
+
+  bool _isFabExtended = true;
 
   String selectedFilter = 'Tous';
   String searchQuery = '';
@@ -48,34 +53,51 @@ class _VancyState extends State<Vancy> with TickerProviderStateMixin {
       vsync: this,
     );
     _slideController = AnimationController(
-      duration: const Duration(milliseconds: 600),
+      duration: const Duration(milliseconds: 800),
       vsync: this,
     );
 
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _fadeController, curve: Curves.easeInOut),
+    _fadeAnimation = CurvedAnimation(
+      parent: _fadeController,
+      curve: Curves.easeOut,
     );
-
     _slideAnimation = Tween<Offset>(
       begin: const Offset(0, 0.1),
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _slideController, curve: Curves.easeOut));
 
-    // Load data and start animations
-    Future.microtask(() {
-      final userProvider = context.read<UserProvider>();
-      userProvider.loadUsers();
+    // Start animations
+    _fadeController.forward();
+    _slideController.forward();
 
-      final compaProvider = context.read<CompaProfileProvider>();
-      //compaProvider.loadVancies();
+    // Initial data load
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      print("DEBUG: Vancy initState - initializing data load");
+      final enterpriseProvider = context.read<EnterpriseProvider>();
 
-      context.read<EnterpriseProvider>().loadUser();
+      // If data is missing (e.g., after Hot Restart), try loading it
+      if (enterpriseProvider.user?.id == null) {
+        print("DEBUG: Vancy - Enterprise data missing, calling loadUser()");
+        await enterpriseProvider.loadUser();
+      }
 
-      // Start animations after a delay
-      Future.delayed(const Duration(milliseconds: 100), () {
-        _fadeController.forward();
-        _slideController.forward();
-      });
+      final token = enterpriseProvider.token;
+      final enterpriseId = enterpriseProvider.user?.id;
+
+      print(
+        "DEBUG: Vancy - Initial attempt IDs: token=${token != null}, entId=$enterpriseId",
+      );
+
+      if (enterpriseId != null) {
+        context.read<UserProvider>().loadCandidates(
+          token,
+          enterpriseId: enterpriseId,
+        );
+      } else {
+        print(
+          "DEBUG: Vancy - Still no enterpriseId after loadUser(), waiting for build/watch",
+        );
+      }
     });
   }
 
@@ -87,207 +109,63 @@ class _VancyState extends State<Vancy> with TickerProviderStateMixin {
     super.dispose();
   }
 
-  List<dynamic> _getFilteredApplicants(List<dynamic> applicants) {
-    var filtered = applicants.where((applicant) {
-      // Filter by search query
-      bool matchesSearch =
-          searchQuery.isEmpty ||
-          applicant.name.toLowerCase().contains(searchQuery.toLowerCase()) ||
-          applicant.speciality.toLowerCase().contains(
-            searchQuery.toLowerCase(),
-          );
+  // --- Logic Methods ---
 
-      // Filter by status
-      bool matchesStatus =
-          selectedFilter == 'Tous' ||
-          applicant.status.toLowerCase() == selectedFilter.toLowerCase() ||
-          (selectedFilter == 'Accepté' && applicant.status == 'Accepte');
+  List<dynamic> _getFilteredApplicants(List<dynamic> allApplicants) {
+    if (allApplicants.isEmpty) return [];
 
-      return matchesSearch && matchesStatus;
+    return allApplicants.where((applicant) {
+      // 1. Filter by Status
+      bool matchesStatus = true;
+      final status = applicant.status.toString().toUpperCase();
+
+      if (selectedFilter != 'Tous') {
+        if (selectedFilter == 'Accepté' &&
+            (status == 'ACCEPTE' || status == 'ACCEPTED')) {
+          matchesStatus = true;
+        } else if (selectedFilter == 'Rejeté' &&
+            (status == 'REJETE' || status == 'REJECTED')) {
+          matchesStatus = true;
+        } else if (selectedFilter == 'Interview' && status == 'INTERVIEW') {
+          matchesStatus = true;
+        } else if (selectedFilter == 'En cours' &&
+            (status == 'EN COURS' || status == 'PENDING')) {
+          matchesStatus = true;
+        } else {
+          matchesStatus = false;
+        }
+      }
+
+      // 2. Filter by Search Query
+      bool matchesSearch = true;
+      if (searchQuery.isNotEmpty) {
+        final query = searchQuery.toLowerCase();
+        final name = applicant.name.toLowerCase();
+        final type = applicant.speciality.toLowerCase();
+        matchesSearch = name.contains(query) || type.contains(query);
+      }
+
+      return matchesStatus && matchesSearch;
     }).toList();
-
-    return filtered;
-  }
-
-  void _showMessage(String message, {bool isError = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(
-              isError ? Icons.error_outline : Icons.check_circle_outline,
-              color: colors.bg,
-              size: 20,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                message,
-                style: TextStyle(
-                  color: colors.bg,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: isError ? colors.error : colors.accepted,
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        duration: Duration(seconds: isError ? 4 : 3),
-      ),
-    );
   }
 
   void _updateApplicantStatus(dynamic applicant, String newStatus) {
-    setState(() {
-      applicant.status = newStatus;
-    });
-
-    String message = '';
-    switch (newStatus) {
-      case 'Interview planifie':
-        message = 'Entretien planifié pour ${applicant.name}';
-        break;
-      case 'Accepte':
-        message = '${applicant.name} a été accepté(e)';
-        break;
-      case 'Rejete':
-        message = '${applicant.name} a été rejeté(e)';
-        break;
-    }
-
-    if (message.isNotEmpty) {
-      _showMessage(message);
-    }
-  }
-
-  Widget _buildSearchAndFilter() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            decoration: BoxDecoration(
-              color: colors.bgSubmit.withOpacity(0.5),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: colors.secondary.withOpacity(0.05)),
-            ),
-            child: TextField(
-              controller: _searchController,
-              onChanged: (value) => setState(() => searchQuery = value),
-              style: TextStyle(color: colors.secondary, fontSize: 15),
-              decoration: InputDecoration(
-                hintText: 'Chercher par nom ou spécialité...',
-                hintStyle: TextStyle(color: colors.secondary.withOpacity(0.4)),
-                prefixIcon: Icon(
-                  Icons.search_rounded,
-                  color: colors.primary,
-                  size: 20,
-                ),
-                border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(vertical: 14),
-              ),
-            ),
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Center(
+          child: Text(
+            'Statut changé en $newStatus ',
+            style: TextStyle(color: colors.bg),
           ),
-          const SizedBox(height: 12),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            child: Row(
-              children: statusFilters.map((filter) {
-                final isSelected = selectedFilter == filter;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: ChoiceChip(
-                    label: Text(filter),
-                    selected: isSelected,
-                    onSelected: (selected) {
-                      setState(() => selectedFilter = filter);
-                    },
-                    labelStyle: TextStyle(
-                      color: isSelected ? Colors.white : colors.secondary,
-                      fontWeight: isSelected
-                          ? FontWeight.w600
-                          : FontWeight.w500,
-                      fontSize: 13,
-                    ),
-                    selectedColor: colors.primary,
-                    backgroundColor: colors.bg,
-                    elevation: 0,
-                    pressElevation: 0,
-                    side: BorderSide(
-                      color: isSelected
-                          ? colors.primary
-                          : colors.secondary.withOpacity(0.1),
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-        ],
+        ),
+        backgroundColor: colors.accepted,
+        duration: const Duration(seconds: 2),
       ),
     );
   }
 
-  Widget _buildStatsCards(List<dynamic> applicants) {
-    final total = applicants.length;
-    final enCours = applicants.where((a) => a.status == 'En cours').length;
-    final interview = applicants.where((a) => a.status == 'Interview').length;
-    final accepte = applicants.where((a) => a.status == 'Accepte').length;
-
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      child: Row(
-        children: [
-          _buildStatBubble('Tous', total.toString(), colors.primary),
-          const SizedBox(width: 12),
-          _buildStatBubble('Pendant', enCours.toString(), colors.impression),
-          const SizedBox(width: 12),
-          _buildStatBubble('Interview', interview.toString(), colors.cour),
-          const SizedBox(width: 12),
-          _buildStatBubble('Accepte', accepte.toString(), colors.accepted),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatBubble(String label, String value, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(100),
-        border: Border.all(color: color.withOpacity(0.1)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            '$value $label',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: color,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  // --- UI Building Methods ---
 
   void _showStatusChangeModal(dynamic applicant) {
     showModalBottomSheet(
@@ -316,7 +194,7 @@ class _VancyState extends State<Vancy> with TickerProviderStateMixin {
                 width: 48,
                 height: 5,
                 decoration: BoxDecoration(
-                  color: colors.secondary.withOpacity(0.1),
+                  color: colors.secondary.withOpacity(0.5),
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
@@ -349,24 +227,12 @@ class _VancyState extends State<Vancy> with TickerProviderStateMixin {
                     ],
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: colors.primary.withOpacity(0.06),
-                    shape: BoxShape.circle,
-                  ),
-                  child: HugeIcon(
-                    icon: HugeIcons.strokeRoundedEdit02,
-                    color: colors.primary,
-                    size: 24,
-                  ),
-                ),
               ],
             ),
             const SizedBox(height: 32),
             _buildStatusOption(
               applicant,
-              'Interview',
+              'INTERVIEW',
               'Planifier un entretien',
               HugeIcons.strokeRoundedCalendar03,
               colors.cour,
@@ -374,7 +240,7 @@ class _VancyState extends State<Vancy> with TickerProviderStateMixin {
             const SizedBox(height: 16),
             _buildStatusOption(
               applicant,
-              'Accepte',
+              'ACCEPTED',
               'Accepter la candidature',
               HugeIcons.strokeRoundedCheckmarkCircle01,
               colors.accepted,
@@ -382,7 +248,7 @@ class _VancyState extends State<Vancy> with TickerProviderStateMixin {
             const SizedBox(height: 16),
             _buildStatusOption(
               applicant,
-              'Rejete',
+              'REJECTED',
               'Rejeter le dossier',
               HugeIcons.strokeRoundedCancel01,
               colors.error,
@@ -397,14 +263,38 @@ class _VancyState extends State<Vancy> with TickerProviderStateMixin {
     dynamic applicant,
     String status,
     String label,
-    List<List<dynamic>> icon,
+    dynamic icon,
     Color color,
   ) {
-    bool isSelected = applicant.status == status;
+    bool isSelected =
+        applicant.status.toString().toUpperCase() == status.toUpperCase();
+
     return InkWell(
-      onTap: () {
-        _updateApplicantStatus(applicant, status);
-        Navigator.pop(context);
+      onTap: () async {
+        print("DEBUG: Status option tapped for status: $status");
+        print("DEBUG: Applicant CandidatureID: ${applicant.candidatureId}");
+
+        if (applicant.candidatureId != null) {
+          final auth = context.read<AuthProvider>();
+          print("DEBUG: Auth Token available: ${auth.token != null}");
+
+          final success = await auth.changeCandidatureStatus(
+            applicant.candidatureId!,
+            status,
+          );
+
+          print("DEBUG: Status change success: $success");
+
+          if (success && mounted) {
+            _updateApplicantStatus(applicant, status);
+            setState(() {
+              applicant.status = status;
+            });
+          }
+        } else {
+          print("DEBUG: Cannot change status - candidatureId is NULL");
+        }
+        if (mounted) Navigator.pop(context);
       },
       borderRadius: BorderRadius.circular(20),
       child: AnimatedContainer(
@@ -460,155 +350,246 @@ class _VancyState extends State<Vancy> with TickerProviderStateMixin {
     Color statusColor;
     String statusText;
 
-    switch (applicant.status) {
-      case 'Accepte':
-        statusColor = colors.accepted;
-        statusText = 'Admis';
+    switch (applicant.status.toString().toUpperCase()) {
+      case 'ACCEPTE':
+      case 'ACCEPTED':
+        statusColor = const Color(0xFF10B981); // Green
+        statusText = 'Accepté';
         break;
-      case 'Interview':
-        statusColor = colors.cour;
+      case 'INTERVIEW':
+        statusColor = const Color(0xFFF59E0B); // Amber
         statusText = 'Entretien';
         break;
-      case 'En cours':
-        statusColor = colors.impression;
-        statusText = 'En attente';
+      case 'REJETE':
+      case 'REJECTED':
+        statusColor = const Color(0xFFEF4444); // Red
+        statusText = 'Refusé';
         break;
       default:
-        statusColor = colors.error;
-        statusText = 'Décliné';
+        statusColor = const Color(0xFF3B82F6); // Blue
+        statusText = 'En cours';
     }
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      child: GestureDetector(
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => UserCvView(userCv: applicant),
-            ),
-          );
-        },
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: colors.bg,
-            borderRadius: BorderRadius.circular(32),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.03),
-                blurRadius: 20,
-                offset: const Offset(0, 10),
-              ),
-            ],
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16, left: 20, right: 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: colors.primary.withOpacity(0.08),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
           ),
-          child: Row(
-            children: [
-              // Avatar with Ring
-              Stack(
-                alignment: Alignment.center,
-                children: [
-                  Container(
-                    width: 76,
-                    height: 76,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: statusColor.withOpacity(0.2),
-                        width: 4,
-                      ),
-                    ),
-                  ),
-                  Hero(
-                    tag: 'avatar_${applicant.name}',
-                    child: Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        image: DecorationImage(
-                          fit: BoxFit.cover,
-                          image: NetworkImage(applicant.photo),
-                        ),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    bottom: 0,
-                    right: 4,
-                    child: Container(
-                      width: 18,
-                      height: 18,
-                      decoration: BoxDecoration(
-                        color: statusColor,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 3),
-                      ),
-                    ),
-                  ),
-                ],
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(24),
+        child: InkWell(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => UserCvView(userCv: applicant),
               ),
-              const SizedBox(width: 20),
-              Expanded(
-                child: Column(
+            );
+          },
+          borderRadius: BorderRadius.circular(24),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              children: [
+                Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      applicant.name,
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w900,
-                        color: colors.secondary,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      applicant.speciality,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: colors.primary,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 4,
+                    Stack(
                       children: [
-                        _buildIdentityBadge(
-                          Icons.location_on_rounded,
-                          applicant.location,
+                        Container(
+                          width: 64,
+                          height: 64,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: colors.primary.withOpacity(0.05),
+                            image:
+                                applicant.photo != null &&
+                                    applicant.photo.isNotEmpty
+                                ? DecorationImage(
+                                    image: NetworkImage(applicant.photo),
+                                    fit: BoxFit.cover,
+                                  )
+                                : null,
+                          ),
+                          child:
+                              (applicant.photo == null ||
+                                  applicant.photo.isEmpty)
+                              ? Center(
+                                  child: Text(
+                                    applicant.name.length > 0
+                                        ? applicant.name[0].toUpperCase()
+                                        : '?',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                      color: colors.primary,
+                                      fontSize: 24,
+                                    ),
+                                  ),
+                                )
+                              : null,
                         ),
-                        _buildIdentityBadge(
-                          Icons.work_history_rounded,
-                          applicant.exp,
+                        Positioned(
+                          right: 0,
+                          bottom: 0,
+                          child: Container(
+                            width: 18,
+                            height: 18,
+                            decoration: BoxDecoration(
+                              color: statusColor,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 3),
+                            ),
+                          ),
                         ),
                       ],
                     ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  applicant.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w800,
+                                    color: colors.secondary,
+                                    letterSpacing: -0.5,
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 5,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: statusColor.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  statusText,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: statusColor,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          if (applicant.email != null &&
+                              applicant.email != 'Non renseigné')
+                            Row(
+                              children: [
+                                // Mail Icon Removed per user request change
+                                Flexible(
+                                  child: Text(
+                                    applicant.email!,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: colors.secondary.withOpacity(0.6),
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          // Speciality Commented out per user request change
+                          // const SizedBox(height: 6),
+                          // Text(
+                          //   applicant.speciality,
+                          //   maxLines: 1,
+                          //   overflow: TextOverflow.ellipsis,
+                          //   style: TextStyle(
+                          //     fontSize: 14,
+                          //     fontWeight: FontWeight.w600,
+                          //     color: colors.primary,
+                          //   ),
+                          // ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
-              ),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: colors.bgSubmit.withOpacity(0.4),
-                  shape: BoxShape.circle,
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          _buildIdentityBadge(
+                            HugeIcons.strokeRoundedLocation01,
+                            applicant.location,
+                          ),
+                          const SizedBox(width: 8),
+                          _buildIdentityBadge(
+                            HugeIcons.strokeRoundedTime01,
+                            applicant.postDate.contains('T')
+                                ? applicant.postDate.split('T').first
+                                : applicant.postDate,
+                          ),
+                        ],
+                      ),
+                      InkWell(
+                        onTap: () => _showStatusChangeModal(applicant),
+                        borderRadius: BorderRadius.circular(50),
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.05),
+                                blurRadius: 10,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: HugeIcon(
+                            icon: HugeIcons.strokeRoundedEdit02,
+                            size: 16,
+                            color: colors.secondary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                child: Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  size: 16,
-                  color: colors.secondary.withOpacity(0.3),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildIdentityBadge(IconData icon, String label) {
+  // CORRECTED TYPE to dynamic/IconData because List<List<dynamic>> is likely an error
+  Widget _buildIdentityBadge(dynamic icon, String label) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
@@ -618,7 +599,11 @@ class _VancyState extends State<Vancy> with TickerProviderStateMixin {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 12, color: colors.secondary.withOpacity(0.4)),
+          HugeIcon(
+            icon: icon, // Expecting IconData
+            size: 12,
+            color: colors.secondary.withOpacity(0.4),
+          ),
           const SizedBox(width: 4),
           Text(
             label,
@@ -674,218 +659,322 @@ class _VancyState extends State<Vancy> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
+    final enterpriseProvider = context.watch<EnterpriseProvider>();
     final userProvider = context.watch<UserProvider>();
-    final applicants = userProvider.allusers;
-    final filteredApplicants = _getFilteredApplicants(applicants);
+
+    // Safety fallback: if userProvider has no users and we have enterprise ID, try loading once
+    if (!userProvider.isLoading &&
+        userProvider.allusers.isEmpty &&
+        enterpriseProvider.user?.id != null &&
+        enterpriseProvider.token != null) {
+      print(
+        "DEBUG: Vancy build - Triggering deferred load for enterprise: ${enterpriseProvider.user?.id}",
+      );
+      Future.microtask(() {
+        userProvider.loadCandidates(
+          enterpriseProvider.token,
+          enterpriseId: enterpriseProvider.user?.id,
+        );
+      });
+    }
+
+    final apps = userProvider.allusers;
+    final filteredApplicants = _getFilteredApplicants(apps);
+
+    final isLoading = userProvider.isLoading;
 
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
-        backgroundColor: const Color(0xFFFBFBFB),
-        floatingActionButton: FloatingActionButton.extended(
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const AddVacancyPage()),
-            );
-          },
-          backgroundColor: colors.primary,
-          icon: const Icon(Icons.add_rounded, color: Colors.white),
-          label: const Text(
-            "Publier",
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-          ),
-          elevation: 4,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-        ),
+        backgroundColor: const Color(0xFFF8FAFC),
         body: NestedScrollView(
-          headerSliverBuilder: (BuildContext context, bool innerBoxIsScrolled) {
-            return [Header(auto: false)];
-          },
-          body: CustomScrollView(
-            slivers: [
-              // Header Section
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Candidatures',
-                                style: TextStyle(
-                                  fontSize: 32,
-                                  fontWeight: FontWeight.w900,
-                                  color: colors.secondary,
-                                  letterSpacing: -1,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Row(
-                                children: [
-                                  Container(
-                                    width: 8,
-                                    height: 8,
-                                    decoration: const BoxDecoration(
-                                      color: Colors.green,
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    '${applicants.length} dossiers actifs',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                      color: colors.secondary.withOpacity(0.4),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
+          headerSliverBuilder: (context, innerBoxIsScrolled) => [
+            SliverAppBar.large(
+              flexibleSpace: FlexibleSpaceBar(
+                centerTitle: true,
+                background: Stack(
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                        color: colors.primary,
+                        image: const DecorationImage(
+                          fit: BoxFit.cover,
+                          image: NetworkImage(
+                            "https://www.shutterstock.com/image-photo/job-search-human-resources-recruitment-260nw-1292578582.jpg",
                           ),
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: colors.primary.withOpacity(0.1),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              Icons.tune_rounded,
-                              color: colors.primary,
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
-                    ],
-                  ),
+                    ),
+                    Positioned(
+                      top: 110,
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 8.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Candidatures',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w800,
+                                color: colors.bg,
+                                fontSize: 25,
+                                letterSpacing: -0.5,
+                              ),
+                            ),
+                            Text(
+                              apps.length == 1
+                                  ? '${apps.length} dossier actif'
+                                  : '${apps.length} dossiers actifs',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: colors.bg.withOpacity(0.6),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
+              automaticallyImplyLeading: false,
+              backgroundColor: colors.primary,
+              surfaceTintColor: Colors.white,
+              elevation: 0,
+              pinned: true,
+              expandedHeight: 150,
+            ),
+          ],
+          body: Column(
+            children: [
+              const SizedBox(height: 20),
+              Container(
+                color: Colors.white,
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                child: Column(
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: TextField(
+                        controller: _searchController,
+                        style: TextStyle(color: colors.secondary),
+                        onChanged: (val) => setState(() => searchQuery = val),
+                        decoration: InputDecoration(
+                          hintText: 'Rechercher un candidat...',
+                          hintStyle: TextStyle(
+                            color: colors.secondary.withOpacity(0.4),
+                            fontWeight: FontWeight.w500,
+                          ),
+                          suffixIcon: IconButton(
+                            onPressed: () {
+                              setState(() {
+                                _searchController.clear();
+                              });
+                            },
+                            icon: _searchController.text.isNotEmpty
+                                ? Icon(Icons.clear)
+                                : SizedBox.shrink(),
+                          ),
+                          prefixIcon: const Icon(Icons.search),
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 16,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: statusFilters.map((filter) {
+                          final isSelected = selectedFilter == filter;
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 10),
+                            child: InkWell(
+                              onTap: () =>
+                                  setState(() => selectedFilter = filter),
+                              borderRadius: BorderRadius.circular(20),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? colors.primary
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: isSelected
+                                        ? colors.primary
+                                        : colors.secondary.withOpacity(0.1),
+                                  ),
+                                ),
+                                child: Text(
+                                  filter,
+                                  style: TextStyle(
+                                    color: isSelected
+                                        ? Colors.white
+                                        : colors.secondary.withOpacity(0.7),
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: isLoading
+                    ? _buildShimmerLoading()
+                    : filteredApplicants.isEmpty
+                    ? CustomScrollView(slivers: [_buildEmptyState()])
+                    : NotificationListener<UserScrollNotification>(
+                        onNotification: (notification) {
+                          if (notification.direction ==
+                              ScrollDirection.reverse) {
+                            if (_isFabExtended) {
+                              setState(() => _isFabExtended = false);
+                            }
+                          } else if (notification.direction ==
+                              ScrollDirection.forward) {
+                            if (!_isFabExtended) {
+                              setState(() => _isFabExtended = true);
+                            }
+                          }
+                          return true;
+                        },
+                        child: ListView.builder(
+                          padding: const EdgeInsets.fromLTRB(0, 10, 0, 100),
+                          itemCount: filteredApplicants.length,
+                          itemBuilder: (context, index) {
+                            final applicant = filteredApplicants[index];
+                            return _buildApplicantCard(applicant);
+                          },
+                        ),
+                      ),
+              ),
+            ],
+          ),
+        ),
+        floatingActionButton: _isFabExtended
+            ? FloatingActionButton.extended(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const AddVacancyPage(),
+                    ),
+                  );
+                },
+                backgroundColor: colors.primary,
+                elevation: 4,
+                icon: const Icon(Icons.add_rounded, color: Colors.white),
+                label: const Text(
+                  "Publier une offre",
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    fontSize: 16,
+                  ),
+                ),
+              )
+            : FloatingActionButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const AddVacancyPage(),
+                    ),
+                  );
+                },
+                backgroundColor: colors.primary,
+                elevation: 4,
+                child: const Icon(Icons.add_rounded, color: Colors.white),
+              ),
+      ),
+    );
+  }
 
-              // Search Bar with Glow
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: colors.bg,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: colors.primary.withOpacity(0.12),
-                          blurRadius: 24,
-                          offset: const Offset(0, 12),
+  Widget _buildShimmerLoading() {
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(0, 10, 0, 100),
+      itemCount: 5,
+      itemBuilder: (context, index) => _buildShimmerCard(),
+    );
+  }
+
+  Widget _buildShimmerCard() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Shimmer.fromColors(
+        baseColor: Colors.grey[200]!,
+        highlightColor: Colors.grey[50]!,
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 64,
+                    height: 64,
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 150,
+                          height: 20,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          width: 200,
+                          height: 14,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
                         ),
                       ],
                     ),
-                    child: TextField(
-                      controller: _searchController,
-                      onChanged: (value) => setState(() => searchQuery = value),
-                      decoration: InputDecoration(
-                        hintText: 'Rechercher un profil...',
-                        prefixIcon: Icon(
-                          Icons.search_rounded,
-                          color: colors.primary,
-                        ),
-                        border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(
-                          vertical: 18,
-                          horizontal: 20,
-                        ),
-                      ),
-                    ),
                   ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Container(
+                height: 50,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
                 ),
               ),
-
-              // Horizontal Filters
-              SliverToBoxAdapter(
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Row(
-                    children: statusFilters.map((filter) {
-                      final isSelected = selectedFilter == filter;
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 12),
-                        child: InkWell(
-                          onTap: () => setState(() => selectedFilter = filter),
-                          child: Column(
-                            children: [
-                              Text(
-                                filter,
-                                style: TextStyle(
-                                  color: isSelected
-                                      ? colors.primary
-                                      : colors.secondary.withOpacity(0.4),
-                                  fontWeight: isSelected
-                                      ? FontWeight.w800
-                                      : FontWeight.w600,
-                                  fontSize: 15,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              AnimatedContainer(
-                                duration: const Duration(milliseconds: 300),
-                                height: 3,
-                                width: isSelected ? 20 : 0,
-                                decoration: BoxDecoration(
-                                  color: colors.primary,
-                                  borderRadius: BorderRadius.circular(2),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ),
-              ),
-
-              const SliverToBoxAdapter(child: SizedBox(height: 24)),
-
-              // Applicants List or Empty State
-              if (filteredApplicants.isEmpty)
-                _buildEmptyState()
-              else
-                SliverList.builder(
-                  itemCount: filteredApplicants.length,
-                  itemBuilder: (context, index) {
-                    final applicant = filteredApplicants[index];
-                    return FadeTransition(
-                      opacity: _fadeAnimation,
-                      child: SlideTransition(
-                        position:
-                            Tween<Offset>(
-                              begin: Offset(0, 0.1 * (index + 1)),
-                              end: Offset.zero,
-                            ).animate(
-                              CurvedAnimation(
-                                parent: _slideController,
-                                curve: Interval(
-                                  (index * 0.1).clamp(0.0, 1.0),
-                                  ((index + 1) * 0.1).clamp(0.0, 1.0),
-                                  curve: Curves.easeOut,
-                                ),
-                              ),
-                            ),
-                        child: _buildApplicantCard(applicant),
-                      ),
-                    );
-                  },
-                ),
-
-              // Bottom Padding
-              const SliverToBoxAdapter(child: SizedBox(height: 24)),
             ],
           ),
         ),

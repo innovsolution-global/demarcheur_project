@@ -9,6 +9,7 @@ import 'package:demarcheur_app/providers/user_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:provider/provider.dart';
+import 'package:shimmer/shimmer.dart';
 
 class DemHomePage extends StatefulWidget {
   const DemHomePage({super.key});
@@ -81,15 +82,22 @@ class _DemHomePageState extends State<DemHomePage> {
           SliverToBoxAdapter(
             child: SizedBox(
               height: 240,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: provider.allJobs.length,
-                itemBuilder: (context, index) {
-                  final dem = provider.allJobs[index];
-                  return _buildModernJobCard(dem);
-                },
-              ),
+              child: provider.isLoading
+                  ? ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      itemCount: 3,
+                      itemBuilder: (context, index) => _buildShimmerJobCard(),
+                    )
+                  : ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      itemCount: provider.allJobs.length,
+                      itemBuilder: (context, index) {
+                        final dem = provider.allJobs[index];
+                        return _buildModernJobCard(dem);
+                      },
+                    ),
             ),
           ),
           SliverToBoxAdapter(
@@ -127,16 +135,24 @@ class _DemHomePageState extends State<DemHomePage> {
           ),
           SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
-            sliver: SliverList.builder(
-              itemCount: user.allusers.length,
-              itemBuilder: (context, index) {
-                final users = user.allusers[index];
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: _buildModernUserCard(users),
-                );
-              },
-            ),
+            sliver: user.isLoading
+                ? SliverList.builder(
+                    itemCount: 3,
+                    itemBuilder: (context, index) => Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: _buildShimmerUserCard(),
+                    ),
+                  )
+                : SliverList.builder(
+                    itemCount: user.allusers.length,
+                    itemBuilder: (context, index) {
+                      final users = user.allusers[index];
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: _buildModernUserCard(users),
+                      );
+                    },
+                  ),
           ),
           const SliverPadding(padding: EdgeInsets.only(bottom: 80)),
         ],
@@ -469,6 +485,152 @@ class _DemHomePageState extends State<DemHomePage> {
               ],
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildShimmerJobCard() {
+    return Container(
+      width: 300,
+      margin: const EdgeInsets.only(right: 16, bottom: 8, top: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Shimmer.fromColors(
+        baseColor: Colors.grey[200]!,
+        highlightColor: Colors.grey[50]!,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 50,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 120,
+                        height: 16,
+                        color: Colors.white,
+                      ),
+                      const SizedBox(height: 6),
+                      Container(
+                        width: 80,
+                        height: 12,
+                        color: Colors.white,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Container(width: 150, height: 12, color: Colors.white),
+              const Spacer(),
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildShimmerUserCard() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Shimmer.fromColors(
+        baseColor: Colors.grey[200]!,
+        highlightColor: Colors.grey[50]!,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 70,
+                    height: 70,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(width: 150, height: 18, color: Colors.white),
+                        const SizedBox(height: 8),
+                        Container(width: 100, height: 14, color: Colors.white),
+                        const SizedBox(height: 8),
+                        Container(width: 80, height: 12, color: Colors.white),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Container(
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

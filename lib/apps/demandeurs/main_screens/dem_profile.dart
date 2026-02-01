@@ -1,16 +1,15 @@
+import 'package:demarcheur_app/apps/demandeurs/main_screens/add_vacancy_page.dart';
 import 'package:demarcheur_app/apps/demandeurs/main_screens/announce_list.dart';
 import 'package:demarcheur_app/apps/demandeurs/main_screens/statistics_page.dart';
-import 'package:demarcheur_app/apps/donneurs/inner_screens/jobs/job_posting.dart';
 import 'package:demarcheur_app/consts/color.dart';
-import 'package:demarcheur_app/models/enterprise/enterprise_model.dart';
 import 'package:demarcheur_app/providers/enterprise_provider.dart';
 import 'package:demarcheur_app/providers/settings_provider.dart';
 import 'package:demarcheur_app/services/auth_provider.dart';
 import 'package:demarcheur_app/widgets/header_page.dart';
 import 'package:demarcheur_app/widgets/payment_widget.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:provider/provider.dart';
+import 'package:shimmer/shimmer.dart';
 
 class DemProfile extends StatefulWidget {
   const DemProfile({super.key});
@@ -72,8 +71,8 @@ class _ProfilePageState extends State<DemProfile>
     }
     if (demUser.isLoading) {
       return Scaffold(
-        backgroundColor: colors.bg,
-        body: Center(child: SpinKitDancingSquare(color: colors.accepted)),
+        backgroundColor: const Color(0xFFF8FAFC),
+        body: _buildShimmerProfile(),
       );
     }
 
@@ -146,7 +145,7 @@ class _ProfilePageState extends State<DemProfile>
                                 if (user?.name != null)
                                   _ModernInfoTile(
                                     icon: Icons.business_outlined,
-                                    label: "Organisation",
+                                    label: "Entreprise",
                                     value: user!.name,
                                     colors: colors,
                                   ),
@@ -240,6 +239,73 @@ class _ProfilePageState extends State<DemProfile>
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildShimmerProfile() {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey[200]!,
+      highlightColor: Colors.grey[50]!,
+      child: CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                children: [
+                  Container(
+                    height: 200,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Container(
+                          height: 100,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Container(
+                          height: 100,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  Container(
+                    height: 120,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    height: 250,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -349,69 +415,69 @@ class _EnhancedProfileHeaderState extends State<_EnhancedProfileHeader> {
                           ),
                         ),
 
-                        // user.isVerified
-                        //     ? Container(
-                        //         padding: const EdgeInsets.symmetric(
-                        //           horizontal: 10,
-                        //           vertical: 6,
-                        //         ),
-                        //         decoration: BoxDecoration(
-                        //           color: widget.colors.accepted.withValues(
-                        //             alpha: 0.08,
-                        //           ),
-                        //           borderRadius: BorderRadius.circular(16),
-                        //         ),
-                        //         child: Row(
-                        //           mainAxisSize: MainAxisSize.min,
-                        //           children: [
-                        //             Icon(
-                        //               Icons.verified_rounded,
-                        //               color: widget.colors.accepted,
-                        //               size: 16,
-                        //             ),
-                        //             const SizedBox(width: 4),
-                        //             Text(
-                        //               "Compte certifié",
-                        //               style: TextStyle(
-                        //                 color: widget.colors.accepted,
-                        //                 fontSize: 12,
-                        //                 fontWeight: FontWeight.w600,
-                        //               ),
-                        //             ),
-                        //           ],
-                        //         ),
-                        //       )
-                        //     :
-                        TextButton(
-                          onPressed: () {
-                            if (!demUser.isLoading && !isLoading) {
-                              submit(context, demUser);
-                            }
-                          },
-                          style: TextButton.styleFrom(
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
+                        if (user?.isVerified ?? false)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
                             ),
-                            backgroundColor: widget.colors.primary.withValues(
-                              alpha: 0.08,
+                            decoration: BoxDecoration(
+                              color: widget.colors.accepted.withValues(
+                                alpha: 0.08,
+                              ),
+                              borderRadius: BorderRadius.circular(16),
                             ),
-                          ),
-                          child: isLoading
-                              ? SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(
-                                    color: widget.colors.primary,
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : Text(
-                                  'Certifier mon compte',
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.verified_rounded,
+                                  color: widget.colors.accepted,
+                                  size: 16,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  "Compte certifié",
                                   style: TextStyle(
-                                    color: widget.colors.primary,
+                                    color: widget.colors.accepted,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
-                        ),
+                              ],
+                            ),
+                          )
+                        else
+                          TextButton(
+                            onPressed: () {
+                              if (!demUser.isLoading && !isLoading) {
+                                submit(context, demUser);
+                              }
+                            },
+                            style: TextButton.styleFrom(
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              backgroundColor: widget.colors.primary.withValues(
+                                alpha: 0.08,
+                              ),
+                            ),
+                            child: isLoading
+                                ? SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                      color: widget.colors.primary,
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : Text(
+                                    'Certifier mon compte',
+                                    style: TextStyle(
+                                      color: widget.colors.primary,
+                                    ),
+                                  ),
+                          ),
                       ],
                     ),
                   ),
@@ -431,48 +497,41 @@ class _EnhancedProfileHeaderState extends State<_EnhancedProfileHeader> {
                   children: [
                     Icon(Icons.star_rounded, color: Colors.amber, size: 20),
                     const SizedBox(width: 8),
-                    // Text(
-                    //   demUser.user!.rate.toString(),
-                    //   style: TextStyle(
-                    //     fontWeight: FontWeight.w700,
-                    //     fontSize: 16,
-                    //     color: widget.colors.primary,
-                    //   ),
-                    // ),
-                    // const SizedBox(width: 4),
-                    // Text(
-                    //   "(127 avis)",
-                    //   style: TextStyle(
-                    //     color: widget.colors.secondary,
-                    //     fontSize: 14,
-                    //   ),
-                    // ),
-                    // const Spacer(),
-                    // Container(
-                    //   padding: const EdgeInsets.symmetric(
-                    //     horizontal: 12,
-                    //     vertical: 6,
-                    //   ),
-                    //   decoration: BoxDecoration(
-                    //     color: widget.colors.primary,
-                    //     borderRadius: BorderRadius.circular(12),
-                    //   ),
-                    //   child: demUser.user!.isVerified
-                    //       ? Text(
-                    //           "Profil à 100%",
-                    //           style: TextStyle(
-                    //             color: Colors.white,
-                    //             fontSize: 12,
-                    //             fontWeight: FontWeight.w600,
-                    //           ),
-                    //         )
-                    //       :
                     Text(
-                      "Profil à 80%",
+                      demUser.user?.rate?.toString() ?? "0.0",
                       style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 16,
+                        color: widget.colors.primary,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      "(Nouveau)",
+                      style: TextStyle(
+                        color: widget.colors.secondary,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: widget.colors.primary,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        (demUser.user?.isVerified ?? false)
+                            ? "Profil à 100%"
+                            : "Profil à 80%",
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ],
@@ -643,7 +702,7 @@ class _QuickActionsSection extends StatelessWidget {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => const JobPosting(),
+                        builder: (context) => const AddVacancyPage(),
                       ),
                     );
                   },

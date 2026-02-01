@@ -67,6 +67,7 @@ class _AnnounceListState extends State<AnnounceList>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      
       backgroundColor: const Color(0xFFFBFBFB),
       body: NestedScrollView(
         headerSliverBuilder: (context, innerBoxIsScrolled) => [
@@ -85,8 +86,9 @@ class _AnnounceListState extends State<AnnounceList>
 
             // Filter vacancies by companyId
             final myVacancies = provider.vacancies.where((vacancy) {
-              final match = currentUser != null && vacancy.companyId == currentUser.id;
-             // print("DEBUG: Vacancy ${vacancy.title} - CompanyId: ${vacancy.companyId} - Match: $match");
+              final match =
+                  currentUser != null && vacancy.companyId == currentUser.id;
+              // print("DEBUG: Vacancy ${vacancy.title} - CompanyId: ${vacancy.companyId} - Match: $match");
               return match;
             }).toList();
 
@@ -219,7 +221,9 @@ class _AnnounceListState extends State<AnnounceList>
               children: [
                 _buildInfoBadge(
                   HugeIcons.strokeRoundedLocation01,
-                  vacancy.city,
+                  vacancy.city.trim().isNotEmpty
+                      ? vacancy.city
+                      : 'Non spécifié',
                 ),
                 const SizedBox(width: 12),
                 _buildInfoBadge(

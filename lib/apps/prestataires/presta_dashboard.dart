@@ -3,6 +3,7 @@ import 'package:demarcheur_app/apps/prestataires/presta_message_page.dart';
 import 'package:demarcheur_app/apps/prestataires/presta_profile_page.dart';
 import 'package:demarcheur_app/consts/color.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_iconly/flutter_iconly.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:google_nav_bar/google_nav_bar.dart';
 
@@ -26,7 +27,11 @@ class _PrestaDashboardState extends State<PrestaDashboard> {
   }
 
   int currentPage = 0;
-  final List pages = [PrestaHomePage(), PrestaMessagePage(), PrestaProfilePage()];
+  final List pages = [
+    PrestaHomePage(),
+    PrestaMessagePage(),
+    PrestaProfilePage(),
+  ];
   void selectedPage(int value) {
     setState(() {
       currentPage = value;
@@ -49,57 +54,63 @@ class _PrestaDashboardState extends State<PrestaDashboard> {
         : Scaffold(
             backgroundColor: color.bg,
             body: pages[currentPage],
-            bottomNavigationBar: Container(
-              decoration: BoxDecoration(
-                border: Border(top: BorderSide(color: color.tertiary)),
-              ),
-
-              child: Padding(
-                padding: const EdgeInsets.all(8.0),
+            bottomNavigationBar: SafeArea(
+              child: Container(
+                margin: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 10,
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(30),
+                  boxShadow: [
+                    BoxShadow(
+                      color: color.primary.withOpacity(0.1),
+                      blurRadius: 20,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
                 child: GNav(
-                  tabMargin: EdgeInsetsGeometry.all(3),
-                  gap: 5,
-                  iconSize: 26,
-
-                  //padding: EdgeInsetsGeometry.all(80),
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  tabBackgroundColor: color.tertiary,
+                  gap: 8,
+                  activeColor: Colors.white,
+                  iconSize: 24,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
+                  ),
+                  duration: const Duration(milliseconds: 400),
+                  tabBackgroundColor: color.primary,
+                  color: color.secondary.withOpacity(0.6),
                   selectedIndex: currentPage,
-                  onTabChange: (value) {
-                    selectedPage(value);
+                  onTabChange: (index) {
+                    selectedPage(index);
                   },
-                  activeColor: color.primary,
-
                   tabs: [
                     GButton(
-                      active: true,
-                      iconColor: color.primary,
-                      iconActiveColor: color.primary,
-                      icon: Icons.home,
-                      text: "Accueil",
-
-                      padding: EdgeInsets.all(10),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    
-                    GButton(
-                      active: true,
-                      borderRadius: BorderRadius.circular(16),
-                      iconColor: color.primary,
-                      iconActiveColor: color.primary,
-                      icon: Icons.message,
-                      text: "Message",
+                      icon: currentPage == 0
+                          ? IconlyBold.home
+                          : IconlyLight.home,
+                      text: 'Acceuil',
                       padding: EdgeInsets.all(10),
                     ),
-
                     GButton(
-                      active: true,
-                      borderRadius: BorderRadius.circular(16),
-                      iconColor: color.primary,
-                      iconActiveColor: color.primary,
-                      icon: Icons.person,
-                      text: "Profil",
+                      icon: currentPage == 1
+                          ? IconlyBold.message
+                          : IconlyLight.message,
+                      text: 'Message',
                       padding: EdgeInsets.all(10),
+                    ),
+                    GButton(
+                      icon: currentPage == 2
+                          ? IconlyBold.profile
+                          : IconlyLight.profile,
+                      padding: EdgeInsets.all(10),
+                      text: 'Profil',
                     ),
                   ],
                 ),

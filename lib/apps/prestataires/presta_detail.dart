@@ -1,12 +1,15 @@
 import 'package:demarcheur_app/consts/color.dart';
 import 'package:demarcheur_app/models/presta/presta_model.dart';
+import 'package:demarcheur_app/models/send_message_model.dart';
+import 'package:demarcheur_app/services/auth_provider.dart';
 import 'package:demarcheur_app/widgets/btn.dart';
+import 'package:demarcheur_app/widgets/chat_widget.dart';
 import 'package:demarcheur_app/widgets/header_page.dart';
 import 'package:demarcheur_app/widgets/sub_title.dart';
 import 'package:demarcheur_app/widgets/title_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
-import 'package:demarcheur_app/apps/prestataires/chat_page.dart';
+import 'package:provider/provider.dart';
 
 class PrestaDetail extends StatefulWidget {
   final PrestaModel presta;
@@ -56,11 +59,37 @@ class _PrestaDetailState extends State<PrestaDetail> {
                 child: Btn(
                   texte: "Contacter",
                   function: () {
+                    final authProvider = context.read<AuthProvider>();
+                    final myId = authProvider.userId;
+                    if (myId == null) {
+                       ScaffoldMessenger.of(context).showSnackBar(
+                         const SnackBar(content: Text("Connectez-vous pour envoyer un message")),
+                       );
+                       return;
+                    }
+                    
+                    final receiverId = widget.presta.ownerId ?? widget.presta.id ?? '';
+                    if (receiverId.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("ID du destinataire introuvable")),
+                      );
+                      return;
+                    }
+
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => ChatPage
-(presta: widget.presta),
+                        builder: (_) => ChatWidget(
+                          pageType: 'Presta',
+                          message: SendMessageModel(
+                            senderId: myId,
+                            receiverId: receiverId,
+                            userName: widget.presta.companyName,
+                            userPhoto: widget.presta.imageUrl.isNotEmpty ? widget.presta.imageUrl.first : null,
+                            content: '',
+                            timestamp: DateTime.now(),
+                          ),
+                        ),
                       ),
                     );
                   },

@@ -118,9 +118,9 @@ class _SearchHomeState extends State<SearchHome> with TickerProviderStateMixin {
     if (_searchController.text.isNotEmpty) {
       final query = _searchController.text.toLowerCase();
       filtered = filtered.where((house) {
-        return house.companyName.toLowerCase().contains(query) ||
-            house.location.toLowerCase().contains(query) ||
-            house.type.toLowerCase().contains(query);
+        return house.companyName!.toLowerCase().contains(query) ||
+            house.location!.toLowerCase().contains(query) ||
+            house.type!.toLowerCase().contains(query);
       }).toList();
     }
 
@@ -131,7 +131,8 @@ class _SearchHomeState extends State<SearchHome> with TickerProviderStateMixin {
       filtered = filtered
           .where(
             (house) =>
-                house.category.toLowerCase() == selectedCategory.toLowerCase(),
+                house.category!.toLowerCase() ==
+                selectedCategory!.toLowerCase(),
           )
           .toList();
     }
@@ -140,13 +141,13 @@ class _SearchHomeState extends State<SearchHome> with TickerProviderStateMixin {
     if (selectedPriceRange != null && selectedPriceRange != 'Tout') {
       filtered = filtered.where((house) {
         if (selectedPriceRange == 'Moins de 500,000 GNF') {
-          return house.rent < 500000;
+          return house.rent! < 500000;
         } else if (selectedPriceRange == '500,000 - 1,000,000 GNF') {
-          return house.rent >= 500000 && house.rent <= 1000000;
+          return house.rent! >= 500000 && house.rent! <= 1000000;
         } else if (selectedPriceRange == '1,000,000 - 5,000,000 GNF') {
-          return house.rent >= 1000000 && house.rent <= 5000000;
+          return house.rent! >= 1000000 && house.rent! <= 5000000;
         } else if (selectedPriceRange == 'Plus de 5,000,000 GNF') {
-          return house.rent > 5000000;
+          return house.rent! > 5000000;
         }
         return true;
       }).toList();
@@ -156,7 +157,7 @@ class _SearchHomeState extends State<SearchHome> with TickerProviderStateMixin {
     if (selectedType != null && selectedType != 'Tout') {
       filtered = filtered
           .where(
-            (house) => house.type.toLowerCase() == selectedType!.toLowerCase(),
+            (house) => house.type!.toLowerCase() == selectedType!.toLowerCase(),
           )
           .toList();
     }
@@ -166,7 +167,8 @@ class _SearchHomeState extends State<SearchHome> with TickerProviderStateMixin {
       filtered = filtered
           .where(
             (house) =>
-                house.location.toLowerCase() == selectedLocation!.toLowerCase(),
+                house.location!.toLowerCase() ==
+                selectedLocation!.toLowerCase(),
           )
           .toList();
     }
@@ -176,7 +178,7 @@ class _SearchHomeState extends State<SearchHome> with TickerProviderStateMixin {
       filtered = filtered
           .where(
             (house) =>
-                house.status.toLowerCase() == selectedStatus!.toLowerCase(),
+                house.status!.toLowerCase() == selectedStatus!.toLowerCase(),
           )
           .toList();
     }
@@ -429,7 +431,7 @@ class _SearchHomeState extends State<SearchHome> with TickerProviderStateMixin {
                   padding: EdgeInsets.only(
                     right: index == categories.length - 1 ? 0 : 12,
                   ),
-                  child: _buildCategoryChip(categories[index], index),
+                  child: _buildCategoryChip(categories[index]!, index),
                 );
               },
             ),
@@ -676,7 +678,7 @@ class _SearchHomeState extends State<SearchHome> with TickerProviderStateMixin {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        house.status,
+                        house.status!,
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 10,
@@ -698,7 +700,7 @@ class _SearchHomeState extends State<SearchHome> with TickerProviderStateMixin {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      house.type,
+                      house.type!,
                       style: TextStyle(
                         color: color.primary,
                         fontSize: 14,
@@ -718,7 +720,7 @@ class _SearchHomeState extends State<SearchHome> with TickerProviderStateMixin {
                         const SizedBox(width: 2),
                         Expanded(
                           child: Text(
-                            house.location,
+                            house.location!,
                             style: TextStyle(
                               color: color.secondary,
                               fontSize: 12,

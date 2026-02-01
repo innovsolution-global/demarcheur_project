@@ -7,6 +7,7 @@ import 'package:demarcheur_app/apps/prestataires/presta_list.dart';
 import 'package:demarcheur_app/consts/color.dart';
 import 'package:demarcheur_app/models/house_model.dart';
 import 'package:demarcheur_app/providers/house_provider.dart';
+import 'package:demarcheur_app/services/auth_provider.dart';
 import 'package:demarcheur_app/widgets/sub_title.dart';
 import 'package:demarcheur_app/widgets/title_widget.dart';
 import 'package:flutter/material.dart';
@@ -102,8 +103,13 @@ class _ImmoHomePageState extends State<ImmoHomePage>
 
   void _loadData() {
     Future.microtask(() {
+      final authProvider = context.read<AuthProvider>();
       final houseProvider = context.read<HouseProvider>();
-      houseProvider.loadHous().then((_) {
+
+      final token = authProvider.token;
+      final companyId = authProvider.userId;
+
+      houseProvider.loadHous(token: token, companyId: companyId).then((_) {
         houseProvider.setHouseFiltered(houseProvider.housefiltered);
       });
     });
@@ -152,60 +158,71 @@ class _ImmoHomePageState extends State<ImmoHomePage>
       pinned: true,
       expandedHeight: 280,
       backgroundColor: _color.primary,
+      systemOverlayStyle: SystemUiOverlayStyle.light,
       flexibleSpace: FlexibleSpaceBar(
         background: Stack(
           children: [
-            // Background Image with Parallax Effect
-            Positioned.fill(
-              child: Image.network(
-                "https://images.unsplash.com/photo-1560518883-ce09059eeffa?ixlib=rb-4.0.3",
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => Container(
-                  color: _color.primary,
-                  child: const Icon(Icons.home, size: 100, color: Colors.white),
-                ),
-              ),
-            ),
-            // Gradient Overlay
+            // Background with Gradient Mesh Effect
             Positioned.fill(
               child: Container(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                     colors: [
-                      Colors.black.withOpacity(0.3),
-                      Colors.black.withOpacity(0.7),
+                      _color.primary,
+                      _color.primary.withRed(100), // Dynamic tint
+                      _color.secondary,
                     ],
                   ),
                 ),
               ),
             ),
-            // Glass Morphism Effect
+            // Decorative Spheres
+            Positioned(
+              top: -50,
+              right: -50,
+              child: Container(
+                width: 200,
+                height: 200,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withOpacity(0.1),
+                ),
+              ),
+            ),
+            // Glass Morphism Header Content
             Positioned(
               left: 20,
               right: 20,
-              bottom: 20,
+              bottom: 25,
               child: FadeTransition(
                 opacity: _headerAnimation,
                 child: SlideTransition(
                   position: Tween<Offset>(
-                    begin: const Offset(0, 0.3),
+                    begin: const Offset(0, 0.2),
                     end: Offset.zero,
                   ).animate(_headerAnimation),
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(24),
                     child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                      filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
                       child: Container(
-                        padding: const EdgeInsets.all(20),
+                        padding: const EdgeInsets.all(24),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(20),
+                          color: Colors.white.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(24),
                           border: Border.all(
-                            color: Colors.white.withOpacity(0.2),
-                            width: 1,
+                            color: Colors.white.withOpacity(0.3),
+                            width: 1.5,
                           ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 20,
+                              offset: const Offset(0, 10),
+                            ),
+                          ],
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -214,36 +231,45 @@ class _ImmoHomePageState extends State<ImmoHomePage>
                             Row(
                               children: [
                                 Container(
-                                  padding: const EdgeInsets.all(8),
+                                  padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.2),
-                                    borderRadius: BorderRadius.circular(12),
+                                    color: Colors.white.withOpacity(0.9),
+                                    borderRadius: BorderRadius.circular(16),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.1),
+                                        blurRadius: 8,
+                                      ),
+                                    ],
                                   ),
                                   child: Icon(
-                                    Icons.home,
-                                    color: Colors.white,
+                                    Icons.dashboard_rounded,
+                                    color: _color.primary,
                                     size: 24,
                                   ),
                                 ),
-                                const SizedBox(width: 12),
+                                const SizedBox(width: 16),
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        "Tableau de bord",
+                                        "Bienvenue !",
                                         style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 24,
-                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white.withOpacity(0.8),
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w500,
+                                          letterSpacing: 0.5,
                                         ),
                                       ),
                                       Text(
-                                        "Gérez vos biens immobiliers",
+                                        "Espace Immo",
                                         style: TextStyle(
-                                          color: Colors.white.withOpacity(0.9),
-                                          fontSize: 16,
+                                          color: Colors.white,
+                                          fontSize: 26,
+                                          fontWeight: FontWeight.w900,
+                                          letterSpacing: -0.5,
                                         ),
                                       ),
                                     ],
@@ -251,7 +277,7 @@ class _ImmoHomePageState extends State<ImmoHomePage>
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 16),
+                            const SizedBox(height: 24),
                             _buildSearchBar(),
                           ],
                         ),
@@ -271,12 +297,12 @@ class _ImmoHomePageState extends State<ImmoHomePage>
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: Colors.black.withOpacity(0.12),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
           ),
         ],
       ),
@@ -284,14 +310,22 @@ class _ImmoHomePageState extends State<ImmoHomePage>
         controller: _searchController,
         onTap: () => setState(() => _isSearchFocused = true),
         onChanged: (value) => setState(() {}),
+        style: TextStyle(
+          color: _color.secondary,
+          fontWeight: FontWeight.w600,
+          fontSize: 15,
+        ),
         decoration: InputDecoration(
-          hintText: "Rechercher vos propriétés...",
-          hintStyle: TextStyle(color: Colors.grey[400], fontSize: 16),
-          prefixIcon: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 200),
-            child: _isSearchFocused
-                ? Icon(Icons.search, color: _color.primary, size: 20)
-                : Icon(Icons.search, color: Colors.grey[400]!, size: 20),
+          hintText: "Rechercher une propriété...",
+          hintStyle: TextStyle(
+            color: Colors.grey[400],
+            fontSize: 15,
+            fontWeight: FontWeight.w500,
+          ),
+          prefixIcon: Icon(
+            Icons.search_rounded,
+            color: _isSearchFocused ? _color.primary : Colors.grey[400],
+            size: 22,
           ),
           suffixIcon: _searchController.text.isNotEmpty
               ? IconButton(
@@ -299,18 +333,34 @@ class _ImmoHomePageState extends State<ImmoHomePage>
                     _searchController.clear();
                     setState(() {});
                   },
-                  icon: Icon(Icons.clear, color: Colors.grey[400]),
+                  icon: Icon(
+                    Icons.close_rounded,
+                    color: Colors.grey[600],
+                    size: 20,
+                  ),
                 )
-              : null,
+              : Container(
+                  margin: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: _color.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    Icons.tune_rounded,
+                    color: _color.primary,
+                    size: 18,
+                  ),
+                ),
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(18),
             borderSide: BorderSide.none,
           ),
           filled: true,
           fillColor: Colors.white,
           contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 16,
+            horizontal: 20,
+            vertical: 18,
           ),
         ),
       ),
@@ -328,7 +378,7 @@ class _ImmoHomePageState extends State<ImmoHomePage>
           final rentedCount = houses.where((h) => h.status == "Loué").length;
           final totalRevenue = houses.fold<double>(
             0,
-            (sum, house) => sum + house.rent,
+            (sum, house) => sum + double.parse(house.rent.toString()),
           );
 
           return Container(
@@ -580,10 +630,29 @@ class _ImmoHomePageState extends State<ImmoHomePage>
   List<HouseModel> _getFilteredHouses(List<HouseModel> houses) {
     List<HouseModel> filtered = houses;
 
-    // Apply status filter
+    // Apply status filter mapping UI labels to backend Enums
     if (_selectedFilter != 'Tous') {
+      String backendStatus = _selectedFilter;
+      switch (_selectedFilter) {
+        case 'Disponible':
+          backendStatus = 'AVAILABLE';
+          break;
+        case 'Loué':
+          backendStatus = 'RENTED';
+          break;
+        case 'En vente':
+          backendStatus = 'AVAILABLE'; // Defaulting for now
+          break;
+        case 'Réservé':
+          backendStatus = 'BOOKED';
+          break;
+      }
       filtered = filtered
-          .where((house) => house.status == _selectedFilter)
+          .where(
+            (house) =>
+                house.status == backendStatus ||
+                house.statusProperty == backendStatus,
+          )
           .toList();
     }
 
@@ -593,9 +662,10 @@ class _ImmoHomePageState extends State<ImmoHomePage>
       filtered = filtered
           .where(
             (house) =>
-                house.category.toLowerCase().contains(query) ||
-                house.companyName.toLowerCase().contains(query) ||
-                house.location.toLowerCase().contains(query),
+                (house.category?.toLowerCase().contains(query) ?? false) ||
+                (house.companyName?.toLowerCase().contains(query) ?? false) ||
+                (house.location?.toLowerCase().contains(query) ?? false) ||
+                (house.title?.toLowerCase().contains(query) ?? false),
           )
           .toList();
     }
@@ -766,7 +836,9 @@ class _ModernPropertyCard extends StatelessWidget {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: isAvailable ? Colors.green : Colors.red,
+                      color: house.status == 'AVAILABLE'
+                          ? Colors.green
+                          : Colors.red,
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
                         BoxShadow(
@@ -777,7 +849,9 @@ class _ModernPropertyCard extends StatelessWidget {
                       ],
                     ),
                     child: Text(
-                      house.status,
+                      house.status == 'AVAILABLE'
+                          ? 'Disponible'
+                          : house.status!,
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 12,
@@ -820,7 +894,7 @@ class _ModernPropertyCard extends StatelessWidget {
                   // Company Header
                   // Property Type
                   Text(
-                    "${house.type} • ${house.category}",
+                    "${house.title ?? 'Bien'} • ${house.countType}",
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
@@ -835,23 +909,8 @@ class _ModernPropertyCard extends StatelessWidget {
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
-                          house.location,
+                          house.location!,
                           style: TextStyle(fontSize: 16, color: color.primary),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Icon(Icons.star, color: Colors.amber, size: 16),
-                      const SizedBox(width: 4),
-                      Text(
-                        house.rate.toString(),
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: color.secondary,
                         ),
                       ),
                     ],
@@ -859,7 +918,7 @@ class _ModernPropertyCard extends StatelessWidget {
                   const SizedBox(height: 8),
                   // Post Date
                   Text(
-                    "Publié ${house.postDate}",
+                    "Publié ${house.postDate?.contains('T') == true ? DateFormat('dd/MM/yyyy HH:mm').format(DateTime.parse(house.postDate!)) : house.postDate}",
                     style: TextStyle(fontSize: 14, color: color.primary),
                   ),
                   const SizedBox(height: 20),

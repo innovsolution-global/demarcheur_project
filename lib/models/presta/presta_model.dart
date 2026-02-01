@@ -1,3 +1,6 @@
+import 'package:demarcheur_app/models/add_vancy_model.dart';
+import 'package:demarcheur_app/services/config.dart';
+
 class PrestaModel {
   final String? id;
   final String title;
@@ -10,6 +13,8 @@ class PrestaModel {
   final List exigences;
   final String about;
   final String salary;
+  final String? ownerId;
+  final AddVancyModel? originalVancy;
 
   PrestaModel({
     this.id,
@@ -23,13 +28,20 @@ class PrestaModel {
     required this.exigences,
     required this.about,
     required this.salary,
+    this.ownerId,
+    this.originalVancy,
   });
   factory PrestaModel.fromJson(Map<String, dynamic> json) {
     return PrestaModel(
       id: json['id'],
+      ownerId: json['ownerId']?.toString() ?? json['companyId']?.toString(),
       title: json['title'],
       companyName: json['companyName'],
-      imageUrl: json['imageUrl'],
+      imageUrl: (json['imageUrl'] as List? ?? [])
+          .map((e) => Config.getImgUrl(e.toString()))
+          .where((e) => e != null)
+          .cast<String>()
+          .toList(),
       postDate: json['postDate'],
       location: json['location'],
       status: json['status'],

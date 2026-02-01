@@ -1,5 +1,8 @@
+import 'package:demarcheur_app/services/config.dart';
+
 class DemJobModel {
   final String? id;
+  final String? ownerId;
   final String title;
   final String companyName;
   final String imageUrl;
@@ -12,6 +15,7 @@ class DemJobModel {
 
   DemJobModel({
     this.id,
+    this.ownerId,
     required this.title,
     required this.companyName,
     required this.imageUrl,
@@ -24,10 +28,26 @@ class DemJobModel {
   });
   factory DemJobModel.fromJson(Map<String, dynamic> json) {
     return DemJobModel(
-      id: json['id'],
+      id: json['id']?.toString(),
+      ownerId: json['ownerId']?.toString() ?? json['companyId']?.toString() ?? json['entrepriseId']?.toString(),
       title: json['title'],
       companyName: json['companyName'],
-      imageUrl: json['imageUrl'],
+      imageUrl:
+          Config.getImgUrl(
+            (json['companyPicture'] ??
+                    json['entreprisePicture'] ??
+                    json['companyPhoto'] ??
+                    json['entreprisePhoto'] ??
+                    json['photoPath'] ??
+                    json['photo_path'] ??
+                    json['profilePath'] ??
+                    json['imageUrl'] ??
+                    json['image_url'] ??
+                    json['image'] ??
+                    json['photo'])
+                ?.toString(),
+          ) ??
+          "",
       postDate: json['postDate'],
       salary: (json['salary'] as num).toDouble(),
       location: json['location'],

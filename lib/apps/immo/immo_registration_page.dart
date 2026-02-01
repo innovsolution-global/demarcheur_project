@@ -1,22 +1,25 @@
 import 'dart:io';
-import 'package:demarcheur_app/apps/immo/immo_dashboard.dart';
+import 'package:demarcheur_app/auths/donneurs/login_page.dart';
 import 'package:demarcheur_app/consts/color.dart';
 import 'package:demarcheur_app/methods/my_methodes.dart';
-import 'package:demarcheur_app/widgets/immo_header.dart';
+import 'package:demarcheur_app/models/enterprise/enterprise_model.dart';
+import 'package:demarcheur_app/services/auth_provider.dart';
+import 'package:demarcheur_app/widgets/header_page.dart';
 import 'package:demarcheur_app/widgets/sub_title.dart';
 import 'package:demarcheur_app/widgets/title_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
 
 class ImmoRegistrationPage extends StatefulWidget {
   const ImmoRegistrationPage({super.key});
 
   @override
-  State<ImmoRegistrationPage> createState() => _ImmoRegistrationPageState();
+  State<ImmoRegistrationPage> createState() => _ImmoRegistrationPage();
 }
 
-class _ImmoRegistrationPageState extends State<ImmoRegistrationPage>
+class _ImmoRegistrationPage extends State<ImmoRegistrationPage>
     with SingleTickerProviderStateMixin {
   final MyMethodes methodes = MyMethodes();
   final _formKey = GlobalKey<FormState>();
@@ -37,9 +40,14 @@ class _ImmoRegistrationPageState extends State<ImmoRegistrationPage>
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
 
+  String? selectedItem;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<AuthProvider>().loadService();
+    });
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,
@@ -58,6 +66,7 @@ class _ImmoRegistrationPageState extends State<ImmoRegistrationPage>
     _phoneController.dispose();
     _locationController.dispose();
     _animationController.dispose();
+
     super.dispose();
   }
 
@@ -96,7 +105,7 @@ class _ImmoRegistrationPageState extends State<ImmoRegistrationPage>
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: ConstColors().tertiary,
+                color: ConstColors().primary,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -146,6 +155,8 @@ class _ImmoRegistrationPageState extends State<ImmoRegistrationPage>
     );
   }
 
+  final color = ConstColors();
+
   Future<void> _submitForm() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -153,7 +164,7 @@ class _ImmoRegistrationPageState extends State<ImmoRegistrationPage>
 
     if (selectedImage == null) {
       _showSnackBar(
-        'Veuillez sélectionner un logo d\'entreprise',
+        'Veuillez sélectionner le logo de l\'entreprise',
         isError: true,
       );
       return;
@@ -162,18 +173,55 @@ class _ImmoRegistrationPageState extends State<ImmoRegistrationPage>
     setState(() {
       isSubmitting = true;
     });
+    final enterprise = EnterpriseModel(
+      name: _companyNameController.text,
+      email: _emailController.text,
+      phone: _phoneController.text,
+      image: selectedImage,
+      adress: _locationController.text,
+      city: _locationController.text,
+      password: _passwordController.text,
+      serviceId: selectedItem,
+      role: 'IMMO',
+    );
+    final succes = await AuthProvider().registerGiver(enterprise);
 
     // Simulate API call
-    await Future.delayed(const Duration(seconds: 2));
+    //await Future.delayed(const Duration(seconds: 2));
 
     if (mounted) {
       setState(() {
         isSubmitting = false;
       });
+    }
+    if (succes) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.green,
 
-      Navigator.pushReplacement(
+          content: Center(
+            child: Text(
+              'Votre compte a été créé avec succès',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ),
+      );
+      Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => const ImmoDashboard()),
+        MaterialPageRoute(builder: (context) => LoginPage()),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.red,
+          content: Center(
+            child: Text(
+              'Une erreur s\'est produite lors de l\'inscription',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ),
       );
     }
   }
@@ -216,7 +264,7 @@ class _ImmoRegistrationPageState extends State<ImmoRegistrationPage>
         extendBodyBehindAppBar: true,
         body: CustomScrollView(
           slivers: [
-            const ImmoHeader(auto: true),
+            const Header(auto: true),
             SliverToBoxAdapter(
               child: FadeTransition(
                 opacity: _fadeAnimation,
@@ -230,6 +278,7 @@ class _ImmoRegistrationPageState extends State<ImmoRegistrationPage>
                         _buildHeader(),
                         _buildImageSelector(),
                         _buildFormFields(),
+                        const SizedBox(height: 24),
                         _buildSubmitButton(),
                         const SizedBox(height: 40),
                       ],
@@ -256,7 +305,7 @@ class _ImmoRegistrationPageState extends State<ImmoRegistrationPage>
           ),
           const SizedBox(height: 8),
           SubTitle(
-            text: "Rejoignez notre plateforme immobilière",
+            text: "Rejoignez notre plateforme",
             fontsize: 16,
             color: ConstColors().primary,
           ),
@@ -341,7 +390,7 @@ class _ImmoRegistrationPageState extends State<ImmoRegistrationPage>
           ),
           const SizedBox(height: 12),
           SubTitle(
-            text: "Logo de l'entreprise",
+            text: "Votre photo de profil",
             fontWeight: FontWeight.w600,
             fontsize: 18,
             color: ConstColors().secondary,
@@ -358,29 +407,83 @@ class _ImmoRegistrationPageState extends State<ImmoRegistrationPage>
       child: Column(
         children: [
           _CustomTextField(
-            controller: _companyNameController,
-            label: "Nom de l'entreprise",
             textCapitalization: TextCapitalization.sentences,
-
+            controller: _companyNameController,
+            label: "Nom complet",
             icon: HugeIcons.strokeRoundedBuilding01,
-            validator: (value) =>
-                _validateRequired(value, "Le nom de l'entreprise"),
+            validator: (value) => _validateRequired(value, "Le nom"),
           ),
           const SizedBox(height: 20),
-          _CustomTextField(
-            controller: _domainController,
-            textCapitalization: TextCapitalization.sentences,
+          DropdownButtonFormField<String>(
+            dropdownColor: color.bg,
+            hint: Text(
+              'Selectionnez votre domaine d\'acti...',
+              overflow: TextOverflow.clip,
+              style: TextStyle(
+                color: color.primary,
+                fontSize: 16,
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+            items: context
+                .watch<AuthProvider>()
+                .serviceList
+                .map(
+                  (service) => DropdownMenuItem<String>(
+                    value: service.id,
+                    child: Text(
+                      service.service_name,
+                      style: TextStyle(
+                        color: color.secondary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                  ),
+                )
+                .toList(),
+            initialValue: selectedItem,
 
-            label: "Domaine d'activité",
-            icon: HugeIcons.strokeRoundedBriefcase01,
             validator: (value) =>
                 _validateRequired(value, "Le domaine d'activité"),
+            onChanged: (value) {
+              setState(() {
+                selectedItem = value;
+              });
+            },
+            decoration: InputDecoration(
+              //labelText: '',
+              labelStyle: TextStyle(color: color.primary, fontSize: 16),
+              // prefixIcon: HugeIcon(icon: icon, color: color.primary, size: 10),
+              filled: true,
+              fillColor: color.bgSubmit,
+              border: OutlineInputBorder(
+                borderSide: BorderSide.none,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: color.primary, width: 2),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              errorBorder: OutlineInputBorder(
+                borderSide: const BorderSide(color: Colors.red, width: 2),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              focusedErrorBorder: OutlineInputBorder(
+                borderSide: const BorderSide(color: Colors.red, width: 2),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              // contentPadding: const EdgeInsets.symmetric(
+              //   horizontal: 16,
+              //   vertical: 16,
+              // ),
+            ),
           ),
           const SizedBox(height: 20),
           _CustomTextField(
-            controller: _emailController,
             textCapitalization: TextCapitalization.none,
 
+            controller: _emailController,
             label: "Adresse e-mail",
             icon: HugeIcons.strokeRoundedMail01,
             keyboardType: TextInputType.emailAddress,
@@ -388,9 +491,9 @@ class _ImmoRegistrationPageState extends State<ImmoRegistrationPage>
           ),
           const SizedBox(height: 20),
           _CustomTextField(
-            controller: _phoneController,
             textCapitalization: TextCapitalization.none,
 
+            controller: _phoneController,
             label: "Numéro de téléphone",
             icon: HugeIcons.strokeRoundedAiPhone01,
             keyboardType: TextInputType.phone,
@@ -398,12 +501,12 @@ class _ImmoRegistrationPageState extends State<ImmoRegistrationPage>
           ),
           const SizedBox(height: 20),
           _CustomTextField(
-            controller: _locationController,
             textCapitalization: TextCapitalization.sentences,
+            controller: _locationController,
             label: "Localisation",
             icon: HugeIcons.strokeRoundedLocation01,
             validator: (value) => _validateRequired(value, "La localisation"),
-            textInputAction: TextInputAction.done,
+            textInputAction: TextInputAction.next,
           ),
           const SizedBox(height: 20),
           _CustomTextField(
@@ -421,45 +524,35 @@ class _ImmoRegistrationPageState extends State<ImmoRegistrationPage>
 
   Widget _buildSubmitButton() {
     return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        children: [
-          const SizedBox(height: 20),
-          SizedBox(
-            width: double.infinity,
-            height: 56,
-            child: ElevatedButton(
-              onPressed: isSubmitting ? null : _submitForm,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: ConstColors().primary,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                disabledBackgroundColor: ConstColors().primary.withValues(
-                  alpha: 0.6,
-                ),
-              ),
-              child: isSubmitting
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
-                  : const Text(
-                      "Créer mon compte",
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+      padding: const EdgeInsets.only(right: 20.0, left: 20),
+      child: SizedBox(
+        width: double.infinity,
+        height: 55,
+        child: ElevatedButton(
+          onPressed: isSubmitting ? null : _submitForm,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: ConstColors().primary,
+            foregroundColor: Colors.white,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
             ),
+            disabledBackgroundColor: ConstColors().primary.withOpacity(0.6),
           ),
-        ],
+          child: isSubmitting
+              ? const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                )
+              : const Text(
+                  "Créer mon compte",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                ),
+        ),
       ),
     );
   }
@@ -479,6 +572,7 @@ class _CustomTextField extends StatelessWidget {
     required this.label,
     required this.icon,
     required this.textCapitalization,
+
     this.keyboardType,
     this.validator,
     this.textInputAction,
@@ -492,6 +586,7 @@ class _CustomTextField extends StatelessWidget {
       controller: controller,
       keyboardType: keyboardType ?? TextInputType.text,
       textInputAction: textInputAction ?? TextInputAction.next,
+      textCapitalization: textCapitalization,
       validator: validator,
       style: TextStyle(fontSize: 16, color: color.secondary),
       decoration: InputDecoration(

@@ -1,7 +1,7 @@
-import 'package:chat_plugin/chat_plugin.dart';
+// main.dart logic updated to remove ChatPlugin
+
 import 'package:demarcheur_app/apps/demandeurs/main_screens/boost_page.dart';
 import 'package:demarcheur_app/apps/demandeurs/main_screens/dem_home_page.dart';
-import 'package:demarcheur_app/apps/demandeurs/main_screens/dem_message.dart';
 import 'package:demarcheur_app/apps/demandeurs/main_screens/dem_onboarding_page.dart';
 import 'package:demarcheur_app/apps/demandeurs/main_screens/dem_profile.dart';
 import 'package:demarcheur_app/apps/demandeurs/main_screens/vancy.dart';
@@ -16,25 +16,25 @@ import 'package:demarcheur_app/providers/donnor_user_provider.dart';
 import 'package:demarcheur_app/providers/enterprise_provider.dart';
 import 'package:demarcheur_app/providers/house_provider.dart';
 import 'package:demarcheur_app/providers/immo/immo_chat_provider.dart';
+import 'package:demarcheur_app/providers/message_provider.dart';
+import 'package:demarcheur_app/providers/chat/chat_provider.dart'; // Added import
 import 'package:demarcheur_app/providers/presta/presta_provider.dart';
-import 'package:demarcheur_app/providers/chat/chat_provider.dart';
 import 'package:demarcheur_app/providers/presta/presta_user_provider.dart';
 import 'package:demarcheur_app/providers/search_provider.dart';
 import 'package:demarcheur_app/providers/user_provider.dart';
 import 'package:demarcheur_app/providers/donor_register_provider.dart';
 import 'package:demarcheur_app/providers/domain_pref_provider.dart';
 import 'package:demarcheur_app/providers/settings_provider.dart';
+import 'package:demarcheur_app/providers/candidature_provider.dart';
 import 'package:demarcheur_app/services/auth_provider.dart';
 import 'package:demarcheur_app/services/auth_service.dart';
+import 'package:demarcheur_app/services/socket_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final isLoggedIn = await AuthService.logedUser();
-  if (isLoggedIn == true) {
-    await AuthService.initilizedChatPlugin();
-  }
   runApp(MyApp(isLoggedIn: isLoggedIn!));
 }
 
@@ -48,6 +48,7 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   // This widget is the root of your application.
+  //[Storing C:\Users\alpho\upload-keystore.jks]
   @override
   void initState() {
     WidgetsBinding.instance.addObserver(this);
@@ -63,30 +64,17 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     if (!widget.isLoggedIn) return;
     if (state == AppLifecycleState.resumed) {
       ensureConnection();
-    } else if (state == AppLifecycleState.resumed) {
-      try {
-        final chatService = ChatPlugin.chatService;
-        chatService.updateUserStatus(false);
-      } catch (ex) {}
-    }
+    } else if (state == AppLifecycleState.resumed) {}
     super.didChangeAppLifecycleState(state);
   }
 
   void ensureConnection() async {
-    if (ChatConfig.instance.userId != null) {
-      try {
-        final chatService = ChatPlugin.chatService;
-        if (!chatService.isSocketConnected) {
-          await chatService.initGlobalConnection();
-        } else {
-          chatService.refreshGlobalConnection();
-        }
-        chatService.updateUserStatus(true);
-      } catch (ex) {
-        throw "this is the $ex";
-      }
-    } else {
-      await AuthService.initilizedChatPlugin();
+    final token = await AuthService.getUserToken();
+    final userId = await AuthService.getUser();
+
+    if (token != null && userId != null) {
+      print('DEBUG: main.dart - Initializing SocketService for user: $userId');
+      SocketService().connect(token, userId);
     }
   }
 
@@ -101,7 +89,6 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         ChangeNotifierProvider(create: (_) => UserProvider()),
         ChangeNotifierProvider(create: (_) => CompaProfileProvider()),
         ChangeNotifierProvider(create: (_) => PrestaProvider()),
-        ChangeNotifierProvider(create: (_) => ChatProvider()),
         ChangeNotifierProvider(create: (_) => ImmoChatProvider()),
         ChangeNotifierProvider(create: (_) => PrestaUserProvider()),
         ChangeNotifierProvider(create: (_) => DonorRegisterProvider()),
@@ -109,9 +96,15 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         ChangeNotifierProvider(create: (_) => SettingsProvider()),
         ChangeNotifierProvider(create: (_) => DemUserProvider()),
         ChangeNotifierProvider(create: (_) => DonnorUserProvider()),
-        ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider(create: (_) => AuthProvider()..loadAuthData()),
         ChangeNotifierProvider(create: (_) => EnterpriseProvider()),
+        ChangeNotifierProvider(create: (_) => CandidatureProvider()),
+        ChangeNotifierProvider(create: (_) => MessageProvider()),
+        ChangeNotifierProvider(
+          create: (_) => ChatProvider(),
+        ), // Added ChatProvider
       ],
+
       child: Consumer<SettingsProvider>(
         builder: (context, settings, child) {
           return MaterialApp(
@@ -125,7 +118,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
               "/demhome": (context) => DemHomePage(),
               "/boost": (context) => BoostPage(),
               "/demonboarding": (context) => DemOnboardingPage(),
-              "/demmsg": (context) => DemMessage(),
+              // "/demmsg": (context) => DemMessage(),
               "/dempro": (context) => DemProfile(),
               "/vancy": (context) => Vancy(),
               "/prestataire": (context) => PrestataireSelectPage(),

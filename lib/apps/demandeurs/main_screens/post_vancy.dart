@@ -102,10 +102,10 @@ class _PostVancyState extends State<PostVancy> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<ApplicationProvider>(
-        context,
-        listen: false,
-      ).loadApplication();
+      // Provider.of<ApplicationProvider>(
+      //   context,
+      //   listen: false,
+      // ).loadApplication();
     });
   }
 
@@ -406,7 +406,7 @@ class _PostVancyState extends State<PostVancy> {
           SubTitle(text: label, fontWeight: FontWeight.w600, fontsize: 16),
           const SizedBox(height: 8),
           DropdownButtonFormField<T>(
-            value: value,
+            initialValue: value,
             decoration: InputDecoration(
               hintText: hint,
               hintStyle: TextStyle(

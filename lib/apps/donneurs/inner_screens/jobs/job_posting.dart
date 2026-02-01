@@ -1,141 +1,75 @@
 import 'dart:io';
+
 import 'package:demarcheur_app/consts/color.dart';
 import 'package:demarcheur_app/widgets/immo_header.dart';
-import 'package:demarcheur_app/widgets/title_widget.dart';
-import 'package:demarcheur_app/widgets/sub_title.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:hugeicons/hugeicons.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:provider/provider.dart';
+import 'package:demarcheur_app/services/auth_provider.dart';
+import 'package:demarcheur_app/models/add_vancy_model.dart';
 
-class JobPosting extends StatefulWidget {
-  const JobPosting({super.key});
+class JobPostings extends StatefulWidget {
+  const JobPostings({super.key});
 
   @override
-  State<JobPosting> createState() => _JobPostingState();
+  State<JobPostings> createState() => _JobPostingsState();
 }
 
-class _JobPostingState extends State<JobPosting>
-    with SingleTickerProviderStateMixin {
+class _JobPostingsState extends State<JobPostings>
+    with TickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
-  final _pageController = PageController();
   final ImagePicker _picker = ImagePicker();
+  final ConstColors colors = ConstColors();
 
   // Form Controllers
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
-  final _priceController = TextEditingController();
-  final _areaController = TextEditingController();
-  final _addressController = TextEditingController();
-  final _bedroomsController = TextEditingController();
-  final _bathroomsController = TextEditingController();
-  final _floorController = TextEditingController();
-  final _yearBuiltController = TextEditingController();
+  final _budgetController = TextEditingController();
+  final _locationController = TextEditingController();
+  final _requirementsController = TextEditingController();
+  final _contactController = TextEditingController();
+  final _levelController = TextEditingController();
+  final _experienceController = TextEditingController();
+  final _deadlineController = TextEditingController();
 
   // Form State
-  String? selectedPropertyType;
-  String? selectedTransactionType;
-  String? selectedCondition;
-  String? selectedFurnishing;
-  String? selectedEnergyRating;
+  String? selectedServiceCategory;
+  String? selectedDuration;
   List<File> selectedImages = [];
-  List<String> selectedFeatures = [];
-  int currentPage = 0;
   bool isSubmitting = false;
 
-  // Animation Controller
-  late AnimationController _animationController;
-  late Animation<double> _slideAnimation;
-
-  // Property Types
-  final List<String> propertyTypes = [
-    'Appartement',
-    'Maison',
-    'Villa',
-    'Studio',
-    'Duplex',
-    'Penthouse',
-    'Loft',
-    'Terrain',
-    'Local commercial',
-    'Bureau',
+  // Service Categories
+  final List<String> serviceCategories = [
+    'Nettoyage ménager',
+    'Plomberie',
+    'Électricité',
+    'Réparation générale',
+    'Jardinage',
+    'Peinture',
+    'Déménagement',
+    'Autre',
   ];
 
-  // Transaction Types
-  final List<String> transactionTypes = [
-    'Vente',
-    'Location',
-    'Location saisonnière',
+  // Duration Options
+  final List<String> durationOptions = [
+    'Ponctuel',
+    'Hebdomadaire',
+    'Mensuel',
+    'À discuter',
   ];
-
-  // Property Conditions
-  final List<String> conditions = [
-    'Neuf',
-    'Excellent état',
-    'Bon état',
-    'À rénover',
-    'À restaurer',
-  ];
-
-  // Furnishing Options
-  final List<String> furnishingOptions = [
-    'Meublé',
-    'Semi-meublé',
-    'Non meublé',
-  ];
-
-  // Energy Ratings
-  final List<String> energyRatings = ['A+', 'A', 'B', 'C', 'D', 'E', 'F', 'G'];
-
-  // Available Features
-  final List<String> availableFeatures = [
-    'Balcon',
-    'Terrasse',
-    'Jardin',
-    'Piscine',
-    'Garage',
-    'Parking',
-    'Cave',
-    'Grenier',
-    'Cheminée',
-    'Climatisation',
-    'Chauffage central',
-    'Ascenseur',
-    'Gardien',
-    'Sécurité',
-    'Vue mer',
-    'Vue montagne',
-    'Proche transport',
-    'Proche école',
-    'Proche commerces',
-  ];
-
-  @override
-  void initState() {
-    super.initState();
-    _animationController = AnimationController(
-      duration: const Duration(milliseconds: 300),
-      vsync: this,
-    );
-    _slideAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
-    );
-    _animationController.forward();
-  }
 
   @override
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
-    _priceController.dispose();
-    _areaController.dispose();
-    _addressController.dispose();
-    _bedroomsController.dispose();
-    _bathroomsController.dispose();
-    _floorController.dispose();
-    _yearBuiltController.dispose();
-    _pageController.dispose();
-    _animationController.dispose();
+    _budgetController.dispose();
+    _locationController.dispose();
+    _requirementsController.dispose();
+    _contactController.dispose();
+    _levelController.dispose();
+    _experienceController.dispose();
+    _deadlineController.dispose();
     super.dispose();
   }
 
@@ -146,35 +80,15 @@ class _JobPostingState extends State<JobPosting>
         imageQuality: 80,
       );
 
-      if (images.isNotEmpty && selectedImages.length + images.length <= 10) {
+      if (images.isNotEmpty && selectedImages.length + images.length <= 5) {
         setState(() {
           selectedImages.addAll(images.map((image) => File(image.path)));
         });
-      } else if (selectedImages.length + images.length > 10) {
-        _showSnackBar('Maximum 10 images autorisées', isError: true);
+      } else if (selectedImages.length + images.length > 5) {
+        _showSnackBar('Maximum 5 images autorisées', isError: true);
       }
     } catch (e) {
       _showSnackBar('Erreur lors de la sélection des images', isError: true);
-    }
-  }
-
-  Future<void> _pickImageFromCamera() async {
-    try {
-      final XFile? image = await _picker.pickImage(
-        source: ImageSource.camera,
-        maxWidth: 1080,
-        imageQuality: 80,
-      );
-
-      if (image != null && selectedImages.length < 10) {
-        setState(() {
-          selectedImages.add(File(image.path));
-        });
-      } else if (selectedImages.length >= 10) {
-        _showSnackBar('Maximum 10 images autorisées', isError: true);
-      }
-    } catch (e) {
-      _showSnackBar('Erreur lors de la prise de photo', isError: true);
     }
   }
 
@@ -188,109 +102,320 @@ class _JobPostingState extends State<JobPosting>
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: isError ? Colors.redAccent : ConstColors().primary,
+        backgroundColor: isError ? colors.error : colors.primary,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
       ),
     );
   }
 
-  void _nextPage() {
-    if (currentPage < 2) {
-      setState(() {
-        currentPage++;
-      });
-      _pageController.nextPage(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
-    }
-  }
-
-  void _previousPage() {
-    if (currentPage > 0) {
-      setState(() {
-        currentPage--;
-      });
-      _pageController.previousPage(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
-    }
-  }
-
-  bool _validateCurrentPage() {
-    switch (currentPage) {
-      case 0:
-        return _titleController.text.isNotEmpty &&
-            _descriptionController.text.isNotEmpty &&
-            selectedPropertyType != null &&
-            selectedTransactionType != null;
-      case 1:
-        return _priceController.text.isNotEmpty &&
-            _areaController.text.isNotEmpty &&
-            _addressController.text.isNotEmpty;
-      case 2:
-        return selectedImages.isNotEmpty;
+  String _mapDurationToJobType(String? duration) {
+    switch (duration) {
+      case 'Ponctuel':
+      case 'Hebdomadaire':
+      case 'Mensuel':
+      case 'À discuter':
+        return 'FREELANCE';
       default:
-        return true;
+        return 'FREELANCE';
     }
   }
 
-  Future<void> _submitForm() async {
-    if (!_formKey.currentState!.validate() || !_validateCurrentPage()) {
-      _showSnackBar('Veuillez remplir tous les champs requis', isError: true);
-      return;
-    }
+  void _submitForm() async {
+    if (_formKey.currentState!.validate()) {
+      if (selectedServiceCategory == null) {
+        _showSnackBar('Veuillez sélectionner une catégorie', isError: true);
+        return;
+      }
+      if (selectedDuration == null) {
+        _showSnackBar('Veuillez sélectionner la durée', isError: true);
+        return;
+      }
 
-    setState(() {
-      isSubmitting = true;
-    });
+      final authProvider = context.read<AuthProvider>();
 
-    // Simulate API call
-    await Future.delayed(const Duration(seconds: 2));
+      print('DEBUG: JobPosting - Role: ${authProvider.role}');
+      print('DEBUG: JobPosting - UserID: ${authProvider.userId}');
+      print('DEBUG: JobPosting - Enterprise: ${authProvider.enterprise?.id}');
 
-    if (mounted) {
+      final companyId = authProvider.enterprise?.id ?? authProvider.userId;
+      print('DEBUG: JobPosting - Selected CompanyID: $companyId');
+
+      if (companyId == null) {
+        _showSnackBar(
+          'Erreur: Identifiant manquant. Veuillez vous reconnecter.',
+          isError: true,
+        );
+        return;
+      }
+
+      setState(() {
+        isSubmitting = true;
+      });
+
+      final vancy = AddVancyModel(
+        title: _titleController.text,
+        description: _descriptionController.text,
+        city: _locationController.text,
+        salary: int.tryParse(_budgetController.text) ?? 0,
+        typeJobe: _mapDurationToJobType(selectedDuration),
+        level: _levelController.text.isNotEmpty
+            ? _levelController.text
+            : 'Intermédiaire',
+        experience: _experienceController.text.isNotEmpty
+            ? _experienceController.text
+            : '1-3 ans',
+        deadline: _deadlineController.text.isNotEmpty
+            ? _deadlineController.text
+            : DateTime.now()
+                  .add(const Duration(days: 30))
+                  .toString()
+                  .split(' ')[0],
+        companyId: companyId,
+        missions: [_descriptionController.text],
+        benefits: [],
+        conditions: [_requirementsController.text],
+        reqProfile: [_requirementsController.text],
+        otherInfo: [_contactController.text],
+      );
+
+      final success = await authProvider.addVancyJob(vancy);
+
+      if (!mounted) return;
+
       setState(() {
         isSubmitting = false;
       });
 
-      _showSnackBar('Annonce publiée avec succès!');
-
-      // Navigate back or to success page
-      Navigator.pop(context);
+      if (success) {
+        _showSnackBar('Annonce publiée avec succès !');
+        Navigator.pop(context);
+      } else {
+        _showSnackBar('Échec de la publication de l\'annonce', isError: true);
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final colors = ConstColors();
-
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
-        backgroundColor: colors.bg,
+        backgroundColor: const Color(0xFFF8FAFC),
         body: Form(
           key: _formKey,
           child: CustomScrollView(
+            physics: const BouncingScrollPhysics(),
             slivers: [
               const ImmoHeader(auto: true),
               SliverToBoxAdapter(
-                child: SlideTransition(
-                  position: Tween<Offset>(
-                    begin: const Offset(0, 0.1),
-                    end: Offset.zero,
-                  ).animate(_slideAnimation),
-                  child: FadeTransition(
-                    opacity: _slideAnimation,
-                    child: Column(
-                      children: [
-                        _buildHeader(),
-                        _buildProgressIndicator(),
-                        _buildPageView(),
-                        _buildNavigationButtons(),
-                      ],
-                    ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 24),
+                      Text(
+                        "Nouvelle Offre",
+                        style: TextStyle(
+                          color: colors.primary,
+                          fontSize: 32,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: -0.5,
+                        ),
+                      ).animate().fadeIn(duration: 400.ms).slideX(begin: -0.1),
+                      Text(
+                        "Trouvez le prestataire idéal pour vos besoins",
+                        style: TextStyle(
+                          color: colors.secondary.withOpacity(0.6),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ).animate().fadeIn(duration: 600.ms).slideX(begin: -0.1),
+                      const SizedBox(height: 32),
+
+                      _buildSectionTitle(
+                        "Informations de base",
+                        Icons.info_outline,
+                      ),
+                      _buildModernCard(
+                        children: [
+                          _buildModernTextField(
+                            controller: _titleController,
+                            label: 'Titre de l\'offre',
+                            hint: 'Ex: Recherche plombier pour réparation',
+                            icon: Icons.title_rounded,
+                            validator: (v) => v!.isEmpty ? 'Requis' : null,
+                          ),
+                          const SizedBox(height: 24),
+                          _buildModernTextField(
+                            controller: _locationController,
+                            label: 'Localisation',
+                            hint: 'Où se situe le besoin ?',
+                            icon: Icons.location_on_outlined,
+                            validator: (v) => v!.isEmpty ? 'Requis' : null,
+                          ),
+                        ],
+                      ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.05),
+
+                      const SizedBox(height: 32),
+                      _buildSectionTitle(
+                        "Catégorie & Type",
+                        Icons.category_outlined,
+                      ),
+                      _buildModernCard(
+                        children: [
+                          const Text(
+                            "Sélectionnez une catégorie",
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF64748B),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          _buildChoiceChips(
+                            items: serviceCategories,
+                            selected: selectedServiceCategory,
+                            onSelected: (v) =>
+                                setState(() => selectedServiceCategory = v),
+                          ),
+                          const SizedBox(height: 24),
+                          const Text(
+                            "Durée estimée",
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF64748B),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          _buildChoiceChips(
+                            items: durationOptions,
+                            selected: selectedDuration,
+                            onSelected: (v) =>
+                                setState(() => selectedDuration = v),
+                          ),
+                        ],
+                      ).animate().fadeIn(delay: 400.ms).slideY(begin: 0.05),
+
+                      const SizedBox(height: 32),
+                      _buildSectionTitle(
+                        "Description & Détails",
+                        Icons.description_outlined,
+                      ),
+                      _buildModernCard(
+                        children: [
+                          _buildModernTextField(
+                            controller: _descriptionController,
+                            label: 'Description détaillée',
+                            hint: 'Décrivez précisément votre besoin...',
+                            icon: Icons.notes_rounded,
+                            maxLines: 4,
+                            validator: (v) => v!.isEmpty ? 'Requis' : null,
+                          ),
+                          const SizedBox(height: 24),
+                          _buildModernTextField(
+                            controller: _requirementsController,
+                            label: 'Exigences particulières',
+                            hint: 'Ex: Outillage, expérience minimum...',
+                            icon: Icons.rule_rounded,
+                            maxLines: 3,
+                          ),
+                        ],
+                      ).animate().fadeIn(delay: 600.ms).slideY(begin: 0.05),
+
+                      const SizedBox(height: 32),
+                      _buildSectionTitle(
+                        "Détails Techniques",
+                        Icons.settings_outlined,
+                      ),
+                      _buildModernCard(
+                        children: [
+                          _buildModernTextField(
+                            controller: _levelController,
+                            label: 'Niveau d\'expérience requis',
+                            hint: 'Ex: Débutant, Senior...',
+                            icon: Icons.grade_outlined,
+                          ),
+                          const SizedBox(height: 24),
+                          _buildModernTextField(
+                            controller: _experienceController,
+                            label: 'Années d\'expérience',
+                            hint: 'Ex: 2 ans',
+                            icon: Icons.history_toggle_off_rounded,
+                          ),
+                          const SizedBox(height: 24),
+                          _buildModernTextField(
+                            controller: _deadlineController,
+                            label: 'Date limite',
+                            hint: 'AAAA-MM-JJ',
+                            icon: Icons.calendar_today_outlined,
+                            readOnly: true,
+                            onTap: () async {
+                              final picked = await showDatePicker(
+                                context: context,
+                                initialDate: DateTime.now().add(
+                                  const Duration(days: 7),
+                                ),
+                                firstDate: DateTime.now(),
+                                lastDate: DateTime.now().add(
+                                  const Duration(days: 365),
+                                ),
+                              );
+                              if (picked != null) {
+                                setState(() {
+                                  _deadlineController.text = picked
+                                      .toString()
+                                      .split(' ')[0];
+                                });
+                              }
+                            },
+                          ),
+                        ],
+                      ).animate().fadeIn(delay: 700.ms).slideY(begin: 0.05),
+
+                      const SizedBox(height: 32),
+                      _buildSectionTitle(
+                        "Budget & Contact",
+                        Icons.payments_outlined,
+                      ),
+                      _buildModernCard(
+                        children: [
+                          _buildModernTextField(
+                            controller: _budgetController,
+                            label: 'Budget estimé (GNF)',
+                            hint: 'Ex: 500000',
+                            icon: Icons.account_balance_wallet_outlined,
+                            keyboardType: TextInputType.number,
+                            validator: (v) => v!.isEmpty ? 'Requis' : null,
+                          ),
+                          const SizedBox(height: 24),
+                          _buildModernTextField(
+                            controller: _contactController,
+                            label: 'Moyen de contact preferred',
+                            hint: 'Ex: WhatsApp, Téléphone...',
+                            icon: Icons.contact_page_outlined,
+                            validator: (v) => v!.isEmpty ? 'Requis' : null,
+                          ),
+                        ],
+                      ).animate().fadeIn(delay: 800.ms).slideY(begin: 0.05),
+
+                      const SizedBox(height: 32),
+                      _buildSectionTitle(
+                        "Photos",
+                        Icons.photo_library_outlined,
+                      ),
+                      _buildImagePickerSection()
+                          .animate()
+                          .fadeIn(delay: 1000.ms)
+                          .slideY(begin: 0.05),
+
+                      const SizedBox(height: 48),
+                      _buildPremiumSubmitButton(),
+                      const SizedBox(height: 48),
+                    ],
                   ),
                 ),
               ),
@@ -301,635 +426,332 @@ class _JobPostingState extends State<JobPosting>
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildSectionTitle(String title, IconData icon) {
     return Padding(
-      padding: const EdgeInsets.all(20.0),
-      child: Column(
-        children: [
-          TitleWidget(
-            text: "Publier une annonce",
-            fontSize: 28,
-            color: ConstColors().secondary,
-          ),
-          const SizedBox(height: 8),
-          SubTitle(
-            text: "Partagez votre bien immobilier avec notre communauté",
-            fontsize: 16,
-            color: ConstColors().primary,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildProgressIndicator() {
-    final colors = ConstColors();
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20.0),
+      padding: const EdgeInsets.only(bottom: 16.0, left: 4),
       child: Row(
-        children: List.generate(3, (index) {
-          final isActive = index <= currentPage;
-          // final isCompleted = index < currentPage;
-
-          return Expanded(
-            child: Container(
-              margin: EdgeInsets.only(right: index < 2 ? 8 : 0),
-              height: 4,
-              decoration: BoxDecoration(
-                color: isActive
-                    ? colors.primary
-                    : colors.tertiary.withOpacity(0.3),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          );
-        }),
-      ),
-    );
-  }
-
-  Widget _buildPageView() {
-    return SizedBox(
-      height: MediaQuery.of(context).size.height * 0.6,
-      child: PageView(
-        controller: _pageController,
-        onPageChanged: (page) {
-          setState(() {
-            currentPage = page;
-          });
-        },
         children: [
-          _buildBasicInfoPage(),
-          _buildDetailsPage(),
-          _buildImagesAndFeaturesPage(),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: colors.primary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: colors.primary, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            title,
+            style: TextStyle(
+              color: colors.primary,
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildBasicInfoPage() {
-    return Padding(
-      padding: const EdgeInsets.all(20.0),
-      child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 20),
-            SubTitle(
-              text: "Informations de base",
-              fontsize: 20,
-              fontWeight: FontWeight.w600,
-              color: ConstColors().secondary,
-            ),
-            const SizedBox(height: 24),
-            _CustomTextField(
-              controller: _titleController,
-              label: "Titre de l'annonce *",
-              icon: HugeIcons.strokeRoundedHome01,
-              validator: (value) =>
-                  value?.isEmpty == true ? 'Titre requis' : null,
-            ),
-            const SizedBox(height: 16),
-            _CustomTextField(
-              controller: _descriptionController,
-              label: "Description *",
-              icon: HugeIcons.strokeRoundedFileEdit,
-              maxLines: 4,
-              validator: (value) =>
-                  value?.isEmpty == true ? 'Description requise' : null,
-            ),
-            const SizedBox(height: 16),
-            _CustomDropdown(
-              value: selectedPropertyType,
-              label: "Type de bien *",
-              icon: HugeIcons.strokeRoundedBuilding01,
-              items: propertyTypes,
-              onChanged: (value) =>
-                  setState(() => selectedPropertyType = value),
-            ),
-            const SizedBox(height: 16),
-            _CustomDropdown(
-              value: selectedTransactionType,
-              label: "Type de transaction *",
-              icon: HugeIcons.strokeRoundedExchange01,
-              items: transactionTypes,
-              onChanged: (value) =>
-                  setState(() => selectedTransactionType = value),
-            ),
-          ],
-        ),
+  Widget _buildModernCard({required List<Widget> children}) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
+      child: Column(children: children),
     );
   }
 
-  Widget _buildDetailsPage() {
-    return Padding(
-      padding: const EdgeInsets.all(20.0),
-      child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 20),
-            SubTitle(
-              text: "Détails du bien",
-              fontsize: 20,
-              fontWeight: FontWeight.w600,
-              color: ConstColors().secondary,
-            ),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: _CustomTextField(
-                    controller: _priceController,
-                    label: "Prix *",
-                    icon: HugeIcons.strokeRoundedMoney03,
-                    keyboardType: TextInputType.number,
-                    suffix: selectedTransactionType == 'Location'
-                        ? '/mois'
-                        : null,
-                    validator: (value) =>
-                        value?.isEmpty == true ? 'Prix requis' : null,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _CustomTextField(
-                    controller: _areaController,
-                    label: "Surface (m²) *",
-                    icon: HugeIcons.strokeRoundedSquare,
-                    keyboardType: TextInputType.number,
-                    validator: (value) =>
-                        value?.isEmpty == true ? 'Surface requise' : null,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            _CustomTextField(
-              controller: _addressController,
-              label: "Adresse *",
-              icon: HugeIcons.strokeRoundedLocation01,
-              validator: (value) =>
-                  value?.isEmpty == true ? 'Adresse requise' : null,
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: _CustomTextField(
-                    controller: _bedroomsController,
-                    label: "Chambres",
-                    icon: HugeIcons.strokeRoundedBed,
-                    keyboardType: TextInputType.number,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _CustomTextField(
-                    controller: _bathroomsController,
-                    label: "Salles de bain",
-                    icon: HugeIcons.strokeRoundedBathtub01,
-                    keyboardType: TextInputType.number,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: _CustomTextField(
-                    controller: _floorController,
-                    label: "Étage",
-                    icon: HugeIcons.strokeRoundedBuilding02,
-                    keyboardType: TextInputType.number,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _CustomTextField(
-                    controller: _yearBuiltController,
-                    label: "Année de construction",
-                    icon: HugeIcons.strokeRoundedCalendar03,
-                    keyboardType: TextInputType.number,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            _CustomDropdown(
-              value: selectedCondition,
-              label: "État du bien",
-              icon: HugeIcons.strokeRoundedCheckmarkSquare02,
-              items: conditions,
-              onChanged: (value) => setState(() => selectedCondition = value),
-            ),
-            const SizedBox(height: 16),
-            if (selectedTransactionType == 'Location')
-              _CustomDropdown(
-                value: selectedFurnishing,
-                label: "Ameublement",
-                icon: HugeIcons.strokeRoundedChair01,
-                items: furnishingOptions,
-                onChanged: (value) =>
-                    setState(() => selectedFurnishing = value),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildImagesAndFeaturesPage() {
-    return Padding(
-      padding: const EdgeInsets.all(20.0),
-      child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 20),
-            SubTitle(
-              text: "Photos et caractéristiques",
-              fontsize: 20,
-              fontWeight: FontWeight.w600,
-              color: ConstColors().secondary,
-            ),
-            const SizedBox(height: 24),
-            _buildImageSection(),
-            const SizedBox(height: 24),
-            _buildFeaturesSection(),
-            const SizedBox(height: 16),
-            _CustomDropdown(
-              value: selectedEnergyRating,
-              label: "Classe énergétique",
-              icon: HugeIcons.strokeRoundedLeaf01,
-              items: energyRatings,
-              onChanged: (value) =>
-                  setState(() => selectedEnergyRating = value),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildImageSection() {
-    final colors = ConstColors();
-
+  Widget _buildModernTextField({
+    required TextEditingController controller,
+    required String label,
+    required String hint,
+    required IconData icon,
+    int maxLines = 1,
+    TextInputType keyboardType = TextInputType.text,
+    bool readOnly = false,
+    VoidCallback? onTap,
+    String? Function(String?)? validator,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            SubTitle(
-              text: "Photos (${selectedImages.length}/10) *",
-              fontsize: 18,
-              fontWeight: FontWeight.w600,
-            ),
-            Row(
-              children: [
-                IconButton(
-                  onPressed: _pickImages,
-                  icon: HugeIcon(
-                    icon: HugeIcons.strokeRoundedImage02,
-                    color: colors.primary,
-                  ),
-                ),
-                IconButton(
-                  onPressed: _pickImageFromCamera,
-                  icon: HugeIcon(
-                    icon: HugeIcons.strokeRoundedCamera01,
-                    color: colors.primary,
-                  ),
-                ),
-              ],
-            ),
-          ],
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF64748B),
+          ),
         ),
-        const SizedBox(height: 12),
-        if (selectedImages.isEmpty)
-          GestureDetector(
-            onTap: _pickImages,
-            child: Container(
-              height: 120,
-              decoration: BoxDecoration(
-                color: colors.tertiary.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: colors.primary.withOpacity(0.3),
-                  style: BorderStyle.solid,
-                ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: controller,
+          maxLines: maxLines,
+          keyboardType: keyboardType,
+          readOnly: readOnly,
+          textCapitalization: TextCapitalization.sentences,
+          onTap: onTap,
+          style: TextStyle(color: colors.secondary),
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: TextStyle(
+              color: Colors.grey.shade400,
+              fontWeight: FontWeight.w400,
+            ),
+            prefixIcon: Icon(
+              icon,
+              color: colors.primary.withOpacity(0.5),
+              size: 20,
+            ),
+            filled: true,
+            fillColor: const Color(0xFFF1F5F9).withOpacity(0.5),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide.none,
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide(
+                color: colors.primary.withOpacity(0.2),
+                width: 2,
               ),
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    HugeIcon(
-                      icon: HugeIcons.strokeRoundedImageAdd01,
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 20,
+              vertical: 16,
+            ),
+          ),
+          validator: validator,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildChoiceChips({
+    required List<String> items,
+    required String? selected,
+    required Function(String) onSelected,
+  }) {
+    return Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      children: items.map((item) {
+        final isSelected = selected == item;
+        return GestureDetector(
+          onTap: () => onSelected(item),
+          child: AnimatedContainer(
+            duration: 200.ms,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            decoration: BoxDecoration(
+              color: isSelected ? colors.primary : Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: isSelected ? colors.primary : const Color(0xFFE2E8F0),
+                width: 1.5,
+              ),
+              boxShadow: isSelected
+                  ? [
+                      BoxShadow(
+                        color: colors.primary.withOpacity(0.2),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ]
+                  : [],
+            ),
+            child: Text(
+              item,
+              style: TextStyle(
+                color: isSelected ? Colors.white : const Color(0xFF475569),
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                fontSize: 14,
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildImagePickerSection() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: const Color(0xFFE2E8F0),
+          style: BorderStyle.solid,
+        ),
+      ),
+      child: Column(
+        children: [
+          if (selectedImages.isEmpty)
+            GestureDetector(
+              onTap: _pickImages,
+              child: Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: colors.primary.withOpacity(0.05),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.add_a_photo_outlined,
                       color: colors.primary,
                       size: 32,
                     ),
-                    const SizedBox(height: 8),
-                    SubTitle(text: "Ajouter des photos", color: colors.primary),
-                  ],
-                ),
-              ),
-            ),
-          )
-        else
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              crossAxisSpacing: 8,
-              mainAxisSpacing: 8,
-            ),
-            itemCount: selectedImages.length,
-            itemBuilder: (context, index) {
-              return Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.file(
-                      selectedImages[index],
-                      fit: BoxFit.cover,
-                      width: double.infinity,
-                      height: double.infinity,
-                    ),
                   ),
-                  Positioned(
-                    top: 4,
-                    right: 4,
-                    child: GestureDetector(
-                      onTap: () => _removeImage(index),
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: const BoxDecoration(
-                          color: Colors.red,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.close,
-                          color: Colors.white,
-                          size: 16,
-                        ),
-                      ),
-                    ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    "Ajouter des photos",
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    "Montrez aux prestataires de quoi il s'agit",
+                    style: TextStyle(color: Colors.grey.shade500, fontSize: 14),
                   ),
                 ],
-              );
-            },
-          ),
-      ],
-    );
-  }
-
-  Widget _buildFeaturesSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SubTitle(
-          text: "Caractéristiques",
-          fontsize: 18,
-          fontWeight: FontWeight.w600,
-        ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: availableFeatures.map((feature) {
-            final isSelected = selectedFeatures.contains(feature);
-            return GestureDetector(
-              onTap: () {
-                setState(() {
-                  if (isSelected) {
-                    selectedFeatures.remove(feature);
-                  } else {
-                    selectedFeatures.add(feature);
-                  }
-                });
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? ConstColors().primary
-                      : ConstColors().tertiary.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: isSelected
-                        ? ConstColors().primary
-                        : ConstColors().tertiary.withOpacity(0.3),
-                  ),
-                ),
-                child: Text(
-                  feature,
-                  style: TextStyle(
-                    color: isSelected ? Colors.white : ConstColors().secondary,
-                    fontSize: 14,
-                    fontWeight: isSelected
-                        ? FontWeight.w500
-                        : FontWeight.normal,
-                  ),
-                ),
               ),
-            );
-          }).toList(),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildNavigationButtons() {
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Row(
-        children: [
-          if (currentPage > 0)
-            Expanded(
-              child: OutlinedButton(
-                onPressed: _previousPage,
-                style: OutlinedButton.styleFrom(
-                  side: BorderSide(color: ConstColors().primary),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+            )
+          else
+            Column(
+              children: [
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      ...selectedImages.asMap().entries.map((entry) {
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 12.0),
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(16),
+                                child: Image.file(
+                                  entry.value,
+                                  width: 100,
+                                  height: 100,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                              Positioned(
+                                top: -8,
+                                right: -8,
+                                child: GestureDetector(
+                                  onTap: () => _removeImage(entry.key),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: const BoxDecoration(
+                                      color: Colors.red,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.close,
+                                      size: 16,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ).animate().scale(duration: 200.ms),
+                        );
+                      }),
+                      if (selectedImages.length < 5)
+                        GestureDetector(
+                          onTap: _pickImages,
+                          child: Container(
+                            width: 100,
+                            height: 100,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: const Color(0xFFE2E8F0),
+                                // dashStyle: BorderStyle.dashed,
+                              ),
+                            ),
+                            child: Icon(
+                              Icons.add_rounded,
+                              color: colors.primary,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
-                child: Text(
-                  "Précédent",
-                  style: TextStyle(
-                    color: ConstColors().primary,
-                    fontSize: 16,
+                const SizedBox(height: 16),
+                Text(
+                  "${selectedImages.length}/5 photos sélectionnées",
+                  style: const TextStyle(
                     fontWeight: FontWeight.w600,
+                    color: Color(0xFF64748B),
                   ),
                 ),
-              ),
+              ],
             ),
-          if (currentPage > 0) const SizedBox(width: 12),
-          Expanded(
-            child: ElevatedButton(
-              onPressed: () {
-                if (currentPage < 2) {
-                  if (_validateCurrentPage()) {
-                    _nextPage();
-                  } else {
-                    _showSnackBar(
-                      'Veuillez remplir tous les champs requis',
-                      isError: true,
-                    );
-                  }
-                } else {
-                  _submitForm();
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: ConstColors().primary,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                padding: const EdgeInsets.symmetric(vertical: 16),
-              ),
-              child: isSubmitting && currentPage == 2
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
-                  : Text(
-                      currentPage < 2 ? "Suivant" : "Publier",
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-            ),
-          ),
         ],
       ),
     );
   }
-}
 
-class _CustomTextField extends StatelessWidget {
-  final TextEditingController controller;
-  final String label;
-  final dynamic icon;
-  final TextInputType? keyboardType;
-  final String? Function(String?)? validator;
-  final int maxLines;
-  final String? suffix;
-
-  const _CustomTextField({
-    required this.controller,
-    required this.label,
-    required this.icon,
-    this.keyboardType,
-    this.validator,
-    this.maxLines = 1,
-    this.suffix,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = ConstColors();
-
-    return TextFormField(
-      controller: controller,
-      keyboardType: keyboardType ?? TextInputType.text,
-      validator: validator,
-      maxLines: maxLines,
-      style: TextStyle(fontSize: 16, color: colors.secondary),
-      decoration: InputDecoration(
-        labelText: label,
-        suffixText: suffix,
-        labelStyle: TextStyle(color: colors.primary, fontSize: 16),
-        suffixStyle: TextStyle(color: colors.primary, fontSize: 14),
-        // prefixIcon: HugeIcon(icon: icon, color: colors.primary, size: 20),
-        filled: true,
-        fillColor: colors.bgSubmit,
-        border: OutlineInputBorder(
-          borderSide: BorderSide.none,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderSide: BorderSide(color: colors.primary, width: 2),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderSide: const BorderSide(color: Colors.red, width: 2),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        focusedErrorBorder: OutlineInputBorder(
-          borderSide: const BorderSide(color: Colors.red, width: 2),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 16,
-        ),
+  Widget _buildPremiumSubmitButton() {
+    return Container(
+      width: double.infinity,
+      height: 60,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: colors.primary.withOpacity(0.3),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
-    );
-  }
-}
-
-class _CustomDropdown extends StatelessWidget {
-  final String? value;
-  final String label;
-  final dynamic icon;
-  final List<String> items;
-  final void Function(String?) onChanged;
-
-  const _CustomDropdown({
-    required this.value,
-    required this.label,
-    required this.icon,
-    required this.items,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = ConstColors();
-
-    return DropdownButtonFormField<String>(
-      value: value,
-      onChanged: onChanged,
-      style: TextStyle(fontSize: 16, color: colors.secondary),
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: TextStyle(color: colors.primary, fontSize: 16),
-        //prefixIcon: HugeIcon(icon: icon, color: colors.primary, size: 20),
-        filled: true,
-        fillColor: colors.bgSubmit,
-        border: OutlineInputBorder(
-          borderSide: BorderSide.none,
-          borderRadius: BorderRadius.circular(12),
+      child: ElevatedButton(
+        onPressed: isSubmitting ? null : _submitForm,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: colors.primary,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          elevation: 0,
         ),
-        focusedBorder: OutlineInputBorder(
-          borderSide: BorderSide(color: colors.primary, width: 2),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 16,
-        ),
+        child: isSubmitting
+            ? const SizedBox(
+                height: 24,
+                width: 24,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 3,
+                ),
+              )
+            : const Text(
+                "Publier l'Offre",
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.5,
+                ),
+              ),
       ),
-      items: items.map((item) {
-        return DropdownMenuItem<String>(value: item, child: Text(item));
-      }).toList(),
     );
   }
 }

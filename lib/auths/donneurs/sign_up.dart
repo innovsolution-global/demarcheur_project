@@ -1,5 +1,4 @@
 
-import 'package:demarcheur_app/auths/donneurs/domain_pref_page.dart';
 import 'package:demarcheur_app/consts/color.dart';
 import 'package:demarcheur_app/widgets/header_page.dart';
 import 'package:demarcheur_app/widgets/sub_title.dart';

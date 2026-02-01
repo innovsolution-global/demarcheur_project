@@ -1,7 +1,8 @@
 import 'package:demarcheur_app/consts/color.dart';
 import 'package:demarcheur_app/models/application_model.dart';
 import 'package:demarcheur_app/providers/application_provider.dart';
-import 'package:demarcheur_app/widgets/title_widget.dart';
+import 'package:demarcheur_app/services/auth_provider.dart';
+import 'package:demarcheur_app/widgets/header_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:hugeicons/hugeicons.dart';
@@ -22,7 +23,13 @@ class _ApplicationPageState extends State<ApplicationPage> {
   void initState() {
     super.initState();
     Future.microtask(() {
-      context.read<ApplicationProvider>().loadApplication();
+      final auth = context.read<AuthProvider>();
+      print('DEBUG: ApplicationPage - User Role: ${auth.role}');
+      context.read<ApplicationProvider>().loadApplication(
+        auth.token,
+        userId: auth.userId,
+        role: auth.role,
+      );
     });
   }
 
@@ -56,38 +63,7 @@ class _ApplicationPageState extends State<ApplicationPage> {
   }
 
   Widget _buildAppBar() {
-    return SliverAppBar.large(
-      expandedHeight: 120,
-      pinned: true,
-      backgroundColor: Colors.white,
-      elevation: 0,
-      automaticallyImplyLeading: false,
-      title: Padding(
-        padding: const EdgeInsets.only(left: 8.0),
-        child: TitleWidget(
-          text: "Candidatures",
-          color: colors.primary,
-          fontSize: 28,
-        ),
-      ),
-      actions: [
-        Container(
-          margin: const EdgeInsets.only(right: 20),
-          decoration: BoxDecoration(
-            color: colors.bgSubmit,
-            shape: BoxShape.circle,
-          ),
-          child: IconButton(
-            onPressed: () {},
-            icon: HugeIcon(
-              icon: HugeIcons.strokeRoundedSearch01,
-              color: colors.primary,
-              size: 24,
-            ),
-          ),
-        ),
-      ],
-    );
+    return Header();
   }
 
   Widget _buildFilterChips(List<String> categories) {
@@ -316,6 +292,8 @@ class _ApplicationPageState extends State<ApplicationPage> {
                     ),
                   ],
                 ),
+                const SizedBox(height: 20),
+                _buildApplicationProgress(app.status),
                 const SizedBox(height: 16),
                 Container(
                   width: double.infinity,
@@ -339,6 +317,112 @@ class _ApplicationPageState extends State<ApplicationPage> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  int _getStatusStep(String status) {
+    status = status.toLowerCase();
+    if (status.contains('accept') ||
+        status.contains('rejet') ||
+        status.contains('accepted') ||
+        status.contains('rejected')) {
+      return 3;
+    } else if (status.contains('interview')) {
+      return 2;
+    } else if (status.contains('attente') ||
+        status.contains('reviewed') ||
+        status.contains('en cours')) {
+      return 1;
+    }
+    return 0; // Default: Soumis
+  }
+
+  Widget _buildApplicationProgress(String status) {
+    int currentStep = _getStatusStep(status);
+    final stages = [
+      {'label': 'Soumise', 'icon': HugeIcons.strokeRoundedCheckmarkCircle01},
+      {'label': 'Étude', 'icon': HugeIcons.strokeRoundedView},
+      {'label': 'Entretien', 'icon': HugeIcons.strokeRoundedCalendar03},
+      {'label': 'Verdict', 'icon': HugeIcons.strokeRoundedGraduateFemale},
+    ];
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: List.generate(stages.length, (index) {
+          bool isCompleted = index <= currentStep;
+          bool isCurrent = index == currentStep;
+          bool isLast = index == stages.length - 1;
+
+          Color stageColor = isCompleted
+              ? colors.primary
+              : Colors.grey.shade300;
+          if (isCurrent && index == 3) {
+            if (status.toLowerCase().contains('rejete') ||
+                status.toLowerCase().contains('rejected')) {
+              stageColor = Colors.red;
+            } else {
+              stageColor = const Color(0xFF10B981); // Success green
+            }
+          }
+
+          return Expanded(
+            child: Row(
+              children: [
+                // Step Circle
+                Column(
+                  children: [
+                    Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: isCompleted
+                            ? stageColor.withOpacity(0.1)
+                            : Colors.transparent,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: stageColor, width: 2),
+                      ),
+                      child: Center(
+                        child: HugeIcon(
+                          icon: stages[index]['icon'] as List<List<dynamic>>,
+                          size: 14,
+                          color: stageColor,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      stages[index]['label'] as String,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: isCompleted
+                            ? FontWeight.bold
+                            : FontWeight.normal,
+                        color: isCompleted ? stageColor : Colors.grey.shade500,
+                      ),
+                    ),
+                  ],
+                ),
+                // Connecting Line
+                if (!isLast)
+                  Expanded(
+                    child: Container(
+                      height: 2,
+                      margin: const EdgeInsets.only(bottom: 14),
+                      decoration: BoxDecoration(
+                        color: index < currentStep
+                            ? stageColor
+                            : Colors.grey.shade200,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          );
+        }),
       ),
     );
   }

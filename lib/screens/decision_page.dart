@@ -1,6 +1,5 @@
 import 'package:demarcheur_app/apps/demandeurs/main_screens/register_page.dart';
 import 'package:demarcheur_app/apps/immo/immo_registration_page.dart';
-import 'package:demarcheur_app/auths/donneurs/domain_pref_page.dart';
 import 'package:demarcheur_app/auths/donneurs/donnor_register.dart';
 import 'package:demarcheur_app/auths/prestataire/prestataire_register.dart';
 import 'package:demarcheur_app/consts/color.dart';
@@ -230,5 +229,9 @@ class _DecisionPageState extends State<DecisionPage> {
         _isLoading = false;
       });
     }
+  } 
+  Future<void> sendMessage(
+    
+  ) async {
   }
 }

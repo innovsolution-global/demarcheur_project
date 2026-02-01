@@ -1,13 +1,15 @@
-import 'package:demarcheur_app/apps/donneurs/main_screens/jobs/job_chat.dart';
-import 'package:demarcheur_app/apps/donneurs/main_screens/jobs/message_page.dart';
 import 'package:demarcheur_app/consts/color.dart';
 import 'package:demarcheur_app/models/house_model.dart';
+import 'package:demarcheur_app/models/send_message_model.dart';
 import 'package:demarcheur_app/providers/house_provider.dart';
+import 'package:demarcheur_app/providers/message_provider.dart';
+import 'package:demarcheur_app/services/auth_provider.dart';
+import 'package:demarcheur_app/services/config.dart';
+import 'package:demarcheur_app/widgets/chat_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:hugeicons/hugeicons.dart';
 import 'package:intl/intl.dart';
-import 'dart:ui';
+import 'package:provider/provider.dart';
 
 class DetailHouse extends StatefulWidget {
   final HouseModel house;
@@ -18,237 +20,120 @@ class DetailHouse extends StatefulWidget {
   State<DetailHouse> createState() => _DetailHouseState();
 }
 
-class _DetailHouseState extends State<DetailHouse>
-    with TickerProviderStateMixin {
-  int _currentImageIndex = 0;
-  final PageController _pageController = PageController();
-  final ConstColors colors = ConstColors();
-  late AnimationController _fadeController;
-  late Animation<double> _fadeAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _fadeController = AnimationController(
-      duration: const Duration(milliseconds: 800),
-      vsync: this,
-    );
-    _fadeAnimation = CurvedAnimation(
-      parent: _fadeController,
-      curve: Curves.easeOut,
-    );
-    _fadeController.forward();
-  }
-
-  @override
-  void dispose() {
-    _pageController.dispose();
-    _fadeController.dispose();
-    super.dispose();
-  }
+class _DetailHouseState extends State<DetailHouse> {
+  final ConstColors _color = ConstColors();
 
   @override
   Widget build(BuildContext context) {
+    final house = widget.house;
+    final sendMessagePro = context.read<MessageProvider>();
+    final message = sendMessagePro.listMessag.isNotEmpty
+        ? sendMessagePro.listMessag.first
+        : SendMessageModel(
+            id: '',
+            content: '',
+            senderId: '',
+            receiverId: '',
+            userName: '',
+            timestamp: DateTime.now(),
+          );
+
     return Scaffold(
-      backgroundColor: const Color(
-        0xFFF5F7FA,
-      ), // Slightly off-white for premium feel
-      body: Stack(
-        children: [
-          CustomScrollView(
-            physics: const BouncingScrollPhysics(),
-            slivers: [
-              _buildSliverAppBar(),
-              SliverToBoxAdapter(
-                child: FadeTransition(
-                  opacity: _fadeAnimation,
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 24, 20, 100),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildHeaderInfo(),
-                        const SizedBox(height: 24),
-                        _buildAgentCard(),
-                        const SizedBox(height: 24),
-                        _buildSectionTitle("Caractéristiques"),
-                        const SizedBox(height: 16),
-                        _buildFeaturesList(),
-                        const SizedBox(height: 24),
-                        _buildSectionTitle("Description"),
-                        const SizedBox(height: 12),
-                        _buildDescription(),
-                        const SizedBox(height: 24),
-                        _buildSectionTitle("Localisation"),
-                        const SizedBox(height: 12),
-                        _buildLocationCard(),
-                      ],
-                    ),
-                  ),
-                ),
+      backgroundColor: Colors.white,
+      body: CustomScrollView(
+        slivers: [
+          _buildSliverAppBar(house),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildHeaderInfo(house),
+                  const SizedBox(height: 32),
+                  _buildQuickFeatures(house),
+                  const SizedBox(height: 32),
+                  _buildDescription(house),
+                  const SizedBox(height: 32),
+                  _buildAmenities(house),
+                  const SizedBox(height: 32),
+                  _buildOwnerCard(house),
+                  const SizedBox(height: 120), // Space for bottom bar
+                ],
               ),
-            ],
+            ),
           ),
-          _buildBottomBar(),
         ],
       ),
+      bottomSheet: _buildBottomBar(house, message),
     );
   }
 
-  Widget _buildSliverAppBar() {
+  Widget _buildSliverAppBar(HouseModel house) {
     return SliverAppBar(
       expandedHeight: 400,
       pinned: true,
-      backgroundColor: colors.primary,
-      elevation: 0,
-      systemOverlayStyle: SystemUiOverlayStyle.light,
-      leading: Container(
-        margin: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: IconButton(
-          onPressed: () => Navigator.pop(context),
-          icon: HugeIcon(
-            icon: HugeIcons.strokeRoundedArrowTurnBackward,
-            color: colors.primary,
-            size: 20,
+      stretch: true,
+      backgroundColor: Colors.white,
+      leading: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: CircleAvatar(
+          backgroundColor: Colors.white.withOpacity(0.9),
+          child: IconButton(
+            icon: Icon(
+              Icons.arrow_back_ios_new,
+              color: _color.secondary,
+              size: 18,
+            ),
+            onPressed: () => Navigator.pop(context),
           ),
         ),
       ),
-
+      actions: [
+        Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: CircleAvatar(
+            backgroundColor: Colors.white.withOpacity(0.9),
+            child: IconButton(
+              icon: Icon(
+                Icons.share_outlined,
+                color: _color.secondary,
+                size: 20,
+              ),
+              onPressed: () {},
+            ),
+          ),
+        ),
+      ],
       flexibleSpace: FlexibleSpaceBar(
         background: Stack(
           fit: StackFit.expand,
           children: [
-            PageView.builder(
-              controller: _pageController,
-              itemCount: widget.house.imageUrl.length,
-              onPageChanged: (index) {
-                setState(() => _currentImageIndex = index);
-              },
-              itemBuilder: (context, index) {
-                return Hero(
-                  tag: 'house_image_${widget.house.id}_$index',
-                  child: Image.network(
-                    widget.house.imageUrl[index],
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
-                      color: colors.tertiary,
-                      child: Icon(
-                        Icons.image_not_supported,
-                        color: colors.bgSubmit,
-                        size: 50,
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-            // Gradient Overlay for text readability
-            Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.black.withOpacity(0.3),
-                    Colors.transparent,
-                    Colors.transparent,
-                    Colors.black.withOpacity(0.6),
-                  ],
-                  stops: const [0.0, 0.2, 0.7, 1.0],
+            Image.network(
+              Config.getImgUrl(
+                    house.imageUrl.isNotEmpty ? house.imageUrl.first : null,
+                  ) ??
+                  "https://via.placeholder.com/400x400",
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => Container(
+                color: Colors.grey[200],
+                child: Icon(
+                  Icons.home_outlined,
+                  size: 80,
+                  color: Colors.grey[400],
                 ),
               ),
             ),
-            // Navigation Arrows
-            if (widget.house.imageUrl.length > 1) ...[
-              // Left Arrow
-              if (_currentImageIndex > 0)
-                Positioned(
-                  left: 16,
-                  top: 0,
-                  bottom: 0,
-                  child: Center(
-                    child: GestureDetector(
-                      onTap: () {
-                        _pageController.previousPage(
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeInOut,
-                        );
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.black,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.2),
-                          ),
-                        ),
-                        child: const Icon(
-                          Icons.arrow_back_ios_new_rounded,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              // Right Arrow
-              if (_currentImageIndex < widget.house.imageUrl.length - 1)
-                Positioned(
-                  right: 16,
-                  top: 0,
-                  bottom: 0,
-                  child: Center(
-                    child: GestureDetector(
-                      onTap: () {
-                        _pageController.nextPage(
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeInOut,
-                        );
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.black,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.2),
-                          ),
-                        ),
-                        child: const Icon(
-                          Icons.arrow_forward_ios_rounded,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-            // Image Indicator
-            Positioned(
-              bottom: 20,
-              right: 20,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.5),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.white.withOpacity(0.2)),
-                ),
-                child: Text(
-                  "${_currentImageIndex + 1} / ${widget.house.imageUrl.length}",
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                  ),
+            const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                  colors: [
+                    Colors.black38,
+                    Colors.transparent,
+                    Colors.transparent,
+                  ],
                 ),
               ),
             ),
@@ -258,140 +143,260 @@ class _DetailHouseState extends State<DetailHouse>
     );
   }
 
-  Widget _buildHeaderInfo() {
+  Widget _buildHeaderInfo(HouseModel house) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: colors.primary.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      widget.house.category.toUpperCase(),
-                      style: TextStyle(
-                        color: colors.primary,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    widget.house.type,
-                    style: TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.bold,
-                      color: colors.primary,
-                      height: 1.2,
-                    ),
-                  ),
-                ],
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: _color.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                house.countType ?? "Propriété",
+                style: TextStyle(
+                  color: _color.primary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
               ),
             ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  "${NumberFormat("#,###").format(widget.house.rent)} GNF",
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w900,
-                    color: colors.primary,
-                  ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: house.status == 'AVAILABLE'
+                    ? Colors.green.withOpacity(0.1)
+                    : Colors.red.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                house.status == 'AVAILABLE' ? 'Disponible' : 'Occupé',
+                style: TextStyle(
+                  color: house.status == 'AVAILABLE'
+                      ? Colors.green
+                      : Colors.red,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
                 ),
-                Text(
-                  "/ mois",
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[600],
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
+              ),
             ),
           ],
         ),
         const SizedBox(height: 16),
+        Text(
+          house.title ?? house.countType ?? "Sans titre",
+          style: TextStyle(
+            fontSize: 28,
+            fontWeight: FontWeight.w900,
+            color: _color.secondary,
+            letterSpacing: -0.5,
+          ),
+        ),
+        const SizedBox(height: 12),
         Row(
           children: [
-            HugeIcon(
-              icon: HugeIcons.strokeRoundedLocation01,
-              color: Colors.grey[500],
-              size: 18,
-            ),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                widget.house.location,
-                style: TextStyle(
-                  fontSize: 15,
-                  color: Colors.grey[600],
-                  fontWeight: FontWeight.w500,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+            Icon(Icons.location_on_rounded, color: Colors.grey[400], size: 18),
+            const SizedBox(width: 4),
+            Text(
+              house.location ?? "Lieu non spécifié",
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey[600],
+                fontWeight: FontWeight.w500,
               ),
             ),
-            Row(
-              children: [
-                Icon(Icons.star_rounded, color: colors.impression, size: 20),
-                const SizedBox(width: 4),
-                Text(
-                  widget.house.rate.toString(),
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: colors.primary,
-                  ),
-                ),
-              ],
-            ),
           ],
+        ),
+        const SizedBox(height: 24),
+        Text(
+          "${NumberFormat('#,###').format(house.rent).replaceAll(',', '.')} GNF",
+          style: TextStyle(
+            fontSize: 32,
+            fontWeight: FontWeight.w900,
+            color: _color.primary,
+          ),
+        ),
+        Text(
+          "par mois",
+          style: TextStyle(
+            fontSize: 14,
+            color: Colors.grey[500],
+            fontWeight: FontWeight.w500,
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildAgentCard() {
+  Widget _buildQuickFeatures(HouseModel house) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 15,
-            offset: const Offset(0, 5),
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.grey[100]!),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _FeatureItem(
+            icon: Icons.meeting_room_outlined,
+            label: "Chambres",
+            value: "${house.rooms ?? 0}",
+          ),
+          _FeatureItem(
+            icon: Icons.weekend_outlined,
+            label: "Salons",
+            value: "${house.livingRooms ?? 0}",
+          ),
+          _FeatureItem(
+            icon: Icons.square_foot_outlined,
+            label: "Surface",
+            value: "${house.area ?? 0} m²",
+          ),
+          _FeatureItem(
+            icon: Icons.garage_outlined,
+            label: "Garage",
+            value: "${house.garage ?? 0}",
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildDescription(HouseModel house) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          "Description",
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: _color.secondary,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          house.description ??
+              "Cette magnifique propriété située à ${house.location} offre un cadre de vie exceptionnel. Parfaitement entretenue, elle dispose de grands espaces lumineux et d'aménagements modernes.",
+          style: TextStyle(fontSize: 16, color: Colors.grey[600], height: 1.6),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAmenities(HouseModel house) {
+    final List<Map<String, dynamic>> amenities = [
+      if (house.kitchen != null && house.kitchen! > 0)
+        {"icon": Icons.kitchen_outlined, "label": "Cuisine"},
+      if (house.garden == true)
+        {"icon": Icons.park_outlined, "label": "Jardin"},
+      if (house.piscine != null && house.piscine! > 0)
+        {"icon": Icons.pool_outlined, "label": "Piscine"},
+      if (house.store != null && house.store! > 0)
+        {"icon": Icons.store_mall_directory_outlined, "label": "Magasin"},
+    ];
+
+    if (amenities.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          "Commodités",
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: _color.secondary,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: amenities.map((item) {
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Colors.grey[200]!),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.02),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    item["icon"] as IconData,
+                    size: 18,
+                    color: _color.primary,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    item["label"] as String,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: _color.secondary,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildOwnerCard(HouseModel house) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: _color.secondary.withOpacity(0.03),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: _color.secondary.withOpacity(0.05)),
       ),
       child: Row(
         children: [
           Container(
-            width: 50,
-            height: 50,
+            width: 64,
+            height: 64,
             decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              image: DecorationImage(
-                image: NetworkImage(widget.house.logo),
-                fit: BoxFit.cover,
-              ),
-              border: Border.all(color: colors.tertiary, width: 2),
+              borderRadius: BorderRadius.circular(16),
+              color: Colors.grey[200],
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Config.getImgUrl(house.logo) != null
+                  ? Image.network(
+                      Config.getImgUrl(house.logo)!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Icon(
+                        Icons.business,
+                        size: 32,
+                        color: Colors.grey[400],
+                      ),
+                    )
+                  : Icon(Icons.business, size: 32, color: Colors.grey[400]),
             ),
           ),
           const SizedBox(width: 16),
@@ -400,234 +405,169 @@ class _DetailHouseState extends State<DetailHouse>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  widget.house.companyName,
+                  house.companyName ?? "Agence Immo",
                   style: TextStyle(
-                    fontSize: 16,
+                    fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: colors.primary,
+                    color: _color.secondary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  "Professionnel vérifié",
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[500],
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBottomBar(HouseModel house, SendMessageModel message) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 40),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 30,
+            offset: const Offset(0, -10),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  "Loyer mensuel",
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[500],
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  "Agence Immobilière",
-                  style: TextStyle(fontSize: 13, color: Colors.grey[500]),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: colors.bgSubmit,
-              shape: BoxShape.circle,
-            ),
-            child: HugeIcon(
-              icon: HugeIcons.strokeRoundedBubbleChat,
-              color: colors.primary,
-              size: 20,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSectionTitle(String title) {
-    return Text(
-      title,
-      style: TextStyle(
-        fontSize: 18,
-        fontWeight: FontWeight.bold,
-        color: colors.primary,
-      ),
-    );
-  }
-
-  Widget _buildFeaturesList() {
-    // Using static data for demo as per previous implementation, but styled better
-    final features = [
-      {'icon': HugeIcons.strokeRoundedBed, 'label': '4 Chambres'},
-      {'icon': HugeIcons.strokeRoundedBathtub01, 'label': '2 Douches'},
-      {'icon': HugeIcons.strokeRoundedKitchenUtensils, 'label': '1 Cuisine'},
-      {'icon': HugeIcons.strokeRoundedBlackHole, 'label': '1 Balcon'},
-    ];
-
-    return SizedBox(
-      height: 100,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: features.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 12),
-        itemBuilder: (context, index) {
-          return Container(
-            width: 100,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: colors.bgSubmit),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: colors.primary.withOpacity(0.05),
-                    shape: BoxShape.circle,
-                  ),
-                  child: HugeIcon(
-                    icon: features[index]['icon'] as List<List<dynamic>>,
-                    color: colors.primary,
-                    size: 22,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  features[index]['label'] as String,
-                  textAlign: TextAlign.center,
+                  "${NumberFormat.compact().format(house.rent)} GNF",
                   style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: colors.secondary,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                    color: _color.primary,
                   ),
                 ),
               ],
             ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildDescription() {
-    return Text(
-      "Cette magnifique propriété située à ${widget.house.location} offre un cadre de vie exceptionnel. ${widget.house.countType}. Parfaitement entretenue, elle dispose de grands espaces lumineux et d'aménagements modernes pour votre confort quotidien.",
-      style: TextStyle(fontSize: 15, height: 1.6, color: Colors.grey[600]),
-    );
-  }
-
-  Widget _buildLocationCard() {
-    return Container(
-      height: 150,
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: colors.tertiary,
-        borderRadius: BorderRadius.circular(20),
-        image: const DecorationImage(
-          image: NetworkImage(
-            "https://static.vecteezy.com/system/resources/previews/000/153/588/original/vector-roadmap-location-map.jpg",
-          ), // Placeholder map
-          fit: BoxFit.cover,
-        ),
-      ),
-      child: Stack(
-        children: [
-          Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              color: Colors.black.withOpacity(0.1),
-            ),
           ),
-          Center(
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.2),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
+          const SizedBox(width: 16),
+          Expanded(
+            flex: 2,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                HapticFeedback.mediumImpact();
+                final authProvider = Provider.of<AuthProvider>(
+                  context,
+                  listen: false,
+                );
+                final currentUserId = authProvider.userId ?? '';
+
+                final newMessage = SendMessageModel(
+                  id: '', // Will be generated by backend or unused for new chat
+                  content: '',
+                  senderId: currentUserId,
+                  receiverId:
+                      house.companyId ??
+                      house.ownerId ??
+                      '', // Use company or owner ID
+                  userName: house.companyName ?? 'Agence Immo',
+                  userPhoto: house.logo,
+                  timestamp: DateTime.now(),
+                );
+
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        ChatWidget(pageType: 'Searcher', message: newMessage),
                   ),
-                ],
+                );
+              },
+              icon: const Icon(Icons.chat_bubble_outline_rounded, size: 20),
+              label: const Text("Contacter"),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _color.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 20),
+                elevation: 8,
+                shadowColor: _color.primary.withOpacity(0.4),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(18),
+                ),
               ),
-              child: Icon(Icons.location_on, color: colors.primary, size: 30),
             ),
           ),
         ],
       ),
     );
   }
+}
 
-  Widget _buildBottomBar() {
-    return Positioned(
-      bottom: 0,
-      left: 0,
-      right: 0,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 20,
-              offset: const Offset(0, -5),
-            ),
-          ],
-        ),
-        child: SafeArea(
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      "Prix total",
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[500],
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    Text(
-                      "${NumberFormat.compact().format(widget.house.rent)} GNF",
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: colors.primary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 20),
-              Expanded(
-                flex: 2,
-                child: ElevatedButton(
-                  onPressed: () {
-                    HapticFeedback.mediumImpact();
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => JobChat(presta: widget.house),
-                      ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: colors.primary,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  child: const Text(
-                    "Contacter",
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ),
+class _FeatureItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _FeatureItem({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10),
             ],
           ),
+          child: Icon(icon, color: ConstColors().primary, size: 24),
         ),
-      ),
+        const SizedBox(height: 12),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+            color: ConstColors().secondary,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey[500],
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
     );
   }
 }

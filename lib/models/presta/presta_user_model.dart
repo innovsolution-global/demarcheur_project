@@ -1,3 +1,5 @@
+import 'package:demarcheur_app/services/config.dart';
+
 class PrestaUserModel {
   final String? id;
   final String companyName;
@@ -22,12 +24,16 @@ class PrestaUserModel {
     return PrestaUserModel(
       id: json['id'],
       companyName: json['companyName'],
-      imageUrl: json['imageUrl'],
+      imageUrl: (json['imageUrl'] as List? ?? [])
+          .map((e) => Config.getImgUrl(e.toString()))
+          .where((e) => e != null)
+          .cast<String>()
+          .toList(),
       location: json['location'],
       status: json['status'],
       categorie: json['categorie'],
       about: json['about'],
-      salary: json['salary'].toString() as int,
+      salary: int.tryParse(json['salary']?.toString() ?? '0') ?? 0,
     );
   }
 

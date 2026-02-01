@@ -1,3 +1,5 @@
+import 'package:demarcheur_app/services/config.dart';
+
 class AddVancyModel {
   String? id;
   String title;
@@ -8,7 +10,7 @@ class AddVancyModel {
   int salary;
   String deadline;
   String city;
-  String companyId;
+  String? companyId;
   List reqProfile;
   List conditions;
   List benefits;
@@ -22,7 +24,7 @@ class AddVancyModel {
     this.id,
     required this.benefits,
     required this.city,
-    required this.companyId,
+    this.companyId,
     required this.conditions,
     required this.deadline,
     required this.description,
@@ -41,7 +43,7 @@ class AddVancyModel {
 
   factory AddVancyModel.fromJson(Map<String, dynamic> json) {
     return AddVancyModel(
-      id: json['id']?.toString(),
+      id: (json['id'] ?? json['_id'])?.toString(),
       title: json['title']?.toString() ?? '',
       description: json['description']?.toString() ?? '',
       typeJobe: (json['typeJobe'] ?? json['typeJob'] ?? '')?.toString() ?? '',
@@ -50,36 +52,43 @@ class AddVancyModel {
       salary: int.tryParse(json['salary']?.toString() ?? '0') ?? 0,
       deadline: json['deadline']?.toString() ?? '',
       city: (json['city'] ?? json['location'] ?? '')?.toString() ?? '',
-      companyId: (json['companyId'] ?? json['entrepriseId'] ?? '')?.toString() ?? '',
+      companyId: (json['companyId'] ?? json['entrepriseId'] ?? json['ownerId'] ?? '')?.toString(),
       reqProfile: json['reqProfile'] ?? json['requiredProdfile'] ?? json['requiredProfile'] ?? [],
       conditions: json['conditions'] ?? [],
       benefits: json['benefits'] ?? [],
       missions: json['missions'] ?? [],
       otherInfo: json['otherInfo'] ?? json['otherInfos'] ?? [],
       companyName: json['companyName']?.toString() ?? json['entrepriseName']?.toString(),
-      companyImage: json['companyPicture']?.toString() ?? json['entreprisePicture']?.toString(),
+      companyImage: Config.getImgUrl((json['companyPicture'] ?? 
+                     json['entreprisePicture'] ??
+                     json['companyPhoto'] ??
+                     json['entreprisePhoto'] ??
+                     json['photoPath'] ??
+                     json['photo_path'] ??
+                     json['profilePath'] ??
+                     json['companyImage'] ??
+                     json['image_url'] ??
+                     json['image'] ??
+                     json['photo'])?.toString()),
       createdAt: json['createdAt']?.toString() ?? json['dateCreation']?.toString(),
     );
   }
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'title': title,
-    'description': description,
-    'typeJob': typeJobe,
-    'level': level,
-    'experience': experience,
-    'salary': salary,
-    'deadline': deadline,
-    'city': city,
-    'companyId': companyId,
-
-    'reqProfile': reqProfile,
-    'conditions': conditions,
-    'benefits': benefits,
-    'missions': missions,
-    'otherInfo': otherInfo,
-    'companyName': companyName,
-    'companyPicture': companyImage,
-    'createdAt': createdAt,
-  };
+  Map<String, dynamic> toJson() {
+    return {
+      'title': title,
+      'description': description,
+      'typeJob': typeJobe,
+      'level': level,
+      'experience': experience,
+      'salary': salary,
+      'deadline': deadline,
+      'city': city,
+      'companyId': companyId,
+      'reqProfile': reqProfile,
+      'conditions': conditions,
+      'benefits': benefits,
+      'missions': missions,
+      'otherInfo': otherInfo,
+    };
+  }
 }

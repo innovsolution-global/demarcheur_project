@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:chat_plugin/chat_plugin.dart';
 import 'package:demarcheur_app/services/config.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -22,7 +21,7 @@ class AuthService {
           await pref.setString("token", data["token"]);
 
           //CHAT PLUGIN
-          await initilizedChatPlugin();
+         // await initilizedChatPlugin();
           await Future.delayed(Duration(milliseconds: 500));
           return true;
         }
@@ -36,7 +35,7 @@ class AuthService {
   Future<bool> registerUser(String email, String password) async {
     try {
       final response = await http.post(
-        Uri.parse("${Config.baseUrl}"),
+        Uri.parse(Config.baseUrl),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'email': email, 'password': password}),
       );
@@ -46,10 +45,6 @@ class AuthService {
           SharedPreferences pref = await SharedPreferences.getInstance();
           await pref.setString("userId", data["userId"]);
           await pref.setString("token", data["token"]);
-
-          //CHAT PLUGIN
-          await initilizedChatPlugin();
-          await Future.delayed(Duration(milliseconds: 500));
           return true;
         }
       }
@@ -76,11 +71,6 @@ class AuthService {
 
   static Future<void> logout(BuildContext context) async {
     SharedPreferences pref = await SharedPreferences.getInstance();
-    try {
-      if (ChatConfig.instance.userId != null) {
-        ChatPlugin.chatService.fullDisconnect();
-      }
-    } catch (ex) {}
     await pref.remove("userId");
     await pref.remove("token");
     await pref.clear();
@@ -88,78 +78,6 @@ class AuthService {
     Navigator.of(context).pushNamed("onloading");
   }
 
-  static Future<void> initilizedChatPlugin() async {
-    final userId = await AuthService.getUser();
-    final token = await AuthService.getUserToken();
-
-    await ChatPlugin.initialize(
-      config: ChatConfig(
-        apiUrl: Config.baseUrl,
-        userId: userId,
-        token: token,
-        enableOnlineStatus: true,
-        enableReadReceipts: true,
-        enableTypingIndicators: true,
-        autoMarkAsRead: true,
-        maxReconnectionAttempts: 5,
-        debugMode: true,
-      ),
-    );
-    await setupChatApiHandler(userId!, token!);
-    await ChatPlugin.chatService.initialize();
-    await ChatPlugin.chatService.loadChatRooms();
-  }
-
-  static Future<void> setupChatApiHandler(String userId, String token) async {
-    final apiHandler = ChatApiHandlers(
-      loadMessagesHandler: ({limit = 20, page = 1, searchText = ""}) async {
-        final receiverId = ChatPlugin.chatService.receiverId;
-        if (receiverId.isEmpty) return [];
-        try {
-          var url =
-              "${Config.baseUrl}/api/chat/messages?currentUserId=$userId&receiverId=$receiverId&page=$page&limit=$limit";
-          if (searchText.isNotEmpty) {
-            url += "&searchText=${Uri.encodeComponent(searchText)}";
-          }
-          final response = await http.get(
-            Uri.parse(url),
-            headers: {
-              "Authorization": "Bearer $token",
-              "Content=Type": "application/json",
-            },
-          );
-          if (response.statusCode == 200) {
-            final List<dynamic> data = jsonDecode(response.body);
-            return data.map((msg) => ChatMessage.fromMap(msg, userId)).toList();
-          }
-          return [];
-        } catch (ex) {
-          return [];
-        }
-      },
-      loadChatRoomsHandler: () async {
-        try {
-          var url = "${Config.baseUrl}/api/chat/chat-room";
-
-          final response = await http.get(
-            Uri.parse(url),
-            headers: {
-              "Authorization": "Bearer $token",
-              "Content=Type": "application/json",
-            },
-          );
-          if (response.statusCode == 200) {
-            final List<dynamic> data = jsonDecode(response.body);
-            return data.map((room) => ChatRoom.fromMap(room)).toList();
-          }
-          return [];
-        } catch (ex) {
-          return [];
-        }
-      },
-    );
-    ChatPlugin.chatService.setApiHandlers(apiHandler);
-  }
 
   Future<List<dynamic>> fetchUser() async {
     var getUser = getUserToken();

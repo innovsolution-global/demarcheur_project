@@ -1,6 +1,6 @@
-// application_provider.dart
 import 'package:flutter/foundation.dart';
 import '../models/application_model.dart';
+import '../services/api_service.dart';
 
 class ApplicationProvider extends ChangeNotifier {
   List<ApplicationModel> _allapplication = [];
@@ -32,57 +32,83 @@ class ApplicationProvider extends ChangeNotifier {
     return result;
   }
 
-  // Simulated async load (fills sample data)
-  Future<void> loadApplication() async {
+  // Load from API
+  Future<void> loadApplication(
+    String? token, {
+    String? userId,
+    String? role,
+  }) async {
     _isLoading = true;
     notifyListeners();
-    debugPrint('[ApplicationProvider] loadApplication started');
+    print(
+      '[ApplicationProvider] loadApplication started - token: ${token != null}, userId: $userId, role: $role',
+    );
+
+    if (userId == null) {
+      print('[ApplicationProvider] loadApplication ABORT: userId is null');
+      _isLoading = false;
+      notifyListeners();
+      return;
+    }
 
     try {
-      await Future.delayed(const Duration(seconds: 5));
-      _allapplication = [
-        ApplicationModel(
-          id: 1,
-          companyName: "TechCorp",
-          title: "Flutter Developer",
-          status: "En attente",
-          logo: "https://placehold.co/100x100",
-          location: "Conakry",
-          postDate: 'il y a 2 jours',
-          jobStatus: "Disponible",
-        ),
-        ApplicationModel(
-          id: 2,
-          companyName: "CodeHub",
-          title: "Backend Engineer",
-          status: "Interview",
-          logo: "https://placehold.co/100x100",
-          location: "Labe",
-          postDate: 'il y a 10 minutes',
-          jobStatus: "Disponible",
-        ),
-        ApplicationModel(
-          id: 3,
-          companyName: "Google",
-          title: "UI/UX Designer",
-          status: "Accepte",
-          logo: "https://placehold.co/100x100",
-          location: "Conakry",
-          postDate: 'il y a 2 jours',
-          jobStatus: "Plus disponible",
-        ),
-      ];
+      List<ApplicationModel> results = [];
+
+      if (role == 'GIVER') {
+        // Employers (Givers) view candidates who applied to their jobs
+        print(
+          '[ApplicationProvider] Role GIVER detected. Fetching incoming candidates...',
+        );
+        final candidates = await ApiService().getEnterpriseCandidates(
+          userId,
+          token,
+        );
+
+        // Map CandidateModel to ApplicationModel
+        results = candidates.map((c) {
+          final applicantName = c.applicant?.name ?? 'Candidat inconnu';
+          final applicantPhoto =
+              c.applicant?.photo ?? 'https://placehold.co/100x100';
+
+          return ApplicationModel(
+            id: c.id ?? '',
+            companyName:
+                'Pour: Offre #${c.jobId.length > 4 ? c.jobId.substring(0, 4) : c.jobId}...',
+            title: applicantName,
+            status: c.status ?? 'En attente',
+            logo: applicantPhoto,
+            location: c.applicant?.location ?? 'N/A',
+            postDate: c.createdAt ?? 'N/A',
+            jobStatus: 'Actif',
+          );
+        }).toList();
+      } else {
+        // Job Seekers (Prestataires) view their own applications
+        print(
+          '[ApplicationProvider] Role $role detected. Fetching my applications...',
+        );
+        final data = await ApiService().getUserApplications(
+          token,
+          userId: userId,
+        );
+        results = data.map((json) => ApplicationModel.fromJson(json)).toList();
+      }
+
+      _allapplication = results;
       _allApp = _allapplication;
       _isLoading = false;
       notifyListeners();
-      debugPrint(
-        '[ApplicationProvider] loaded ${_allapplication.length} items',
+      print(
+        '[ApplicationProvider] loaded ${_allapplication.length} items from API',
       );
     } catch (ex, st) {
-      debugPrint('[ApplicationProvider] loadApplication ERROR: $ex\n$st');
+      print('[ApplicationProvider] loadApplication ERROR: $ex\n$st');
+      _isLoading = false;
+      notifyListeners();
     }
   }
-List<ApplicationModel> _filteredUsers = [];
+
+  List<ApplicationModel> _filteredUsers = [];
   String _searchQuery = '';
 
   List<ApplicationModel> get users =>
@@ -93,8 +119,10 @@ List<ApplicationModel> _filteredUsers = [];
     if (query.isEmpty) {
       _filteredUsers = [];
     } else {
-_allapplication          .where((user) =>
-              user.title.toLowerCase().contains(query.toLowerCase()))
+      _filteredUsers = _allapplication
+          .where(
+            (user) => user.title.toLowerCase().contains(query.toLowerCase()),
+          )
           .toList();
     }
     notifyListeners();

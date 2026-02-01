@@ -217,7 +217,7 @@ class _EditNotificationState extends State<EditNotification>
         trailing: Switch(
           value: value,
           onChanged: onChanged,
-          activeColor: colors.primary,
+          activeThumbColor: colors.primary,
           activeTrackColor: colors.primary.withOpacity(0.3),
           inactiveThumbColor: colors.secondary.withOpacity(0.5),
           inactiveTrackColor: colors.tertiary,
@@ -314,7 +314,7 @@ class _EditNotificationState extends State<EditNotification>
                     _showMessage('Son de notification mis à jour');
                   },
                 );
-              }).toList(),
+              }),
               const SizedBox(height: 20),
             ],
           ),
@@ -377,7 +377,7 @@ class _EditNotificationState extends State<EditNotification>
                       : 'Mode silencieux désactivé',
                 );
               },
-              activeColor: colors.cour,
+              activeThumbColor: colors.cour,
               activeTrackColor: colors.cour.withOpacity(0.3),
             ),
           ),

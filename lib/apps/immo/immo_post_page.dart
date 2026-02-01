@@ -3,10 +3,15 @@ import 'package:demarcheur_app/consts/color.dart';
 import 'package:demarcheur_app/widgets/immo_header.dart';
 import 'package:demarcheur_app/widgets/title_widget.dart';
 import 'package:demarcheur_app/widgets/sub_title.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:demarcheur_app/models/house_model.dart';
+import 'package:demarcheur_app/models/type_properties.dart';
+import 'package:demarcheur_app/services/auth_provider.dart';
+import 'package:provider/provider.dart';
 
 class ImmoPostPage extends StatefulWidget {
   const ImmoPostPage({super.key});
@@ -27,10 +32,18 @@ class _ImmoPostPageState extends State<ImmoPostPage>
   final _priceController = TextEditingController();
   final _areaController = TextEditingController();
   final _addressController = TextEditingController();
+  final _districtController = TextEditingController();
+  final _cityController = TextEditingController();
   final _bedroomsController = TextEditingController();
+  final _livingRoomsController = TextEditingController();
   final _bathroomsController = TextEditingController();
   final _floorController = TextEditingController();
   final _yearBuiltController = TextEditingController();
+  final _garageController = TextEditingController();
+  final _kitchenController = TextEditingController();
+  final _storeController = TextEditingController();
+  final _otherDescriptionController = TextEditingController();
+  final _advantageController = TextEditingController();
 
   // Form State
   String? selectedPropertyType;
@@ -40,26 +53,13 @@ class _ImmoPostPageState extends State<ImmoPostPage>
   String? selectedEnergyRating;
   List<File> selectedImages = [];
   List<String> selectedFeatures = [];
+  bool hasGarden = false;
   int currentPage = 0;
   bool isSubmitting = false;
 
   // Animation Controller
   late AnimationController _animationController;
   late Animation<double> _slideAnimation;
-
-  // Property Types
-  final List<String> propertyTypes = [
-    'Appartement',
-    'Maison',
-    'Villa',
-    'Studio',
-    'Duplex',
-    'Penthouse',
-    'Loft',
-    'Terrain',
-    'Local commercial',
-    'Bureau',
-  ];
 
   // Transaction Types
   final List<String> transactionTypes = [
@@ -121,6 +121,10 @@ class _ImmoPostPageState extends State<ImmoPostPage>
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
     _animationController.forward();
+    debugPrint("DEBUG: ImmoPostPage.initState - calling loadPropertyTypes");
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<AuthProvider>().loadPropertyTypes();
+    });
   }
 
   @override
@@ -130,14 +134,26 @@ class _ImmoPostPageState extends State<ImmoPostPage>
     _priceController.dispose();
     _areaController.dispose();
     _addressController.dispose();
+    _districtController.dispose();
+    _cityController.dispose();
     _bedroomsController.dispose();
+    _livingRoomsController.dispose();
     _bathroomsController.dispose();
     _floorController.dispose();
     _yearBuiltController.dispose();
+    _garageController.dispose();
+    _kitchenController.dispose();
+    _storeController.dispose();
+    _otherDescriptionController.dispose();
+    _advantageController.dispose();
     _pageController.dispose();
     _animationController.dispose();
     super.dispose();
   }
+
+  final bool _isLoading = false;
+
+  void _submitingPost() async {}
 
   Future<void> _pickImages() async {
     try {
@@ -248,17 +264,97 @@ class _ImmoPostPageState extends State<ImmoPostPage>
     });
 
     // Simulate API call
-    await Future.delayed(const Duration(seconds: 2));
+    try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-    if (mounted) {
-      setState(() {
-        isSubmitting = false;
-      });
+      if (authProvider.propertyTypes.isEmpty) {
+        debugPrint(
+          "DEBUG: _submitForm - propertyTypes empty, attempting to load...",
+        );
+        await authProvider.loadPropertyTypes();
+      }
 
-      _showSnackBar('Annonce publiée avec succès!');
+      debugPrint(
+        "DEBUG: _submitForm - selectedPropertyType: $selectedPropertyType",
+      );
+      debugPrint(
+        "DEBUG: _submitForm - Total propertyTypes in provider: ${authProvider.propertyTypes.length}",
+      );
+      for (var pt in authProvider.propertyTypes) {
+        debugPrint("DEBUG: PT ID: ${pt.id}, Name: ${pt.tyPePropertyName}");
+      }
 
-      // Navigate back or to success page
-      Navigator.pop(context);
+      final matchedType = authProvider.propertyTypes.firstWhere(
+        (t) =>
+            t.tyPePropertyName.trim().toLowerCase() ==
+            selectedPropertyType?.trim().toLowerCase(),
+        orElse: () => TypeProperties(tyPePropertyName: '', typeEnum: ''),
+      );
+      debugPrint("DEBUG: _submitForm - Matched ID: ${matchedType.id}");
+
+      if (matchedType.id == null) {
+        _showSnackBar('Type de propriété invalide', isError: true);
+        setState(() => isSubmitting = false);
+        return;
+      }
+
+      final house = HouseModel(
+        ownerId: authProvider.userId,
+        companyId: authProvider.userId,
+        companyName: _titleController.text,
+        title: _titleController.text,
+        description: _descriptionController.text,
+        price: double.tryParse(_priceController.text),
+        rent: double.tryParse(_priceController.text),
+        district: _districtController.text.isNotEmpty
+            ? _districtController.text
+            : _addressController.text,
+        city: _cityController.text.isNotEmpty
+            ? _cityController.text
+            : _addressController.text,
+        location: _addressController.text,
+        type: matchedType.id,
+        typePropertId: matchedType.id,
+        statusProperty: 'Disponible',
+        status: 'Disponible',
+        rooms: int.tryParse(_bedroomsController.text),
+        livingRooms: int.tryParse(_livingRoomsController.text),
+        area: _areaController.text,
+        garage: int.tryParse(_garageController.text),
+        kitchen: int.tryParse(_kitchenController.text),
+        store: int.tryParse(_storeController.text),
+        garden: hasGarden,
+        otherDescription: _otherDescriptionController.text,
+        advantage: _advantageController.text,
+        condition: selectedCondition ?? 'Bon état',
+        category: selectedTransactionType,
+        piscine: selectedFeatures.contains('Piscine') ? 1 : 0,
+      );
+
+      final result = await authProvider.addPropertiesForCompany(
+        house,
+        selectedImages,
+      );
+
+      if (mounted) {
+        setState(() {
+          isSubmitting = false;
+        });
+
+        if (result) {
+          _showSnackBar('Annonce publiée avec succès!');
+          Navigator.pop(context);
+        } else {
+          _showSnackBar('Erreur lors de la publication', isError: true);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          isSubmitting = false;
+        });
+        _showSnackBar('Erreur: $e', isError: true);
+      }
     }
   }
 
@@ -330,7 +426,7 @@ class _ImmoPostPageState extends State<ImmoPostPage>
       child: Row(
         children: List.generate(3, (index) {
           final isActive = index <= currentPage;
-         // final isCompleted = index < currentPage;
+          // final isCompleted = index < currentPage;
 
           return Expanded(
             child: Container(
@@ -400,13 +496,19 @@ class _ImmoPostPageState extends State<ImmoPostPage>
                   value?.isEmpty == true ? 'Description requise' : null,
             ),
             const SizedBox(height: 16),
-            _CustomDropdown(
-              value: selectedPropertyType,
-              label: "Type de bien *",
-              icon: HugeIcons.strokeRoundedBuilding01,
-              items: propertyTypes,
-              onChanged: (value) =>
-                  setState(() => selectedPropertyType = value),
+            Consumer<AuthProvider>(
+              builder: (context, authProvider, child) {
+                return _CustomDropdown(
+                  value: selectedPropertyType,
+                  label: "Type de bien *",
+                  icon: HugeIcons.strokeRoundedBuilding01,
+                  items: authProvider.propertyTypes
+                      .map((e) => e.tyPePropertyName)
+                      .toList(),
+                  onChanged: (value) =>
+                      setState(() => selectedPropertyType = value),
+                );
+              },
             ),
             const SizedBox(height: 16),
             _CustomDropdown(
@@ -488,8 +590,30 @@ class _ImmoPostPageState extends State<ImmoPostPage>
                 const SizedBox(width: 12),
                 Expanded(
                   child: _CustomTextField(
+                    controller: _livingRoomsController,
+                    label: "Salons",
+                    icon: HugeIcons.strokeRoundedLiveStreaming01,
+                    keyboardType: TextInputType.number,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: _CustomTextField(
+                    controller: _kitchenController,
+                    label: "Cuisines",
+                    icon: HugeIcons.strokeRoundedKitchenUtensils,
+                    keyboardType: TextInputType.number,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _CustomTextField(
                     controller: _bathroomsController,
-                    label: "Salles de bain",
+                    label: "Douches",
                     icon: HugeIcons.strokeRoundedBathtub01,
                     keyboardType: TextInputType.number,
                   ),
@@ -501,22 +625,66 @@ class _ImmoPostPageState extends State<ImmoPostPage>
               children: [
                 Expanded(
                   child: _CustomTextField(
-                    controller: _floorController,
-                    label: "Étage",
-                    icon: HugeIcons.strokeRoundedBuilding02,
+                    controller: _garageController,
+                    label: "Garages",
+                    icon: HugeIcons.strokeRoundedCar01,
                     keyboardType: TextInputType.number,
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: _CustomTextField(
-                    controller: _yearBuiltController,
-                    label: "Année de construction",
-                    icon: HugeIcons.strokeRoundedCalendar03,
+                    controller: _storeController,
+                    label: "Magasins",
+                    icon: HugeIcons.strokeRoundedArchive01,
                     keyboardType: TextInputType.number,
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: _CustomTextField(
+                    controller: _districtController,
+                    label: "Quartier *",
+                    icon: HugeIcons.strokeRoundedLocation01,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _CustomTextField(
+                    controller: _cityController,
+                    label: "Ville *",
+                    icon: HugeIcons.strokeRoundedLocation01,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _CustomTextField(
+              controller: _advantageController,
+              label: "Avantages / Caractéristiques",
+              icon: HugeIcons.strokeRoundedStar,
+            ),
+            const SizedBox(height: 16),
+            _CustomTextField(
+              controller: _otherDescriptionController,
+              label: "Autres descriptions",
+              icon: HugeIcons.strokeRoundedNote01,
+              maxLines: 2,
+            ),
+            const SizedBox(height: 16),
+            CheckboxListTile(
+              title: Text(
+                "Présence d'un jardin",
+                style: TextStyle(color: ConstColors().secondary),
+              ),
+              value: hasGarden,
+              onChanged: (value) => setState(() => hasGarden = value ?? false),
+              activeColor: ConstColors().primary,
+              contentPadding: EdgeInsets.zero,
             ),
             const SizedBox(height: 16),
             _CustomDropdown(
@@ -526,16 +694,6 @@ class _ImmoPostPageState extends State<ImmoPostPage>
               items: conditions,
               onChanged: (value) => setState(() => selectedCondition = value),
             ),
-            const SizedBox(height: 16),
-            if (selectedTransactionType == 'Location')
-              _CustomDropdown(
-                value: selectedFurnishing,
-                label: "Ameublement",
-                icon: HugeIcons.strokeRoundedChair01,
-                items: furnishingOptions,
-                onChanged: (value) =>
-                    setState(() => selectedFurnishing = value),
-              ),
           ],
         ),
       ),
@@ -905,7 +1063,7 @@ class _CustomDropdown extends StatelessWidget {
     final colors = ConstColors();
 
     return DropdownButtonFormField<String>(
-      value: value,
+      initialValue: value,
       onChanged: onChanged,
       style: TextStyle(fontSize: 16, color: colors.secondary),
       decoration: InputDecoration(

@@ -7,7 +7,7 @@ import 'package:shimmer/shimmer.dart';
 class HousePage extends StatefulWidget {
   final HouseModel houseModel;
   final HouseProvider houseLenth;
-  HousePage({super.key, required this.houseModel, required this.houseLenth});
+  const HousePage({super.key, required this.houseModel, required this.houseLenth});
 
   @override
   State<HousePage> createState() => _HousePageState();

@@ -1,13 +1,14 @@
 import 'package:demarcheur_app/apps/donneurs/inner_screens/jobs/job_detail.dart';
 import 'package:demarcheur_app/consts/color.dart';
 import 'package:demarcheur_app/providers/compa_profile_provider.dart';
-import 'package:demarcheur_app/providers/search_provider.dart';
+import 'package:demarcheur_app/models/add_vancy_model.dart';
 import 'package:demarcheur_app/widgets/sub_title.dart';
 import 'package:demarcheur_app/widgets/title_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:provider/provider.dart';
+import 'package:demarcheur_app/services/auth_provider.dart';
 import 'package:intl/intl.dart';
 
 class SearchPage extends StatefulWidget {
@@ -47,6 +48,11 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
       setState(() {
         _showClear = _searchController.text.isNotEmpty;
       });
+    });
+
+    // Start animations immediately as data is likely already available
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _animationController.forward();
     });
   }
 
@@ -88,8 +94,28 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    final search = Provider.of<SearchProvider>(context);
+    final search = Provider.of<CompaProfileProvider>(
+      context,
+    ); // Listen to changes
+    final auth = Provider.of<AuthProvider>(context, listen: false);
     final categories = search.categories;
+
+    // Logic to filter based on Category (Local State) + Search (Provider State)
+    final selectedCategory = currentIndex == 0
+        ? null
+        : (categories.length > currentIndex ? categories[currentIndex] : null);
+
+    final initialJobs = (selectedCategory == null || selectedCategory == 'Tout')
+        ? search.filterVancy
+        : search.filterVancy.where((h) => h.title == selectedCategory).toList();
+
+    // Apply role-based filtering
+    final bool isSearcher = auth.role == 'SEARCHER';
+    final displayedJobs = initialJobs.where((job) {
+      if (!isSearcher) return true;
+      // Heuristic: SEARCHERs should not see jobs from other SEARCHERs (assumed to be those without companyName)
+      return job.companyName != null && job.companyName!.trim().isNotEmpty;
+    }).toList();
 
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
@@ -109,14 +135,17 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
                           opacity: _fadeAnimation,
                           child: SlideTransition(
                             position: _slideAnimation,
-                            child: _buildSearchSection(search),
+                            child: _buildSearchSection(
+                              search,
+                              displayedJobs.length,
+                            ),
                           ),
                         );
                       },
                     ),
                   ),
                   SliverToBoxAdapter(child: _buildButtonSection(categories)),
-                  SliverToBoxAdapter(child: _buildJobResults(search)),
+                  SliverToBoxAdapter(child: _buildJobResults(displayedJobs)),
                 ],
               ),
       ),
@@ -228,19 +257,12 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
       floating: false,
       pinned: true,
       backgroundColor: color.primary,
-      leading: Container(
-        margin: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: IconButton(
-          onPressed: () => Navigator.pop(context),
-          icon: HugeIcon(
-            icon: HugeIcons.strokeRoundedArrowTurnBackward,
-            color: color.primary,
-            size: 20,
-          ),
+      leading: IconButton(
+        onPressed: () => Navigator.pop(context),
+        icon: HugeIcon(
+          icon: HugeIcons.strokeRoundedArrowTurnBackward,
+          color: color.bg,
+          size: 20,
         ),
       ),
       flexibleSpace: FlexibleSpaceBar(
@@ -315,7 +337,7 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildSearchSection(SearchProvider search) {
+  Widget _buildSearchSection(CompaProfileProvider search, int count) {
     return Container(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -339,7 +361,8 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
                   ),
                   child: TextField(
                     controller: _searchController,
-                    onChanged: search.searchJobs,
+                    onChanged: search.search,
+                    style: TextStyle(color: color.primary),
                     decoration: InputDecoration(
                       hintText: 'Rechercher un emploi...',
                       hintStyle: TextStyle(color: color.secondary),
@@ -447,7 +470,7 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    '${search.allJob.length} trouvé${search.allJob.length > 1 ? 's' : ''}',
+                    '$count trouvé${count > 1 ? 's' : ''}',
                     style: TextStyle(
                       color: color.primary,
                       fontSize: 14,
@@ -487,45 +510,26 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildJobResults(SearchProvider search) {
-    final provider = context.watch<SearchProvider>();
-    final categories = provider.categories;
-    final houses = provider.filteredJobs;
-
-    if (houses.isEmpty) {
-      return _buildEmptyState('Aucune offre disponible pour le moment.');
+  Widget _buildJobResults(List<AddVancyModel> jobs) {
+    if (jobs.isEmpty) {
+      return _buildEmptyState('Aucune offre trouvée.');
     }
 
-    final selectedCategory = currentIndex == 0
-        ? null
-        : categories[currentIndex];
-    final filteredHouses = selectedCategory == null
-        ? houses
-        : houses
-              .where(
-                (h) =>
-                    h.category.toLowerCase() == selectedCategory.toLowerCase(),
-              )
-              .toList();
-
-    if (filteredHouses.isEmpty) {
-      return _buildEmptyState('Aucune offre trouvée dans cette catégorie.');
-    }
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         children: List.generate(
-          filteredHouses.length,
+          jobs.length,
           (index) => Padding(
             padding: const EdgeInsets.only(bottom: 16),
-            child: _buildModernJobCard(filteredHouses[index]),
+            child: _buildModernJobCard(jobs[index]),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildModernJobCard(dynamic job) {
+  Widget _buildModernJobCard(AddVancyModel job) {
     return GestureDetector(
       onTap: () {
         // Navigate to job detail
@@ -564,7 +568,9 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
                       borderRadius: BorderRadius.circular(12),
                       image: DecorationImage(
                         fit: BoxFit.cover,
-                        image: NetworkImage(job.imageUrl),
+                        image: NetworkImage(
+                          job.companyImage ?? "https://via.placeholder.com/150",
+                        ),
                       ),
                     ),
                   ),
@@ -585,7 +591,7 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          job.companyName,
+                          job.companyName ?? "Unknown",
                           style: TextStyle(
                             color: color.secondary,
                             fontSize: 14,
@@ -601,17 +607,13 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: job.status == 'Disponible'
-                          ? color.accepted.withOpacity(0.1)
-                          : color.error.withOpacity(0.1),
+                      color: color.primary.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
-                      job.status,
+                      job.typeJobe, // Assuming status isn't available, using typeJobe or static logic
                       style: TextStyle(
-                        color: job.status == 'Disponible'
-                            ? color.accepted
-                            : color.error,
+                        color: color.primary,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
@@ -624,9 +626,12 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
 
               Row(
                 children: [
-                  _buildInfoChip(Icons.location_on_outlined, job.location),
+                  _buildInfoChip(
+                    Icons.location_on_outlined,
+                    job.city.trim().isNotEmpty ? job.city : 'Non spécifié',
+                  ),
                   const SizedBox(width: 12),
-                  _buildInfoChip(Icons.work_outline, job.type),
+                  _buildInfoChip(Icons.work_outline, job.typeJobe),
                 ],
               ),
 
@@ -641,7 +646,7 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    job.postDate,
+                    job.createdAt?.split('T')[0] ?? "Récemment",
                     style: TextStyle(color: color.secondary, fontSize: 12),
                   ),
                 ],
@@ -710,7 +715,7 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
     );
   }
 
-  void _showFilterBottomSheet(SearchProvider search) {
+  void _showFilterBottomSheet(CompaProfileProvider search) {
     _filterController.forward();
 
     showModalBottomSheet(
@@ -795,7 +800,7 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
                               selectedType,
                               (value) {
                                 setState(() => selectedType = value);
-                                search.filterByType(value ?? 'Tout');
+                                // search.filterByType(value ?? 'Tout'); // Not implemented in CompaProfileProvider yet
                               },
                             ),
                             const SizedBox(height: 20),
@@ -805,7 +810,7 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
                               selectedLocation,
                               (value) {
                                 setState(() => selectedLocation = value);
-                                search.filterByLocation(value ?? 'Tout');
+                                //search.filterByLocation(value ?? 'Tout');
                               },
                             ),
                           ],
