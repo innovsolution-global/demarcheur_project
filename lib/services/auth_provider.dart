@@ -11,6 +11,7 @@ import 'package:demarcheur_app/models/services/service_model.dart';
 import 'package:demarcheur_app/models/type_properties.dart';
 import 'package:demarcheur_app/services/api_service.dart';
 import 'package:demarcheur_app/services/config.dart';
+import 'package:demarcheur_app/services/storage_service.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
@@ -151,7 +152,9 @@ class AuthProvider with ChangeNotifier {
       final token = response['token'];
       if (token != null) {
         _token = token;
-        await prefs.setString('token', token);
+        final StorageService storage = StorageService();
+        await storage.saveToken(token);
+        await prefs.setString('token', token); // Keep for compat if needed, but primary is storage.saveToken
       }
 
       // 2. Handle connected user
@@ -206,6 +209,7 @@ class AuthProvider with ChangeNotifier {
   Future<void> logout(BuildContext context) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear(); // Clear SharedPreferences (tokens, user data, etc.)
+    await StorageService().clearAll(); // Clear secure storage
     _token = null;
     _role = null;
     notifyListeners();
@@ -258,8 +262,9 @@ class AuthProvider with ChangeNotifier {
 
   Future<void> loadAuthData() async {
     final prefs = await SharedPreferences.getInstance();
+    final StorageService storage = StorageService();
 
-    _token = prefs.getString('token');
+    _token = await storage.getToken() ?? prefs.getString('token');
     _role = prefs.getString('role');
     _userId = prefs.getString('user_id');
 

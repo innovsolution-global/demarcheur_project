@@ -69,7 +69,6 @@ class ApplicationProvider extends ChangeNotifier {
           final applicantName = c.applicant?.name ?? 'Candidat inconnu';
           final applicantPhoto =
               c.applicant?.photo ?? 'https://placehold.co/100x100';
-
           return ApplicationModel(
             id: c.id ?? '',
             companyName:

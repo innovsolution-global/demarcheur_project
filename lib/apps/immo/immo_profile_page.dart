@@ -1,6 +1,8 @@
 import 'package:demarcheur_app/apps/demandeurs/main_screens/add_vacancy_page.dart';
 import 'package:demarcheur_app/apps/demandeurs/main_screens/announce_list.dart';
 import 'package:demarcheur_app/apps/demandeurs/main_screens/statistics_page.dart';
+import 'package:demarcheur_app/apps/immo/immo_announce_page.dart';
+import 'package:demarcheur_app/apps/immo/immo_post_page.dart';
 import 'package:demarcheur_app/consts/color.dart';
 import 'package:demarcheur_app/providers/enterprise_provider.dart';
 import 'package:demarcheur_app/providers/settings_provider.dart';
@@ -132,8 +134,8 @@ class _ProfilePageState extends State<ImmoProfilePage>
                         child: Column(
                           children: [
                             _EnhancedProfileHeader(colors: colors),
-                            const SizedBox(height: 20),
-                            _ModernStatsSection(colors: colors),
+                            // const SizedBox(height: 20),
+                            // _ModernStatsSection(colors: colors),
                             const SizedBox(height: 20),
                             _QuickActionsSection(colors: colors),
                             const SizedBox(height: 20),
@@ -558,36 +560,15 @@ class _ModernStatsSection extends StatelessWidget {
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => AnnounceList()),
+                MaterialPageRoute(builder: (context) => ImmoAnnouncePage()),
               );
             },
             child: _ModernStatCard(
               colors: colors,
               icon: Icons.campaign_outlined,
-              label: "Annonces",
-              value: "12",
-              subtitle: "Actives",
+              label: "Actives",
+              value: "Mes Annonces",
             ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _ModernStatCard(
-            colors: colors,
-            icon: Icons.message_outlined,
-            label: "Messages",
-            value: "5",
-            subtitle: "Non lus",
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _ModernStatCard(
-            colors: colors,
-            icon: Icons.visibility_outlined,
-            label: "Vues",
-            value: "248",
-            subtitle: "Ce mois",
           ),
         ),
       ],
@@ -600,20 +581,19 @@ class _ModernStatCard extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
-  final String subtitle;
 
   const _ModernStatCard({
     required this.colors,
     required this.icon,
     required this.label,
     required this.value,
-    required this.subtitle,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      height: 100,
+      // padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
@@ -626,11 +606,12 @@ class _ModernStatCard extends StatelessWidget {
         ],
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: colors.primary.withValues(alpha: 0.02),
+              color: colors.primary.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(icon, color: colors.primary, size: 20),
@@ -653,7 +634,6 @@ class _ModernStatCard extends StatelessWidget {
               fontWeight: FontWeight.w500,
             ),
           ),
-          Text(subtitle, style: TextStyle(color: colors.primary, fontSize: 10)),
         ],
       ),
     );
@@ -702,7 +682,24 @@ class _QuickActionsSection extends StatelessWidget {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => const AddVacancyPage(),
+                        builder: (context) => const ImmoPostPage(),
+                      ),
+                    );
+                  },
+                ),
+              ),
+
+              const SizedBox(width: 12),
+              Expanded(
+                child: _QuickActionButton(
+                  colors: colors,
+                  icon: Icons.campaign_outlined,
+                  label: "Mes announces",
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ImmoAnnouncePage(),
                       ),
                     );
                   },
@@ -719,21 +716,6 @@ class _QuickActionsSection extends StatelessWidget {
                       context,
                       MaterialPageRoute(
                         builder: (context) => const StatisticsPage(),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _QuickActionButton(
-                  colors: colors,
-                  icon: Icons.support_agent_outlined,
-                  label: "Support",
-                  onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text("Support bientôt disponible"),
                       ),
                     );
                   },

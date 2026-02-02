@@ -147,33 +147,58 @@ class _ChatWidgetState extends State<ChatWidget> {
     );
   }
 
-  void _handleSendPressed(types.PartialText message) {
-    if (message.text.trim().isEmpty && _selectedAttachments.isEmpty) return;
+  Future<void> _handleSendPressed(types.PartialText message) async {
+    final text = message.text.trim();
+    if (text.isEmpty && _selectedAttachments.isEmpty) return;
 
     final chatProvider = Provider.of<ChatProvider>(context, listen: false);
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
     final myId = authProvider.userId;
-    String receiverId = widget.message.receiverId;
+    if (myId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Erreur: Utilisateur non connecté')),
+      );
+      return;
+    }
 
+    String receiverId = widget.message.receiverId;
     if (widget.message.receiverId == myId) {
       receiverId = widget.message.senderId;
     }
 
+    // Create a copy of attachments before clearing
+    final attachmentsToSend = _selectedAttachments.isNotEmpty
+        ? List<XFile>.from(_selectedAttachments)
+        : null;
+
     final newMessage = SendMessageModel(
-      content: message.text,
-      senderId: myId!,
+      content: text,
+      senderId: myId,
       receiverId: receiverId,
       userName: authProvider.userName ?? 'Moi',
       userPhoto: authProvider.userPhoto,
-      attachments: _selectedAttachments.isNotEmpty
-          ? List.from(_selectedAttachments)
-          : null,
+      attachments: attachmentsToSend,
       timestamp: DateTime.now(),
     );
 
-    chatProvider.sendNewMessage(newMessage, authProvider.token);
+    // Clear local selection immediately for better UX
     setState(() => _selectedAttachments.clear());
+
+    final success = await chatProvider.sendNewMessage(
+      newMessage,
+      authProvider.token,
+    );
+
+    if (!success && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Erreur lors de l\'envoi du message')),
+      );
+      // Optional: restore attachments if failed
+      if (attachmentsToSend != null) {
+        setState(() => _selectedAttachments.addAll(attachmentsToSend));
+      }
+    }
   }
 
   Widget _buildAttachmentPreview() {
@@ -338,6 +363,11 @@ class _ChatWidgetState extends State<ChatWidget> {
                   ),
                   showUserAvatars: true,
                   showUserNames: false,
+                  inputOptions: ui.InputOptions(
+                    sendButtonVisibilityMode: _selectedAttachments.isNotEmpty
+                        ? ui.SendButtonVisibilityMode.always
+                        : ui.SendButtonVisibilityMode.editing,
+                  ),
                 );
               },
             ),

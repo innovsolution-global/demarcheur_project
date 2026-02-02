@@ -5,8 +5,8 @@ class SendMessageModel {
   final String userName;
   final String? userPhoto;
   final String content;
-  final List<XFile>? attachments;
-  final List<String>? attachmentUrls;
+  final List<XFile>? attachments; // Local files being sent
+  final List<String>? attachmentUrls; // Remote URLs from server
   final String senderId;
   final String receiverId;
   final DateTime? timestamp;
@@ -40,16 +40,16 @@ class SendMessageModel {
       final contact = json['contact'];
       final lastMsg = json['lastMessage'] ?? {};
       final partnerId = extractId(contact, ['id', '_id']) ?? '';
-      
+
       return SendMessageModel(
         id: lastMsg['id']?.toString() ?? partnerId,
         content: lastMsg['content'] ?? lastMsg['message'] ?? '',
-        senderId: lastMsg['isMe'] == true ? '' : partnerId, 
+        senderId: lastMsg['isMe'] == true ? '' : partnerId,
         receiverId: lastMsg['isMe'] == true ? partnerId : '',
         userName: contact['name'] ?? contact['username'] ?? '',
         userPhoto: contact['avatar'] ?? contact['image'] ?? contact['photo'],
-        timestamp: lastMsg['createdAt'] != null 
-            ? DateTime.tryParse(lastMsg['createdAt']) 
+        timestamp: lastMsg['createdAt'] != null
+            ? DateTime.tryParse(lastMsg['createdAt'])
             : null,
       );
     }
@@ -66,20 +66,32 @@ class SendMessageModel {
 
     final msgId = json['id']?.toString() ?? json['_id']?.toString() ?? '';
 
-    // Handle multiple images/files
+    // Handle multiple images/files (fileUrl, image, attachments)
     List<String> urls = [];
+    
+    // Check fileUrl (from logs)
+    if (json['fileUrl'] != null) {
+      if (json['fileUrl'] is String) {
+        if (json['fileUrl'].toString().isNotEmpty) urls.add(json['fileUrl']);
+      } else if (json['fileUrl'] is List) {
+        urls.addAll(List<String>.from(json['fileUrl'].map((i) => i.toString())));
+      }
+    }
+    
+    // Check image
     if (json['image'] != null) {
       if (json['image'] is String) {
-        urls.add(json['image']);
+        if (json['image'].toString().isNotEmpty) urls.add(json['image']);
       } else if (json['image'] is List) {
         urls.addAll(List<String>.from(json['image'].map((i) => i is Map ? (i['path'] ?? i['url']) : i.toString())));
       } else if (json['image'] is Map) {
         urls.add(json['image']['path'] ?? json['image']['url']);
       }
     }
-    
+
+    // Check attachments
     if (json['attachments'] != null && json['attachments'] is List) {
-       urls.addAll(List<String>.from(json['attachments'].map((a) => a is Map ? (a['path'] ?? a['url']) : a.toString())));
+      urls.addAll(List<String>.from(json['attachments'].map((a) => a is Map ? (a['path'] ?? a['url']) : a.toString())));
     }
 
     // Comprehensive name extraction
@@ -92,7 +104,7 @@ class SendMessageModel {
 
     // Comprehensive photo extraction
     final photo =
-        (urls.isNotEmpty ? urls.first : null) ??
+        (json['userPhoto'] ?? json['photo'] ?? json['avatar']) ??
         (json['user'] is Map
             ? json['user']['image'] ??
                 json['user']['photo'] ??

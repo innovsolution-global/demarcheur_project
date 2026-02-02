@@ -64,9 +64,7 @@ class Header extends StatelessWidget {
           color: color.primary,
           image: DecorationImage(
             fit: BoxFit.cover,
-            image: NetworkImage(
-              "https://www.shutterstock.com/image-photo/job-search-human-resources-recruitment-260nw-1292578582.jpg",
-            ),
+            image: AssetImage("assets/background.png"),
           ),
         ),
       ),

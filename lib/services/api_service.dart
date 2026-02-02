@@ -11,19 +11,28 @@ import 'package:demarcheur_app/models/send_message_model.dart';
 import 'package:demarcheur_app/models/services/service_model.dart';
 import 'package:demarcheur_app/models/type_properties.dart';
 import 'package:demarcheur_app/services/config.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:demarcheur_app/services/storage_service.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:mime/mime.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
-  final FlutterSecureStorage storage = FlutterSecureStorage();
+  final StorageService _storage = StorageService();
   final String baseUrl = Config.baseUrl;
   Map<String, String> get _headers => {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-  };
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      };
+
+  Future<Map<String, String>> _getAuthHeaders([String? token]) async {
+    final headers = _headers;
+    final authToken = token ?? await _storage.getToken();
+    if (authToken != null && authToken.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $authToken';
+    }
+    return headers;
+  }
 
   //for job seeker registration
   Future<Map<String, dynamic>?> donneurRegistration(
@@ -249,12 +258,10 @@ class ApiService {
       return null;
     }
 
+    final headers = await _getAuthHeaders(token);
     final response = await http.get(
       Uri.parse('$baseUrl/auth/profile-giver'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
+      headers: headers,
     );
     try {
       if (response.statusCode == 200) {
@@ -276,12 +283,10 @@ class ApiService {
 
   //load the givers
   Future<DonneurModel?> searcherProfile(String? token) async {
+    final headers = await _getAuthHeaders(token);
     final response = await http.get(
       Uri.parse('$baseUrl/auth/profile-searcher'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
+      headers: headers,
     );
     try {
       if (response.statusCode == 200) {
@@ -311,12 +316,10 @@ class ApiService {
 
     for (final url in endpoints) {
       try {
+        final headers = await _getAuthHeaders(token);
         final response = await http.get(
           Uri.parse(url),
-          headers: {
-            if (token != null) 'Authorization': 'Bearer $token',
-            'Content-Type': 'application/json',
-          },
+          headers: headers,
         );
 
         if (response.statusCode == 200) {
@@ -345,12 +348,11 @@ class ApiService {
     try {
       final body = jsonEncode(vancy);
 
+      final headers = await _getAuthHeaders(token);
+
       final response = await http.post(
         Uri.parse('$baseUrl/job-offers'),
-        headers: {
-          'Content-Type': 'application/json',
-          if (token != null) 'Authorization': 'Bearer $token',
-        },
+        headers: headers,
         body: body,
       );
 
@@ -367,14 +369,12 @@ class ApiService {
   // Get company vacancies
   Future<List<AddVancyModel>> getMyVacancies(String? token) async {
     try {
+      final headers = await _getAuthHeaders(token);
       final response = await http.get(
         Uri.parse(
           '$baseUrl/job-offers',
         ), // Assuming this endpoint exists, or fallback to /job-offers
-        headers: {
-          'Content-Type': 'application/json',
-          if (token != null) 'Authorization': 'Bearer $token',
-        },
+        headers: headers,
       );
 
       if (response.statusCode == 200) {
@@ -411,10 +411,8 @@ class ApiService {
         Uri.parse('$baseUrl/candidatures'),
       );
 
-      request.headers.addAll({
-        'Authorization': 'Bearer $token',
-        'Accept': 'application/json',
-      });
+      final headers = await _getAuthHeaders(token);
+      request.headers.addAll(headers);
 
       request.fields['JobId'] = candidate.jobId;
       request.fields['appliquantId'] = candidate.appliquantId;
@@ -568,15 +566,13 @@ class ApiService {
 
   Future<Map<String, dynamic>?> updateStatus(
     String candidatureId,
-    String newStatus,
-    String token,
-  ) async {
+    String newStatus, [
+    String? token,
+  ]) async {
+    final headers = await _getAuthHeaders(token);
     final response = await http.patch(
       Uri.parse('$baseUrl/candidatures/$candidatureId'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
+      headers: headers,
       body: jsonEncode({'status': newStatus}),
     );
 
@@ -707,12 +703,10 @@ class ApiService {
 
   Future<List<TypeProperties>> typeProperties(String? token) async {
     try {
+      final headers = await _getAuthHeaders(token);
       final response = await http.get(
         Uri.parse('$baseUrl/type-properties'),
-        headers: {
-          'Content-Type': 'application/json',
-          if (token != null) 'Authorization': 'Bearer $token',
-        },
+        headers: headers,
       );
 
       if (response.statusCode == 200) {
@@ -791,12 +785,10 @@ class ApiService {
     String? companyId,
   }) async {
     try {
+      final headers = await _getAuthHeaders(token);
       final response = await http.get(
         Uri.parse('$baseUrl/properties'),
-        headers: {
-          'Content-Type': 'application/json',
-          if (token != null) 'Authorization': 'Bearer $token',
-        },
+        headers: headers,
       );
 
       if (response.statusCode == 200) {
@@ -834,18 +826,23 @@ class ApiService {
       final url = '$baseUrl/chats';
       final request = http.MultipartRequest('POST', Uri.parse(url));
 
-      if (token != null && token.isNotEmpty) {
-        request.headers['Authorization'] = 'Bearer $token';
-      }
-      request.headers['Accept'] = 'application/json';
+      final headers = await _getAuthHeaders(token);
+      request.headers.addAll(headers);
 
-      Map<String, dynamic> fields = chat.toJson();
-      fields.forEach((key, value) {
-        request.fields[key] = value.toString();
-      });
+      // Required fields as per doc: senderId, receiverId, content
+      request.fields['senderId'] = chat.senderId;
+      request.fields['receiverId'] = chat.receiverId;
+      request.fields['content'] = chat.content;
 
+      // Optional property: image (array of files, max 15)
       if (chat.attachments != null && chat.attachments!.isNotEmpty) {
-        for (var file in chat.attachments!) {
+        // Enforce max 15 files as mentioned in doc
+        final filesToSend = chat.attachments!.take(15).toList();
+        if (chat.attachments!.length > 15) {
+          print('WARNING: ApiService.sendMessage - More than 15 images provided. Only the first 15 will be sent.');
+        }
+
+        for (var file in filesToSend) {
           final mimeType = lookupMimeType(file.path);
           final contentType = mimeType != null
               ? MediaType.parse(mimeType)
@@ -853,7 +850,7 @@ class ApiService {
 
           request.files.add(
             await http.MultipartFile.fromPath(
-              'image', // Keeping 'image' as the field name as per backend expectation, multiple files with same key are usually handled as an array
+              'image', // Field name 'image' as per documentation
               file.path,
               contentType: contentType,
             ),
@@ -861,14 +858,10 @@ class ApiService {
         }
       }
 
-      // 4. Send the request
       var streamedResponse = await request.send();
-      // 5. Read the response
       var response = await http.Response.fromStream(streamedResponse);
 
-      // 6. Handle the status code
       if (response.statusCode >= 200 && response.statusCode < 300) {
-        print('DEBUG: sendMessage SUCCESS BODY: ${response.body}');
         return jsonDecode(response.body);
       } else {
         print('DEBUG: sendMessage FAILED Status: ${response.statusCode}');
@@ -883,23 +876,20 @@ class ApiService {
 
   // Retrieve a message by its ID
   Future<List<SendMessageModel>> fetchMessagesById(
-    String messageId,
+    String messageId, [
     String? token,
-  ) async {
+  ]) async {
     try {
       final url = '$baseUrl/chats/$messageId';
-      final response = await http.get(
-        Uri.parse(url),
-        headers: {
-          if (token != null && token.isNotEmpty)
-            'Authorization': 'Bearer $token',
-          'Accept': 'application/json',
-        },
-      );
+      final headers = await _getAuthHeaders(token);
+      final response = await http.get(Uri.parse(url), headers: headers);
 
       if (response.statusCode == 200) {
         final decoded = jsonDecode(response.body);
-        return decoded['data'] ?? decoded['message'] ?? decoded;
+        final list = decoded['data'] ?? decoded['message'] ?? decoded;
+        if (list is List) {
+          return list.map((j) => SendMessageModel.fromJson(j)).toList();
+        }
       } else {
         print('Failed to fetch message by ID: ${response.statusCode}');
       }
@@ -909,7 +899,7 @@ class ApiService {
     return [];
   }
 
-  Future<List<SendMessageModel>> allConversation(
+  Future<List<SendMessageModel>?> allConversation(
     String userId, {
     String? token,
   }) async {
@@ -917,12 +907,10 @@ class ApiService {
       print(
         'DEBUG: ApiService.allConversation - Requesting for userId: $userId',
       );
+      final headers = await _getAuthHeaders(token);
       final response = await http.get(
         Uri.parse('$baseUrl/chats/by-user/$userId'),
-        headers: {
-          'Accept': 'application/json',
-          if (token != null) 'Authorization': 'Bearer $token',
-        }..addAll(_headers),
+        headers: headers,
       );
 
       List<SendMessageModel> allMessages = [];
@@ -1059,12 +1047,10 @@ class ApiService {
       Future<void> fetchAndAdd(String url) async {
         try {
           print('DEBUG: fetchConversations - Requesting $url');
+          final headers = await _getAuthHeaders(token);
           final resp = await http.get(
             Uri.parse(url),
-            headers: {
-              if (token != null) 'Authorization': 'Bearer $token',
-              'Accept': 'application/json',
-            },
+            headers: headers,
           );
           if (resp.statusCode == 200) {
             final d = jsonDecode(resp.body);
@@ -1202,7 +1188,7 @@ class ApiService {
       // Normalize IDs
       final String myId = senderId.trim();
       final String otherId = receiverId.trim();
-      print('The token is: $token');
+      final headers = await _getAuthHeaders(token);
       print(
         'DEBUG: fetchMessages - Starting fetch for Me=$myId, Other=$otherId',
       );
@@ -1214,10 +1200,7 @@ class ApiService {
           print('DEBUG: fetchMessages - Requesting $url');
           final resp = await http.get(
             Uri.parse(url),
-            headers: {
-              if (token != null) 'Authorization': 'Bearer $token',
-              'Accept': 'application/json',
-            },
+            headers: headers,
           );
           if (resp.statusCode == 200) {
             final d = jsonDecode(resp.body);
@@ -1284,7 +1267,7 @@ class ApiService {
           try {
             final resp = await http.get(
               Uri.parse(url),
-              headers: {if (token != null) 'Authorization': 'Bearer $token'},
+              headers: headers,
             );
             if (resp.statusCode == 200) {
               final d = jsonDecode(resp.body);

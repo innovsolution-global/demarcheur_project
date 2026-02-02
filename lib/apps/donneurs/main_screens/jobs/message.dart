@@ -3,6 +3,7 @@ import 'package:demarcheur_app/models/send_message_model.dart';
 import 'package:demarcheur_app/providers/chat/chat_provider.dart';
 import 'package:demarcheur_app/services/auth_provider.dart';
 import 'package:demarcheur_app/widgets/chat_widget.dart';
+import 'package:demarcheur_app/widgets/title_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:provider/provider.dart';
@@ -47,7 +48,11 @@ class _MessageState extends State<Message> {
       backgroundColor: colors.bg,
       body: CustomScrollView(
         physics: BouncingScrollPhysics(),
-        slivers: [_buildHeader(), _builMessageCard()],
+        slivers: [
+          _buildHeader(),
+          SliverToBoxAdapter(child: SizedBox(height: 18)),
+          _builMessageCard(),
+        ],
       ),
     );
   }
@@ -55,8 +60,22 @@ class _MessageState extends State<Message> {
   Widget _buildHeader() {
     return SliverAppBar.large(
       automaticallyImplyLeading: false,
-      title: Text('Messages', style: TextStyle(color: colors.bg)),
       backgroundColor: colors.primary,
+      flexibleSpace: FlexibleSpaceBar(
+        background: Container(
+          decoration: BoxDecoration(
+            image: DecorationImage(
+              fit: BoxFit.cover,
+              image: AssetImage("assets/background.png"),
+              colorFilter: ColorFilter.mode(
+                Colors.black.withValues(alpha: 0.4),
+                BlendMode.darken,
+              ),
+            ),
+          ),
+        ),
+        title: TitleWidget(text: '   Messages', color: colors.bg),
+      ),
     );
   }
 
@@ -74,7 +93,7 @@ class _MessageState extends State<Message> {
           return SliverToBoxAdapter(
             child: Center(
               child: Padding(
-                padding: EdgeInsets.all(20),
+                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 24),
                 child: CircularProgressIndicator(color: colors.primary),
               ),
             ),

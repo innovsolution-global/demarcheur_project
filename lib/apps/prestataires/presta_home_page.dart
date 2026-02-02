@@ -52,8 +52,13 @@ class _PrestaHomePageState extends State<PrestaHomePage> {
           physics: const BouncingScrollPhysics(),
           slivers: [
             _buildHeader(),
-            SliverToBoxAdapter(child: _buildSearchBar()),
-            _buildStatsSection(),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.all(20.0),
+                child: _buildSearchBar(),
+              ),
+            ),
+            // _buildStatsSection(),
             _buildCategorySection(provider.categories),
             _buildSectionTitle("Opportunités récentes", () {
               Navigator.push(
@@ -127,129 +132,12 @@ class _PrestaHomePageState extends State<PrestaHomePage> {
           hintText: "Rechercher une mission...",
           hintStyle: TextStyle(color: colors.secondary.withOpacity(0.5)),
           prefixIcon: Icon(Icons.search),
-          suffixIcon: Container(
-            margin: const EdgeInsets.all(8),
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: colors.primary,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const HugeIcon(
-              icon: HugeIcons.strokeRoundedFilterHorizontal,
-              color: Colors.white,
-              size: 16,
-            ),
-          ),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 20,
             vertical: 14,
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildStatsSection() {
-    return SliverToBoxAdapter(
-      child: Container(
-        height: 100,
-        margin: const EdgeInsets.symmetric(vertical: 20),
-        child: ListView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          physics: const BouncingScrollPhysics(),
-          children: [
-            _buildStatCard(
-              "Revenus",
-              "2.5M GNF",
-              HugeIcons.strokeRoundedWallet01,
-              Colors.green,
-            ),
-            const SizedBox(width: 12),
-            _buildStatCard(
-              "Missions",
-              "12",
-              HugeIcons.strokeRoundedTask01,
-              Colors.blue,
-            ),
-            const SizedBox(width: 12),
-            _buildStatCard(
-              "Note",
-              "4.9",
-              HugeIcons.strokeRoundedStar,
-              Colors.orange,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatCard(
-    String label,
-    String value,
-    List<List<dynamic>> icon,
-    Color color,
-  ) {
-    return Container(
-      width: 140,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              HugeIcon(icon: icon, color: color, size: 20),
-              Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  color: color,
-                  size: 8,
-                ),
-              ),
-            ],
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                value,
-                style: TextStyle(
-                  color: colors.primary,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              Text(
-                label,
-                style: TextStyle(
-                  color: colors.secondary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }
@@ -322,17 +210,17 @@ class _PrestaHomePageState extends State<PrestaHomePage> {
                 fontWeight: FontWeight.w700,
               ),
             ),
-            GestureDetector(
-              onTap: onTap,
-              child: Text(
-                "Voir tout",
-                style: TextStyle(
-                  color: colors.primary,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
+            // GestureDetector(
+            //   onTap: onTap,
+            //   child: Text(
+            //     "Voir tout",
+            //     style: TextStyle(
+            //       color: colors.primary,
+            //       fontSize: 14,
+            //       fontWeight: FontWeight.w600,
+            //     ),
+            //   ),
+            // ),
           ],
         ),
       ),
@@ -498,7 +386,7 @@ class _ModernJobCard extends StatelessWidget {
                         ],
                       ),
                     ),
-                    Icon(Icons.bookmark_border_rounded, color: colors.tertiary),
+                    //Icon(Icons.bookmark_border_rounded, color: colors.tertiary),
                   ],
                 ),
                 const SizedBox(height: 20),
@@ -539,7 +427,7 @@ class _ModernJobCard extends StatelessWidget {
                           final authProvider = context.read<AuthProvider>();
                           final myId = authProvider.userId;
                           if (myId == null) return;
-                          
+
                           final receiverId = job.ownerId ?? job.id;
                           if (receiverId!.isEmpty) return;
 
@@ -552,7 +440,9 @@ class _ModernJobCard extends StatelessWidget {
                                   senderId: myId,
                                   receiverId: receiverId,
                                   userName: job.companyName,
-                                  userPhoto: job.imageUrl.isNotEmpty ? job.imageUrl[0] : null,
+                                  userPhoto: job.imageUrl.isNotEmpty
+                                      ? job.imageUrl[0]
+                                      : null,
                                   content: '',
                                   timestamp: DateTime.now(),
                                 ),

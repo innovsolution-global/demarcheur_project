@@ -43,7 +43,7 @@ class PrestaModel {
           .cast<String>()
           .toList(),
       postDate: json['postDate'],
-      location: json['location'],
+      location: json['adresse'],
       status: json['status'],
       categorie: json['categorie'],
       exigences: json['exigences'],
@@ -59,7 +59,7 @@ class PrestaModel {
     'companyName': companyName,
     'imageUrl': imageUrl,
     'postDate': postDate,
-    'location': location,
+    'adresse': location,
     'status': status,
     'categorie': categorie,
     'exigences': exigences,

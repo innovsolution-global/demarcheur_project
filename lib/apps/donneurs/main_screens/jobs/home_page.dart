@@ -100,10 +100,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     final search = Provider.of<CompaProfileProvider>(context);
     final houses = Provider.of<HouseProvider>(context);
-    final auth = Provider.of<AuthProvider>(context, listen: false); // Get AuthProvider
-
-
-
+    final auth = Provider.of<AuthProvider>(
+      context,
+      listen: false,
+    ); // Get AuthProvider
 
     // Filter jobs logic
     final bool isSearcher = auth.role == 'SEARCHER';
@@ -215,15 +215,12 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             ),
           ),
           child: Stack(
-            
             children: [
               Container(
                 decoration: BoxDecoration(
                   image: DecorationImage(
                     fit: BoxFit.cover,
-                    image: const NetworkImage(
-                      "https://www.shutterstock.com/image-photo/job-search-human-resources-recruitment-260nw-1292578582.jpg",
-                    ),
+                    image: AssetImage("assets/background.png"),
                     colorFilter: ColorFilter.mode(
                       Colors.black.withValues(alpha: 0.4),
                       BlendMode.darken,
@@ -372,8 +369,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildJobResults(List<AddVancyModel> jobs, bool isLoading,
-      {int? limit}) {
+  Widget _buildJobResults(
+    List<AddVancyModel> jobs,
+    bool isLoading, {
+    int? limit,
+  }) {
     // Empty check removed, handled in build method
 
     if (isLoading) {

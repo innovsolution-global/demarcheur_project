@@ -4,6 +4,7 @@ import 'package:demarcheur_app/services/api_service.dart';
 import 'package:demarcheur_app/services/socket_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_chat_types/flutter_chat_types.dart' as types;
+import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 
@@ -110,21 +111,30 @@ class ChatProvider extends ChangeNotifier {
   }
 
   void _syncDerivedLists() {
-    print('DEBUG: ChatProvider._syncDerivedLists - Map keys: ${_messageMap.keys.length}, ActiveConv: $_activeConversationId');
+    print(
+      'DEBUG: ChatProvider._syncDerivedLists - Map keys: ${_messageMap.keys.length}, ActiveConv: $_activeConversationId',
+    );
     _messages = _messageMap.values.where((m) {
       if (_activeConversationId == null) return true;
       final ids = [m.senderId.trim(), m.receiverId.trim()]..sort();
       final currentConvId = ids.join('_');
       final match = currentConvId == _activeConversationId;
       if (!match && _messageMap.length < 5) {
-         print('DEBUG: ChatProvider._syncDerivedLists - Mismatch: msgConv=$currentConvId vs active=$_activeConversationId');
+        print(
+          'DEBUG: ChatProvider._syncDerivedLists - Mismatch: msgConv=$currentConvId vs active=$_activeConversationId',
+        );
       }
       return match;
     }).toList();
-    print('DEBUG: ChatProvider._syncDerivedLists - Filtered count: ${_messages.length}');
+    print(
+      'DEBUG: ChatProvider._syncDerivedLists - Filtered count: ${_messages.length}',
+    );
 
     // Map to types.Message and sort descending
-    final mapped = _messages.map((m) => _mapToChatType(m)).toList();
+    final mapped = <types.Message>[];
+    for (final m in _messages) {
+      mapped.addAll(_mapToChatTypes(m));
+    }
     mapped.sort((a, b) => (b.createdAt ?? 0).compareTo(a.createdAt ?? 0));
     _chatMessages = mapped;
   }
@@ -202,68 +212,136 @@ class ChatProvider extends ChangeNotifier {
     final result = await _apiService.sendMessage(message, token);
 
     if (result != null) {
-      final sentMsg = SendMessageModel.fromJson(result);
+      final apiMsg = SendMessageModel.fromJson(result);
+
+      // Merge local metadata (userName, userPhoto) into the received message
+      // as the API might only return the basic fields (id, content, etc.)
+      final sentMsg = SendMessageModel(
+        id: apiMsg.id,
+        content: apiMsg.content.isNotEmpty ? apiMsg.content : message.content,
+        senderId: apiMsg.senderId.isNotEmpty
+            ? apiMsg.senderId
+            : message.senderId,
+        receiverId: apiMsg.receiverId.isNotEmpty
+            ? apiMsg.receiverId
+            : message.receiverId,
+        userName: apiMsg.userName.isNotEmpty
+            ? apiMsg.userName
+            : message.userName,
+        userPhoto: apiMsg.userPhoto ?? message.userPhoto,
+        attachmentUrls: apiMsg.attachmentUrls ?? message.attachmentUrls,
+        attachments: message.attachments, // Keep local files for immediate UI
+        timestamp: apiMsg.timestamp ?? message.timestamp,
+      );
+
       final msgId = sentMsg.id;
 
       if (msgId != null && msgId.isNotEmpty) {
-        if (!_messageMap.containsKey(msgId)) {
-          print('DEBUG: ChatProvider - Adding message from API: $msgId');
-          _messageMap[msgId] = sentMsg;
-          _saveMessagesToCache();
-          _syncDerivedLists();
-          notifyListeners();
-        }
+        print('DEBUG: ChatProvider - Adding message from API (merged): $msgId');
+        _messageMap[msgId] = sentMsg;
+        _saveMessagesToCache();
+        _syncDerivedLists();
+        notifyListeners();
       }
       return true;
     }
     return false;
   }
 
-  types.Message _mapToChatType(SendMessageModel msg) {
+  List<types.Message> _mapToChatTypes(SendMessageModel msg) {
     final authorId = msg.senderId.isNotEmpty ? msg.senderId : 'unknown';
     final timestamp =
         msg.timestamp?.millisecondsSinceEpoch ??
         DateTime.now().millisecondsSinceEpoch;
-
-    final msgId = msg.id ?? 'msg_${timestamp}_${msg.content.hashCode}';
     final author = types.User(id: authorId);
+    final List<types.Message> result = [];
 
-    // If we have attachment URLs, check if it's an image or other file
-    if (msg.attachmentUrls != null && msg.attachmentUrls!.isNotEmpty) {
-      final url = msg.attachmentUrls!.first; // For now handle first; UI can be improved for carousel
-      final isImage = url.toLowerCase().contains('.jpg') || 
-                      url.toLowerCase().contains('.jpeg') || 
-                      url.toLowerCase().contains('.png') || 
-                      url.toLowerCase().contains('.gif') ||
-                      url.toLowerCase().contains('.webp');
+    final baseId = msg.id ?? 'msg_${timestamp}_${msg.content.hashCode}';
 
-      if (isImage) {
-        return types.ImageMessage(
+    // 1. Text Content
+    if (msg.content.trim().isNotEmpty) {
+      result.add(types.TextMessage(
+        author: author,
+        createdAt: timestamp,
+        id: '${baseId}_text',
+        text: msg.content,
+      ));
+    }
+
+    // 2. Local Attachments (XFiles)
+    if (msg.attachments != null && msg.attachments!.isNotEmpty) {
+      for (int i = 0; i < msg.attachments!.length; i++) {
+        final file = msg.attachments![i];
+        result.add(_createFileMessage(
           author: author,
           createdAt: timestamp,
-          id: msgId,
-          name: url.split('/').last,
-          size: 0,
-          uri: url,
-        );
-      } else {
-        return types.FileMessage(
+          id: '${baseId}_local_$i',
+          uri: file.path,
+          name: file.name,
+        ));
+      }
+    }
+    // 3. Remote Attachment URLs (Strings)
+    else if (msg.attachmentUrls != null && msg.attachmentUrls!.isNotEmpty) {
+      for (int i = 0; i < msg.attachmentUrls!.length; i++) {
+        final url = msg.attachmentUrls![i];
+        result.add(_createFileMessage(
           author: author,
           createdAt: timestamp,
-          id: msgId,
-          name: url.split('/').last,
-          size: 0,
+          id: '${baseId}_remote_$i',
           uri: url,
-        );
+          name: url.split('/').last,
+        ));
       }
     }
 
-    return types.TextMessage(
-      author: author,
-      createdAt: timestamp,
-      id: msgId,
-      text: msg.content,
-    );
+    // Fallback if message has neither content nor attachments (should not happen normally)
+    if (result.isEmpty) {
+      result.add(types.TextMessage(
+        author: author,
+        createdAt: timestamp,
+        id: '${baseId}_empty',
+        text: msg.content,
+      ));
+    }
+
+    return result;
+  }
+
+  types.Message _createFileMessage({
+    required types.User author,
+    required int createdAt,
+    required String id,
+    required String uri,
+    required String name,
+  }) {
+    final lowerUri = uri.toLowerCase();
+    final isImage =
+        lowerUri.contains('.jpg') ||
+        lowerUri.contains('.jpeg') ||
+        lowerUri.contains('.png') ||
+        lowerUri.contains('.gif') ||
+        lowerUri.contains('.webp');
+
+    if (isImage) {
+      return types.ImageMessage(
+        author: author,
+        createdAt: createdAt,
+        id: id,
+        name: name,
+        size: 0,
+        uri: uri,
+      );
+    } else {
+      return types.FileMessage(
+        author: author,
+        createdAt: createdAt,
+        id: id,
+        name: name,
+        size: 0,
+        uri: uri,
+      );
+    }
   }
 
   void updateLastMessage(PrestaModel presta, String message, String timeLabel) {
@@ -282,10 +360,15 @@ class ChatProvider extends ChangeNotifier {
     notifyListeners();
     try {
       print('DEBUG: ChatProvider.fetchConversations - Fetching for $userId');
-      final parsedList = await _apiService.allConversation(userId, token: token);
-      
-      _conversationList = parsedList;
-      print('DEBUG: ChatProvider.fetchConversations - Loaded ${_conversationList.length} conversations');
+      final parsedList = await _apiService.allConversation(
+        userId,
+        token: token,
+      );
+
+      _conversationList = parsedList ?? [];
+      print(
+        'DEBUG: ChatProvider.fetchConversations - Loaded ${_conversationList.length} conversations',
+      );
     } catch (e) {
       print('DEBUG: ChatProvider.fetchConversations error: $e');
     } finally {
@@ -338,7 +421,9 @@ class ChatProvider extends ChangeNotifier {
             receiverId: msgData['receiverId'] ?? '',
             userName: msgData['userName'] ?? '',
             userPhoto: msgData['userPhoto'],
-            attachmentUrls: msgData['attachmentUrls'] != null ? List<String>.from(msgData['attachmentUrls']) : null,
+            attachmentUrls: msgData['attachmentUrls'] != null
+                ? List<String>.from(msgData['attachmentUrls'])
+                : null,
             timestamp: msgData['timestamp'] != null
                 ? DateTime.tryParse(msgData['timestamp'])
                 : null,
