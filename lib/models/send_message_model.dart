@@ -1,3 +1,4 @@
+import 'package:demarcheur_app/services/config.dart';
 import 'package:image_picker/image_picker.dart';
 
 class SendMessageModel {
@@ -66,32 +67,49 @@ class SendMessageModel {
 
     final msgId = json['id']?.toString() ?? json['_id']?.toString() ?? '';
 
+    // Comprehensive photo extraction
+    final photo = Config.getImgUrl(
+        (json['userPhoto'] ?? json['photo'] ?? json['avatar'] ?? json['profile'] ?? json['image'])?.toString() ??
+        (json['user'] is Map
+            ? (json['user']['image'] ??
+                json['user']['photo'] ??
+                json['user']['avatar'] ??
+                json['user']['profile'])?.toString()
+            : null));
+
     // Handle multiple images/files (fileUrl, image, attachments)
     List<String> urls = [];
     
-    // Check fileUrl (from logs)
+    void addUrl(dynamic u) {
+      if (u == null) return;
+      final resolved = Config.getImgUrl(u.toString());
+      if (resolved != null) urls.add(resolved);
+    }
+    
+    // Check fileUrl
     if (json['fileUrl'] != null) {
-      if (json['fileUrl'] is String) {
-        if (json['fileUrl'].toString().isNotEmpty) urls.add(json['fileUrl']);
-      } else if (json['fileUrl'] is List) {
-        urls.addAll(List<String>.from(json['fileUrl'].map((i) => i.toString())));
+      if (json['fileUrl'] is List) {
+        for (var i in json['fileUrl']) addUrl(i);
+      } else {
+        addUrl(json['fileUrl']);
       }
     }
     
     // Check image
     if (json['image'] != null) {
-      if (json['image'] is String) {
-        if (json['image'].toString().isNotEmpty) urls.add(json['image']);
-      } else if (json['image'] is List) {
-        urls.addAll(List<String>.from(json['image'].map((i) => i is Map ? (i['path'] ?? i['url']) : i.toString())));
+      if (json['image'] is List) {
+        for (var i in json['image']) {
+          if (i is Map) {
+            addUrl(i['path'] ?? i['url']);
+          } else {
+            addUrl(i);
+          }
+        }
       } else if (json['image'] is Map) {
-        urls.add(json['image']['path'] ?? json['image']['url']);
+        addUrl(json['image']['path'] ?? json['image']['url']);
+      } else {
+        addUrl(json['image']);
       }
-    }
-
-    // Check attachments
-    if (json['attachments'] != null && json['attachments'] is List) {
-      urls.addAll(List<String>.from(json['attachments'].map((a) => a is Map ? (a['path'] ?? a['url']) : a.toString())));
     }
 
     // Comprehensive name extraction
@@ -103,13 +121,14 @@ class SendMessageModel {
             : '');
 
     // Comprehensive photo extraction
-    final photo =
-        (json['userPhoto'] ?? json['photo'] ?? json['avatar']) ??
+    final photo = Config.getImgUrl(
+        (json['userPhoto'] ?? json['photo'] ?? json['avatar'] ?? json['profile'] ?? json['image'])?.toString() ??
         (json['user'] is Map
-            ? json['user']['image'] ??
+            ? (json['user']['image'] ??
                 json['user']['photo'] ??
-                json['user']['avatar']
-            : null);
+                json['user']['avatar'] ??
+                json['user']['profile'])?.toString()
+            : null));
 
     return SendMessageModel(
       id: msgId.isNotEmpty ? msgId : null,

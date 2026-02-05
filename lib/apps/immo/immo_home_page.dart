@@ -135,13 +135,13 @@ class _ImmoHomePageState extends State<ImmoHomePage>
         backgroundColor: _color.bg,
         body: RefreshIndicator(
           onRefresh: _refreshData,
-          color: _color.primary,
+          color: _color.bg,
           child: CustomScrollView(
             controller: _scrollController,
             physics: const BouncingScrollPhysics(),
             slivers: [
               _buildModernHeader(),
-              _buildQuickStats(),
+              //_buildQuickStats(),
               _buildFilterSection(),
               _buildPropertyList(),
             ],
@@ -166,14 +166,8 @@ class _ImmoHomePageState extends State<ImmoHomePage>
             Positioned.fill(
               child: Container(
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      _color.primary,
-                      _color.primary.withRed(100), // Dynamic tint
-                      _color.secondary,
-                    ],
+                  image: DecorationImage(
+                    image: AssetImage('assets/background.png'),
                   ),
                 ),
               ),

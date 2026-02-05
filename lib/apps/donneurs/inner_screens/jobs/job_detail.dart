@@ -136,26 +136,12 @@ class _JobDetailState extends State<JobDetail> with TickerProviderStateMixin {
       pinned: true,
       elevation: 0,
       backgroundColor: color.primary,
-      leading: Container(
-        margin: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.9),
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 10,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: IconButton(
-          onPressed: () => Navigator.pop(context),
-          icon: HugeIcon(
-            icon: HugeIcons.strokeRoundedArrowTurnBackward,
-            color: color.primary,
-            size: 22,
-          ),
+      leading: IconButton(
+        onPressed: () => Navigator.pop(context),
+        icon: HugeIcon(
+          icon: HugeIcons.strokeRoundedArrowTurnBackward,
+          color: color.bg,
+          size: 22,
         ),
       ),
       // actions: [

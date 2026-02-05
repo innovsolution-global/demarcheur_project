@@ -1,7 +1,10 @@
+import 'package:demarcheur_app/apps/donneurs/inner_screens/jobs/job_applicants_page.dart';
 import 'package:demarcheur_app/apps/donneurs/inner_screens/jobs/job_posting.dart';
+import 'package:demarcheur_app/apps/donneurs/inner_screens/jobs/my_announcements.dart';
 import 'package:demarcheur_app/consts/color.dart';
 import 'package:demarcheur_app/providers/donnor_user_provider.dart';
 import 'package:demarcheur_app/providers/settings_provider.dart';
+import 'package:demarcheur_app/services/auth_provider.dart';
 import 'package:demarcheur_app/widgets/header_page.dart';
 import 'package:demarcheur_app/widgets/payment_widget.dart';
 import 'package:flutter/material.dart';
@@ -130,8 +133,8 @@ class _ProfilePageState extends State<ProfilePage>
                           children: [
                             _EnhancedProfileHeader(colors: colors),
                             const SizedBox(height: 20),
-                            _ModernStatsSection(colors: colors),
-                            const SizedBox(height: 20),
+                            // _ModernStatsSection(colors: colors),
+                            //const SizedBox(height: 20),
                             _QuickActionsSection(colors: colors),
                             const SizedBox(height: 20),
                             _ModernSectionCard(
@@ -639,14 +642,14 @@ class _QuickActionsSection extends StatelessWidget {
                 child: _QuickActionButton(
                   colors: colors,
                   icon: Icons.analytics_outlined,
-                  label: "Statistiques",
+                  label: "Mes annonces",
                   onTap: () {
-                    // Navigator.push(
-                    //   context,
-                    //   MaterialPageRoute(
-                    //     builder: (context) => const StatisticsPage(),
-                    //   ),
-                    // );
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const MyAnnouncements(),
+                      ),
+                    );
                   },
                 ),
               ),
@@ -655,7 +658,7 @@ class _QuickActionsSection extends StatelessWidget {
                 child: _QuickActionButton(
                   colors: colors,
                   icon: Icons.support_agent_outlined,
-                  label: "Support",
+                  label: "Statistiques",
                   onTap: () {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
@@ -975,7 +978,9 @@ class _ActionButtonsSection extends StatelessWidget {
                     ),
                     TextButton(
                       onPressed: () {
-                        Navigator.pop(context);
+                        final auth = AuthProvider();
+                        auth.logout(context);
+                        // Navigator.pop(context);
                         // Add logout logic here if available
                       },
                       style: OutlinedButton.styleFrom(

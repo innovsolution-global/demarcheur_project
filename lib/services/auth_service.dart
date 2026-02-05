@@ -75,7 +75,7 @@ class AuthService {
     await pref.remove("token");
     await pref.clear();
 
-    Navigator.of(context).pushNamed("onloading");
+    Navigator.of(context).pushNamedAndRemoveUntil("/intro_onboarding", (route) => false);
   }
 
 

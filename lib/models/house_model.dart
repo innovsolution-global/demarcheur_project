@@ -81,28 +81,85 @@ class HouseModel {
     // Hande images from different formats
     List<String> parseImages(Map<String, dynamic> json) {
       List<String> images = [];
+      
+      void addImage(dynamic img) {
+        if (img == null) return;
+        final resolved = Config.getImgUrl(img.toString());
+        if (resolved != null) images.add(resolved);
+      }
+
       if (json['imageUrl'] is List) {
-        images.addAll(List<String>.from(json['imageUrl']));
+        for (var item in json['imageUrl']) addImage(item);
       } else if (json['imageUrl'] is String) {
-        images.add(json['imageUrl']);
+        addImage(json['imageUrl']);
       }
       
-      if (json['cover_image'] != null && json['cover_image'] is String) {
-        images.add(json['cover_image']);
+      if (json['cover_image'] != null) {
+        addImage(json['cover_image']);
       }
       
       if (json['galery_image'] is List) {
-        images.addAll(List<String>.from(json['galery_image']));
+        for (var item in json['galery_image']) addImage(item);
       }
       
-      return images.toSet().toList(); // Unique images
+      return images.toSet().toList(); // Unique resolved images
     }
 
     return HouseModel(
       id: (json['id'] ?? json['_id'])?.toString(),
-      ownerId: json['ownerId']?.toString() ?? json['companyId']?.toString(),
-      companyName: json['companyName'] ?? json['company_name'] ?? json['company']?['name'],
-      logo: json['logo'] ?? json['company']?['logo'],
+      ownerId: json['ownerId']?.toString() ??
+          json['companyId']?.toString() ??
+          json['user']?['id']?.toString() ??
+          json['user']?['_id']?.toString(),
+      companyName: json['companyName'] ??
+          json['company_name'] ??
+          json['entrepriseName'] ??
+          json['entreprise_name'] ??
+          json['company_organization'] ??
+          json['name_organization'] ??
+          json['company']?['name'] ??
+          json['company']?['name_organization'] ??
+          json['company']?['username'] ??
+          json['user']?['name'] ??
+          json['user']?['username'] ??
+          json['user']?['name_organization'] ??
+          json['owner']?['name'] ??
+          json['owner']?['username'] ??
+          json['owner']?['name_organization'],
+      logo: Config.getImgUrl((json['logo'] ??
+          json['logo_path'] ??
+          json['company_logo'] ??
+          json['entreprise_logo'] ??
+          json['companyPicture'] ??
+          json['entreprisePicture'] ??
+          json['company_profile'] ??
+          json['entreprise_profile'] ??
+          json['company']?['logo'] ??
+          json['company']?['profile'] ??
+          json['company']?['image'] ??
+          json['company']?['photo'] ??
+          json['company']?['photoPath'] ??
+          json['company']?['photo_path'] ??
+          json['company']?['profilePath'] ??
+          json['company']?['companyPicture'] ??
+          json['company']?['entreprisePicture'] ??
+          json['user']?['logo'] ??
+          json['user']?['profile'] ??
+          json['user']?['image'] ??
+          json['user']?['photo'] ??
+          json['user']?['photoPath'] ??
+          json['user']?['photo_path'] ??
+          json['user']?['profilePath'] ??
+          json['owner']?['logo'] ??
+          json['owner']?['profile'] ??
+          json['owner']?['image'] ??
+          json['owner']?['photo'] ??
+          json['profile'] ??
+          json['image'] ??
+          json['photo'] ??
+          json['photoPath'] ??
+          json['photo_path'] ??
+          json['profilePath'])?.toString()),
       // Map 'countType' as the display name of the property type
       countType: json['countType'] ?? json['count_type'] ?? json['typeProperty']?['name'],
       imageUrl: parseImages(json),
@@ -131,7 +188,15 @@ class HouseModel {
       advantage: json['advantage']?.toString(),
       condition: json['condition']?.toString(),
       typePropertId: json['typePropertId']?.toString() ?? json['typeProperty']?['id']?.toString(),
-      companyId: json['companyId']?.toString() ?? json['ownerId']?.toString() ?? json['company']?['id']?.toString(),
+      companyId: json['companyId']?.toString() ??
+          json['entrepriseId']?.toString() ??
+          json['ownerId']?.toString() ??
+          json['company']?['id']?.toString() ??
+          json['company']?['_id']?.toString() ??
+          json['user']?['id']?.toString() ??
+          json['user']?['_id']?.toString() ??
+          json['owner']?['id']?.toString() ??
+          json['owner']?['_id']?.toString(),
       piscine: json['piscine'] is int ? json['piscine'] : int.tryParse(json['piscine']?.toString() ?? '0'),
     );
   }

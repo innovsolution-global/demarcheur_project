@@ -1,4 +1,4 @@
-// main.dart logic updated to remove ChatPlugin
+// main.dart logic updated to remove ChatPlugin and implement Splash/Onboarding
 
 import 'package:demarcheur_app/apps/demandeurs/main_screens/boost_page.dart';
 import 'package:demarcheur_app/apps/demandeurs/main_screens/dem_home_page.dart';
@@ -17,7 +17,7 @@ import 'package:demarcheur_app/providers/enterprise_provider.dart';
 import 'package:demarcheur_app/providers/house_provider.dart';
 import 'package:demarcheur_app/providers/immo/immo_chat_provider.dart';
 import 'package:demarcheur_app/providers/message_provider.dart';
-import 'package:demarcheur_app/providers/chat/chat_provider.dart'; // Added import
+import 'package:demarcheur_app/providers/chat/chat_provider.dart';
 import 'package:demarcheur_app/providers/presta/presta_provider.dart';
 import 'package:demarcheur_app/providers/presta/presta_user_provider.dart';
 import 'package:demarcheur_app/providers/search_provider.dart';
@@ -26,6 +26,8 @@ import 'package:demarcheur_app/providers/donor_register_provider.dart';
 import 'package:demarcheur_app/providers/domain_pref_provider.dart';
 import 'package:demarcheur_app/providers/settings_provider.dart';
 import 'package:demarcheur_app/providers/candidature_provider.dart';
+import 'package:demarcheur_app/screens/intro_onboarding_page.dart';
+import 'package:demarcheur_app/screens/splash_screen.dart';
 import 'package:demarcheur_app/services/auth_provider.dart';
 import 'package:demarcheur_app/services/auth_service.dart';
 import 'package:demarcheur_app/services/socket_service.dart';
@@ -34,13 +36,11 @@ import 'package:provider/provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final isLoggedIn = await AuthService.logedUser();
-  runApp(MyApp(isLoggedIn: isLoggedIn!));
+  runApp(const MyApp());
 }
 
 class MyApp extends StatefulWidget {
-  final bool isLoggedIn;
-  const MyApp({super.key, required this.isLoggedIn});
+  const MyApp({super.key});
 
   @override
   State<MyApp> createState() => _MyAppState();
@@ -52,16 +52,13 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   @override
   void initState() {
     WidgetsBinding.instance.addObserver(this);
-    if (widget.isLoggedIn) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {});
-      ensureConnection();
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {});
+    ensureConnection();
     super.initState();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (!widget.isLoggedIn) return;
     if (state == AppLifecycleState.resumed) {
       ensureConnection();
     } else if (state == AppLifecycleState.resumed) {}
@@ -102,7 +99,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         ChangeNotifierProvider(create: (_) => MessageProvider()),
         ChangeNotifierProvider(
           create: (_) => ChatProvider(),
-        ), // Added ChatProvider
+        ),
       ],
 
       child: Consumer<SettingsProvider>(
@@ -114,7 +111,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             locale: settings.locale,
             themeMode: settings.themeMode,
             routes: {
-              //"/": (context) => InitializeWidget(),
+              "/": (context) => const SplashScreen(),
+              "/intro_onboarding": (context) => const IntroOnboardingPage(),
+              "/login": (context) => const LoginPage(),
               "/demhome": (context) => DemHomePage(),
               "/boost": (context) => BoostPage(),
               "/demonboarding": (context) => DemOnboardingPage(),
@@ -135,41 +134,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                 brightness: Brightness.dark,
               ),
             ),
-            home: const LoginPage(),
           );
         },
       ),
     );
-  }
-}
-
-class InitializeWidget extends StatefulWidget {
-  const InitializeWidget({super.key});
-
-  @override
-  State<InitializeWidget> createState() => _InitializeWidgetState();
-}
-
-class _InitializeWidgetState extends State<InitializeWidget> {
-  String? initilizeRoute;
-  @override
-  void initState() {
-    super.initState();
-    _connectionState();
-  }
-
-  Future<void> _connectionState() async {
-    final isLoggedIn = await AuthService.logedUser();
-    if (isLoggedIn == true) {
-      initilizeRoute = "/login";
-    } else {
-      initilizeRoute = "/landing";
-    }
-    Navigator.of(context).pushReplacementNamed(initilizeRoute!);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(body: Center(child: CircularProgressIndicator()));
   }
 }

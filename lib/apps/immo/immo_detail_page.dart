@@ -307,6 +307,8 @@ class _ImmoDetailPageState extends State<ImmoDetailPage> {
   }
 
   Widget _buildOwnerCard(HouseModel house) {
+    debugPrint("DEBUG IMMO DETAIL: logo=${house.logo}");
+    debugPrint("DEBUG IMMO DETAIL: companyName=${house.companyName}");
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -334,15 +336,18 @@ class _ImmoDetailPageState extends State<ImmoDetailPage> {
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(16),
-                  child: Config.getImgUrl(house.logo) != null
+                  child: house.logo != null && house.logo!.isNotEmpty
                       ? Image.network(
-                          Config.getImgUrl(house.logo)!,
+                          house.logo!,
                           fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) => Icon(
-                            Icons.business,
-                            size: 32,
-                            color: Colors.grey[400],
-                          ),
+                          errorBuilder: (context, error, stackTrace) {
+                            debugPrint("DEBUG IMMO DETAIL: Image load error: $error");
+                            return Icon(
+                              Icons.business,
+                              size: 32,
+                              color: Colors.grey[400],
+                            );
+                          },
                         )
                       : Icon(
                           Icons.business,

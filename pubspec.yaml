@@ -61,6 +61,7 @@ dependencies:
   flutter_secure_storage:
   fluttertoast: 
   socket_io_client:
+  google_fonts: ^8.0.0
 
 
   
@@ -125,6 +126,10 @@ flutter:
     - assets/soutra.png
     - assets/demapp.png
     - assets/background.png
+    - assets/job.png
+    - assets/opportinuity.png
+    - assets/real.png
+
 
 
     

@@ -208,44 +208,80 @@ class ChatProvider extends ChangeNotifier {
   }
 
   Future<bool> sendNewMessage(SendMessageModel message, String? token) async {
-    // API Call
-    final result = await _apiService.sendMessage(message, token);
+    // 1. Optimistic Update: Add temporary message immediately
+    final tempId = 'temp_${DateTime.now().microsecondsSinceEpoch}';
+    print('DEBUG: ChatProvider - Adding optimistic message: $tempId');
+    
+    final tempMessage = SendMessageModel(
+      id: tempId,
+      content: message.content,
+      senderId: message.senderId,
+      receiverId: message.receiverId,
+      userName: message.userName,
+      userPhoto: message.userPhoto,
+      attachments: message.attachments, // Local files show immediately
+      attachmentUrls: message.attachmentUrls,
+      timestamp: DateTime.now(),
+    );
 
-    if (result != null) {
-      final apiMsg = SendMessageModel.fromJson(result);
+    _messageMap[tempId] = tempMessage;
+    _syncDerivedLists();
+    notifyListeners();
 
-      // Merge local metadata (userName, userPhoto) into the received message
-      // as the API might only return the basic fields (id, content, etc.)
-      final sentMsg = SendMessageModel(
-        id: apiMsg.id,
-        content: apiMsg.content.isNotEmpty ? apiMsg.content : message.content,
-        senderId: apiMsg.senderId.isNotEmpty
-            ? apiMsg.senderId
-            : message.senderId,
-        receiverId: apiMsg.receiverId.isNotEmpty
-            ? apiMsg.receiverId
-            : message.receiverId,
-        userName: apiMsg.userName.isNotEmpty
-            ? apiMsg.userName
-            : message.userName,
-        userPhoto: apiMsg.userPhoto ?? message.userPhoto,
-        attachmentUrls: apiMsg.attachmentUrls ?? message.attachmentUrls,
-        attachments: message.attachments, // Keep local files for immediate UI
-        timestamp: apiMsg.timestamp ?? message.timestamp,
-      );
+    try {
+      // 2. API Call
+      final result = await _apiService.sendMessage(message, token);
 
-      final msgId = sentMsg.id;
+      // 3. Handle Result
+      if (result != null) {
+        final apiMsg = SendMessageModel.fromJson(result);
 
-      if (msgId != null && msgId.isNotEmpty) {
-        print('DEBUG: ChatProvider - Adding message from API (merged): $msgId');
-        _messageMap[msgId] = sentMsg;
-        _saveMessagesToCache();
+        // Remove temp message
+        _messageMap.remove(tempId);
+
+        // Merge local metadata (userName, userPhoto) into the received message
+        final sentMsg = SendMessageModel(
+          id: apiMsg.id,
+          content: apiMsg.content.isNotEmpty ? apiMsg.content : message.content,
+          senderId: apiMsg.senderId.isNotEmpty
+              ? apiMsg.senderId
+              : message.senderId,
+          receiverId: apiMsg.receiverId.isNotEmpty
+              ? apiMsg.receiverId
+              : message.receiverId,
+          userName: apiMsg.userName.isNotEmpty
+              ? apiMsg.userName
+              : message.userName,
+          userPhoto: apiMsg.userPhoto ?? message.userPhoto,
+          attachmentUrls: apiMsg.attachmentUrls ?? message.attachmentUrls,
+          attachments: message.attachments, // Keep local files for now
+          timestamp: apiMsg.timestamp ?? message.timestamp,
+        );
+
+        final msgId = sentMsg.id;
+        if (msgId != null && msgId.isNotEmpty) {
+           print('DEBUG: ChatProvider - Replaced optimized msg with real API msg: $msgId');
+          _messageMap[msgId] = sentMsg;
+          _saveMessagesToCache();
+          _syncDerivedLists();
+          notifyListeners();
+        }
+        return true;
+      } else {
+         // API returned null (failure)
+         print('DEBUG: ChatProvider - Send failed (null result), removing temp msg');
+        _messageMap.remove(tempId);
         _syncDerivedLists();
         notifyListeners();
+        return false;
       }
-      return true;
+    } catch (e) {
+      print('DEBUG: ChatProvider - Send failed with error: $e');
+      _messageMap.remove(tempId);
+      _syncDerivedLists();
+      notifyListeners();
+      return false;
     }
-    return false;
   }
 
   List<types.Message> _mapToChatTypes(SendMessageModel msg) {
@@ -258,13 +294,19 @@ class ChatProvider extends ChangeNotifier {
 
     final baseId = msg.id ?? 'msg_${timestamp}_${msg.content.hashCode}';
 
+    // Check if it's a temporary (sending) message
+    final isSending = baseId.startsWith('temp_');
+    final status = isSending ? types.Status.sending : types.Status.sent;
+
     // 1. Text Content
-    if (msg.content.trim().isNotEmpty) {
+    // Filter out the placeholder string used for file-only messages
+    if (msg.content.trim().isNotEmpty && msg.content != '__FILE_ONLY__') {
       result.add(types.TextMessage(
         author: author,
         createdAt: timestamp,
         id: '${baseId}_text',
         text: msg.content,
+        status: status,
       ));
     }
 
@@ -278,6 +320,7 @@ class ChatProvider extends ChangeNotifier {
           id: '${baseId}_local_$i',
           uri: file.path,
           name: file.name,
+          status: status,
         ));
       }
     }
@@ -291,6 +334,7 @@ class ChatProvider extends ChangeNotifier {
           id: '${baseId}_remote_$i',
           uri: url,
           name: url.split('/').last,
+          status: status,
         ));
       }
     }
@@ -302,6 +346,7 @@ class ChatProvider extends ChangeNotifier {
         createdAt: timestamp,
         id: '${baseId}_empty',
         text: msg.content,
+        status: status,
       ));
     }
 
@@ -314,6 +359,7 @@ class ChatProvider extends ChangeNotifier {
     required String id,
     required String uri,
     required String name,
+    required types.Status status,
   }) {
     final lowerUri = uri.toLowerCase();
     final isImage =
@@ -331,6 +377,7 @@ class ChatProvider extends ChangeNotifier {
         name: name,
         size: 0,
         uri: uri,
+        status: status,
       );
     } else {
       return types.FileMessage(
@@ -340,6 +387,7 @@ class ChatProvider extends ChangeNotifier {
         name: name,
         size: 0,
         uri: uri,
+        status: status,
       );
     }
   }

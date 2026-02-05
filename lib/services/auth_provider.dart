@@ -154,7 +154,10 @@ class AuthProvider with ChangeNotifier {
         _token = token;
         final StorageService storage = StorageService();
         await storage.saveToken(token);
-        await prefs.setString('token', token); // Keep for compat if needed, but primary is storage.saveToken
+        await prefs.setString(
+          'token',
+          token,
+        ); // Keep for compat if needed, but primary is storage.saveToken
       }
 
       // 2. Handle connected user
@@ -215,7 +218,9 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
 
     // Navigate back to login
-    Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+    Navigator.of(
+      context,
+    ).pushNamedAndRemoveUntil('/intro_onboarding', (route) => false);
   }
 
   //adding job vancy

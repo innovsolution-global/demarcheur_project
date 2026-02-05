@@ -9,6 +9,8 @@ import 'package:flutter_chat_types/flutter_chat_types.dart' as types;
 import 'package:flutter_chat_ui/flutter_chat_ui.dart' as ui;
 import 'package:hugeicons/hugeicons.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:flutter_spinkit/flutter_spinkit.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 class ChatWidget extends StatefulWidget {
@@ -25,12 +27,20 @@ class _ChatWidgetState extends State<ChatWidget> {
   final colors = ConstColors();
   final Key _chatKey = UniqueKey();
   final List<XFile> _selectedAttachments = [];
+  final TextEditingController _textController =
+      TextEditingController(); // Added controller
   bool _isPicking = false;
 
   @override
   void initState() {
     super.initState();
     _initializeChat();
+  }
+
+  @override
+  void dispose() {
+    _textController.dispose();
+    super.dispose();
   }
 
   void _initializeChat() {
@@ -137,19 +147,28 @@ class _ChatWidgetState extends State<ChatWidget> {
       leading: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: colors.primary.withOpacity(0.1),
+          color: colors.primary,
           borderRadius: BorderRadius.circular(10),
         ),
-        child: HugeIcon(icon: icon, color: colors.primary, size: 24),
+        child: HugeIcon(icon: icon, color: colors.bg, size: 24),
       ),
-      title: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+      title: Text(
+        label,
+        style: TextStyle(fontWeight: FontWeight.w600, color: colors.primary),
+      ),
       onTap: onTap,
     );
   }
 
-  Future<void> _handleSendPressed(types.PartialText message) async {
-    final text = message.text.trim();
+  // Modified to be called manually from custom input
+  Future<void> _onSendTap() async {
+    String text = _textController.text.trim();
     if (text.isEmpty && _selectedAttachments.isEmpty) return;
+
+    // Use placeholder if text is empty but attachments exist
+    if (text.isEmpty && _selectedAttachments.isNotEmpty) {
+      text = "__FILE_ONLY__";
+    }
 
     final chatProvider = Provider.of<ChatProvider>(context, listen: false);
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
@@ -182,7 +201,8 @@ class _ChatWidgetState extends State<ChatWidget> {
       timestamp: DateTime.now(),
     );
 
-    // Clear local selection immediately for better UX
+    // Clear UI state immediately
+    _textController.clear();
     setState(() => _selectedAttachments.clear());
 
     final success = await chatProvider.sendNewMessage(
@@ -277,6 +297,78 @@ class _ChatWidgetState extends State<ChatWidget> {
     );
   }
 
+  // Custom Input Bar to replace the default one
+  Widget _buildCustomInput() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _buildAttachmentPreview(), // Moving preview here above the input
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          color: Colors.white,
+          child: SafeArea(
+            child: Row(
+              children: [
+                IconButton(
+                  onPressed: _handleAttachmentPressed,
+                  icon: HugeIcon(
+                    icon: HugeIcons.strokeRoundedCamera01,
+                    color: colors.primary,
+                    size: 24,
+                  ),
+                ),
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF5F7FB),
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    child: TextField(
+                      controller: _textController,
+                      style: TextStyle(color: colors.primary),
+                      textCapitalization: TextCapitalization.sentences,
+                      decoration: const InputDecoration(
+                        border: InputBorder.none,
+                        hintText: "Écrire un message...",
+                        hintStyle: TextStyle(color: Colors.grey),
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(vertical: 10),
+                      ),
+                      minLines: 1,
+                      maxLines: 4,
+                      onChanged: (val) {
+                        setState(() {}); // Rebuild to toggle send icon
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  onPressed:
+                      (_textController.text.trim().isNotEmpty ||
+                          _selectedAttachments.isNotEmpty)
+                      ? _onSendTap
+                      : null,
+                  style: IconButton.styleFrom(
+                    backgroundColor: colors.primary,
+                    shape: const CircleBorder(),
+                    padding: const EdgeInsets.all(10),
+                  ),
+                  icon: const Icon(
+                    Icons.send_rounded,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
@@ -292,8 +384,8 @@ class _ChatWidgetState extends State<ChatWidget> {
         toolbarHeight: 70,
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
-          icon: const Icon(
-            Icons.chevron_left_rounded,
+          icon: const HugeIcon(
+            icon: HugeIcons.strokeRoundedArrowTurnBackward,
             color: Colors.white,
             size: 30,
           ),
@@ -312,68 +404,115 @@ class _ChatWidgetState extends State<ChatWidget> {
                   : null,
             ),
             const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                otherUserName,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 18,
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  otherUserName,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 18,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
-                overflow: TextOverflow.ellipsis,
-              ),
+                Text(
+                  widget.message.timestamp != null
+                      ? DateFormat('HH:mm').format(widget.message.timestamp!)
+                      : '',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w400,
+                    fontSize: 14,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ),
           ],
         ),
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: Consumer<ChatProvider>(
-              builder: (context, chatProvider, child) {
-                return ui.Chat(
-                  key: _chatKey,
-                  messages: chatProvider.chatMessages,
-                  onSendPressed: _handleSendPressed,
-                  onAttachmentPressed: _handleAttachmentPressed,
-                  user: user,
-                  theme: ui.DefaultChatTheme(
-                    primaryColor: colors.primary,
-                    secondaryColor: Colors.grey.shade100,
-                    inputBackgroundColor: Colors.white,
-                    inputTextColor: Colors.black87,
-                    inputTextStyle: const TextStyle(fontSize: 16),
-                    inputPadding: const EdgeInsets.all(12),
-                    inputBorderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(20),
-                    ),
-                    sentMessageBodyTextStyle: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 15,
-                    ),
-                    receivedMessageBodyTextStyle: const TextStyle(
-                      color: Colors.black87,
-                      fontSize: 15,
-                    ),
-                    backgroundColor: const Color(0xFFF5F7FB),
-                    dateDividerTextStyle: TextStyle(
-                      color: Colors.grey.shade600,
-                      fontWeight: FontWeight.w500,
+      body: Consumer<ChatProvider>(
+        builder: (context, chatProvider, child) {
+          if (chatProvider.isloading) {
+            return Center(
+              child: SpinKitPulse(color: colors.primary, size: 60.0),
+            );
+          }
+          return ui.Chat(
+            key: _chatKey,
+            messages: chatProvider.chatMessages,
+            onSendPressed: (_) {}, // Ignored since we use custom input
+            onAttachmentPressed: _handleAttachmentPressed,
+            user: user,
+            customBottomWidget: _buildCustomInput(), // Use Custom Input
+            emptyState: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  HugeIcon(
+                    icon: HugeIcons.strokeRoundedMessage01,
+                    size: 60,
+                    color: colors.primary.withValues(alpha: 0.5),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    "Aucune discussion",
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: colors.primary,
                     ),
                   ),
-                  showUserAvatars: true,
-                  showUserNames: false,
-                  inputOptions: ui.InputOptions(
-                    sendButtonVisibilityMode: _selectedAttachments.isNotEmpty
-                        ? ui.SendButtonVisibilityMode.always
-                        : ui.SendButtonVisibilityMode.editing,
+                  const SizedBox(height: 8),
+                  Text(
+                    "Envoyez un message pour démarrer la conversation",
+                    style: TextStyle(color: Colors.grey.shade500, fontSize: 14),
                   ),
-                );
-              },
+                ],
+              ),
             ),
-          ),
-          _buildAttachmentPreview(),
-        ],
+            imageMessageBuilder: (message, {required messageWidth}) {
+              final isLocal = !message.uri.startsWith('http');
+              if (isLocal) {
+                return Image.file(File(message.uri), fit: BoxFit.cover);
+              }
+              return Image.network(
+                message.uri,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return const Center(child: Icon(Icons.error));
+                },
+              );
+            },
+            theme: ui.DefaultChatTheme(
+              primaryColor: colors.primary,
+              secondaryColor: Colors.grey.shade100,
+              inputBackgroundColor: Colors.white,
+              inputTextColor: Colors.black87,
+              inputTextStyle: const TextStyle(fontSize: 16),
+              inputPadding: const EdgeInsets.all(12),
+              inputBorderRadius: const BorderRadius.vertical(
+                top: Radius.circular(20),
+              ),
+              sentMessageBodyTextStyle: const TextStyle(
+                color: Colors.white,
+                fontSize: 15,
+              ),
+              receivedMessageBodyTextStyle: const TextStyle(
+                color: Colors.black87,
+                fontSize: 15,
+              ),
+              backgroundColor: const Color(0xFFF5F7FB),
+              dateDividerTextStyle: TextStyle(
+                color: Colors.grey.shade600,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            showUserAvatars: true,
+            showUserNames: false,
+          );
+        },
       ),
     );
   }

@@ -8,6 +8,7 @@ import 'package:demarcheur_app/services/config.dart';
 import 'package:demarcheur_app/widgets/chat_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
@@ -77,34 +78,37 @@ class _DetailHouseState extends State<DetailHouse> {
       backgroundColor: Colors.white,
       leading: Padding(
         padding: const EdgeInsets.all(8.0),
-        child: CircleAvatar(
-          backgroundColor: Colors.white.withOpacity(0.9),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+          ),
           child: IconButton(
-            icon: Icon(
-              Icons.arrow_back_ios_new,
-              color: _color.secondary,
-              size: 18,
+            icon: HugeIcon(
+              icon: HugeIcons.strokeRoundedArrowTurnBackward,
+              color: _color.primary,
+              size: 30,
             ),
             onPressed: () => Navigator.pop(context),
           ),
         ),
       ),
-      actions: [
-        Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: CircleAvatar(
-            backgroundColor: Colors.white.withOpacity(0.9),
-            child: IconButton(
-              icon: Icon(
-                Icons.share_outlined,
-                color: _color.secondary,
-                size: 20,
-              ),
-              onPressed: () {},
-            ),
-          ),
-        ),
-      ],
+      // actions: [
+      //   Padding(
+      //     padding: const EdgeInsets.all(8.0),
+      //     child: CircleAvatar(
+      //       backgroundColor: Colors.white.withOpacity(0.9),
+      //       child: IconButton(
+      //         icon: Icon(
+      //           Icons.share_outlined,
+      //           color: _color.secondary,
+      //           size: 20,
+      //         ),
+      //         onPressed: () {},
+      //       ),
+      //     ),
+      //   ),
+      // ],
       flexibleSpace: FlexibleSpaceBar(
         background: Stack(
           fit: StackFit.expand,
@@ -144,6 +148,8 @@ class _DetailHouseState extends State<DetailHouse> {
   }
 
   Widget _buildHeaderInfo(HouseModel house) {
+    bool isTerrain = house.title?.toLowerCase().contains('terrain') ?? false;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -188,7 +194,7 @@ class _DetailHouseState extends State<DetailHouse> {
         ),
         const SizedBox(height: 16),
         Text(
-          house.title ?? house.countType ?? "Sans titre",
+          house.title ?? "Sans titre",
           style: TextStyle(
             fontSize: 28,
             fontWeight: FontWeight.w900,
@@ -220,19 +226,22 @@ class _DetailHouseState extends State<DetailHouse> {
             color: _color.primary,
           ),
         ),
-        Text(
-          "par mois",
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.grey[500],
-            fontWeight: FontWeight.w500,
+        if (!isTerrain)
+          Text(
+            "par mois",
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[500],
+              fontWeight: FontWeight.w500,
+            ),
           ),
-        ),
       ],
     );
   }
 
   Widget _buildQuickFeatures(HouseModel house) {
+    bool isTerrain = house.title?.toLowerCase().contains('terrain') ?? false;
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -243,26 +252,29 @@ class _DetailHouseState extends State<DetailHouse> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _FeatureItem(
-            icon: Icons.meeting_room_outlined,
-            label: "Chambres",
-            value: "${house.rooms ?? 0}",
-          ),
-          _FeatureItem(
-            icon: Icons.weekend_outlined,
-            label: "Salons",
-            value: "${house.livingRooms ?? 0}",
-          ),
+          if (!isTerrain)
+            _FeatureItem(
+              icon: Icons.meeting_room_outlined,
+              label: "Chambres",
+              value: "${house.rooms ?? 0}",
+            ),
+          if (!isTerrain)
+            _FeatureItem(
+              icon: Icons.weekend_outlined,
+              label: "Salons",
+              value: "${house.livingRooms ?? 0}",
+            ),
           _FeatureItem(
             icon: Icons.square_foot_outlined,
             label: "Surface",
             value: "${house.area ?? 0} m²",
           ),
-          _FeatureItem(
-            icon: Icons.garage_outlined,
-            label: "Garage",
-            value: "${house.garage ?? 0}",
-          ),
+          if (!isTerrain)
+            _FeatureItem(
+              icon: Icons.garage_outlined,
+              label: "Garage",
+              value: "${house.garage ?? 0}",
+            ),
         ],
       ),
     );
@@ -283,7 +295,7 @@ class _DetailHouseState extends State<DetailHouse> {
         const SizedBox(height: 12),
         Text(
           house.description ??
-              "Cette magnifique propriété située à ${house.location} offre un cadre de vie exceptionnel. Parfaitement entretenue, elle dispose de grands espaces lumineux et d'aménagements modernes.",
+              "Cette magnifique propriété située à ${house.city} offre un cadre de vie exceptionnel. Parfaitement entretenue, elle dispose de grands espaces lumineux et d'aménagements modernes.",
           style: TextStyle(fontSize: 16, color: Colors.grey[600], height: 1.6),
         ),
       ],
@@ -291,12 +303,16 @@ class _DetailHouseState extends State<DetailHouse> {
   }
 
   Widget _buildAmenities(HouseModel house) {
+    bool isTerrain = house.title?.toLowerCase().contains('terrain') ?? false;
     final List<Map<String, dynamic>> amenities = [
-      if (house.kitchen != null && house.kitchen! > 0)
+      if (!isTerrain && house.kitchen != null && house.kitchen! > 0)
         {"icon": Icons.kitchen_outlined, "label": "Cuisine"},
       if (house.garden == true)
-        {"icon": Icons.park_outlined, "label": "Jardin"},
-      if (house.piscine != null && house.piscine! > 0)
+        {
+          "icon": Icons.park_outlined,
+          "label": "Jardin",
+        }, // Garden might be relevant for land
+      if (!isTerrain && house.piscine != null && house.piscine! > 0)
         {"icon": Icons.pool_outlined, "label": "Piscine"},
       if (house.store != null && house.store! > 0)
         {"icon": Icons.store_mall_directory_outlined, "label": "Magasin"},
@@ -361,6 +377,8 @@ class _DetailHouseState extends State<DetailHouse> {
   }
 
   Widget _buildOwnerCard(HouseModel house) {
+    debugPrint("DEBUG HOUSE DETAIL: logo=${house.logo}");
+    debugPrint("DEBUG HOUSE DETAIL: companyName=${house.companyName}");
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -386,15 +404,18 @@ class _DetailHouseState extends State<DetailHouse> {
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(16),
-              child: Config.getImgUrl(house.logo) != null
+              child: house.logo != null && house.logo!.isNotEmpty
                   ? Image.network(
-                      Config.getImgUrl(house.logo)!,
+                      house.logo!,
                       fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Icon(
-                        Icons.business,
-                        size: 32,
-                        color: Colors.grey[400],
-                      ),
+                      errorBuilder: (context, error, stackTrace) {
+                        debugPrint("DEBUG HOUSE DETAIL: Image load error: $error");
+                        return Icon(
+                          Icons.business,
+                          size: 32,
+                          color: Colors.grey[400],
+                        );
+                      },
                     )
                   : Icon(Icons.business, size: 32, color: Colors.grey[400]),
             ),

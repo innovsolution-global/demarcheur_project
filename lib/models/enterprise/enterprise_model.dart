@@ -46,10 +46,22 @@ class EnterpriseModel {
       adress: (json['adress'] ?? json['address'] ?? json['location'])?.toString(),
       city: json['city']?.toString(),
       serviceId: json['serviceId']?.toString(),
-      profile: Config.getImgUrl(json['profile']?.toString() ??
-               json['photoPath']?.toString() ??
-               json['photo_path']?.toString() ??
-               json['profilePath']?.toString()),
+      profile: Config.getImgUrl((json['profile'] ??
+               json['logo'] ??
+               json['image'] ??
+               json['photo'] ??
+               json['photoPath'] ??
+               json['photo_path'] ??
+               json['profilePath'] ??
+               json['logoPath'] ??
+               json['logo_path'] ??
+               json['companyLogo'] ??
+               json['company_logo'] ??
+               json['entrepriseLogo'] ??
+               json['entreprise_logo'] ??
+               json['companyPicture'] ??
+               json['entreprisePicture'] ??
+               json['image_url'])?.toString()),
       role: json['role']?.toString(),
       rate: (json['rate'] ?? 0.0).toDouble(),
       isVerified: json['isVerified'] ?? false,

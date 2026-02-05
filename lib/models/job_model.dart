@@ -1,3 +1,4 @@
+import 'package:demarcheur_app/services/config.dart';
 class JobModel {
   final String? id;
   final String title;
@@ -27,7 +28,7 @@ class JobModel {
       id: json['id'],
       title: json['title'],
       companyName: json['companyName'],
-      imageUrl: json['imageUrl'],
+      imageUrl: Config.getImgUrl(json['imageUrl']?.toString()) ?? '',
       postDate: json['postDate'],
       salary: (json['salary'] as num).toDouble(),
       location: json['location'],
