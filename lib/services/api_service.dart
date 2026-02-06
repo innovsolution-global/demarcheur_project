@@ -21,9 +21,9 @@ class ApiService {
   final StorageService _storage = StorageService();
   final String baseUrl = Config.baseUrl;
   Map<String, String> get _headers => {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      };
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+  };
 
   Future<Map<String, String>> _getAuthHeaders([String? token]) async {
     final headers = _headers;
@@ -317,10 +317,7 @@ class ApiService {
     for (final url in endpoints) {
       try {
         final headers = await _getAuthHeaders(token);
-        final response = await http.get(
-          Uri.parse(url),
-          headers: headers,
-        );
+        final response = await http.get(Uri.parse(url), headers: headers);
 
         if (response.statusCode == 200) {
           final body = jsonDecode(response.body);
@@ -839,7 +836,9 @@ class ApiService {
         // Enforce max 15 files as mentioned in doc
         final filesToSend = chat.attachments!.take(15).toList();
         if (chat.attachments!.length > 15) {
-          print('WARNING: ApiService.sendMessage - More than 15 images provided. Only the first 15 will be sent.');
+          print(
+            'WARNING: ApiService.sendMessage - More than 15 images provided. Only the first 15 will be sent.',
+          );
         }
 
         for (var file in filesToSend) {
@@ -970,7 +969,9 @@ class ApiService {
       // Grouping Logic: If endpoint returned raw messages, we must group them by conversation partner
       final Map<String, SendMessageModel> conversationsMap = {};
 
-      print('DEBUG: ApiService.allConversation - Total messages to group: ${allMessages.length}');
+      print(
+        'DEBUG: ApiService.allConversation - Total messages to group: ${allMessages.length}',
+      );
       for (var msg in allMessages) {
         // Identify the partner ID.
         // Logic: The partner is the ID that is NOT mine.
@@ -982,7 +983,9 @@ class ApiService {
           partnerId = msg.receiverId;
         }
 
-        print('DEBUG: ApiService.allConversation - msg: s="${msg.senderId}", r="${msg.receiverId}", partnerId="$partnerId"');
+        print(
+          'DEBUG: ApiService.allConversation - msg: s="${msg.senderId}", r="${msg.receiverId}", partnerId="$partnerId"',
+        );
 
         if (partnerId.isEmpty || partnerId == userId) {
           continue;
@@ -1001,8 +1004,10 @@ class ApiService {
           userPhoto: msg.userPhoto,
           timestamp: msg.timestamp,
         );
-        
-        print('DEBUG: ApiService.allConversation - Produced normalized: s="${normalizedMsg.senderId}", r="${normalizedMsg.receiverId}"');
+
+        print(
+          'DEBUG: ApiService.allConversation - Produced normalized: s="${normalizedMsg.senderId}", r="${normalizedMsg.receiverId}"',
+        );
 
         if (!conversationsMap.containsKey(partnerId)) {
           conversationsMap[partnerId] = normalizedMsg;
@@ -1048,10 +1053,7 @@ class ApiService {
         try {
           print('DEBUG: fetchConversations - Requesting $url');
           final headers = await _getAuthHeaders(token);
-          final resp = await http.get(
-            Uri.parse(url),
-            headers: headers,
-          );
+          final resp = await http.get(Uri.parse(url), headers: headers);
           if (resp.statusCode == 200) {
             final d = jsonDecode(resp.body);
             List l = [];
@@ -1198,10 +1200,7 @@ class ApiService {
       Future<void> fetchAndAdd(String url) async {
         try {
           print('DEBUG: fetchMessages - Requesting $url');
-          final resp = await http.get(
-            Uri.parse(url),
-            headers: headers,
-          );
+          final resp = await http.get(Uri.parse(url), headers: headers);
           if (resp.statusCode == 200) {
             final d = jsonDecode(resp.body);
             List l = [];
@@ -1265,10 +1264,7 @@ class ApiService {
         // Use a temporary list to fetch generic
         Future<void> fetchGeneric(String url) async {
           try {
-            final resp = await http.get(
-              Uri.parse(url),
-              headers: headers,
-            );
+            final resp = await http.get(Uri.parse(url), headers: headers);
             if (resp.statusCode == 200) {
               final d = jsonDecode(resp.body);
               List l = [];
@@ -1342,5 +1338,13 @@ class ApiService {
       print('ApiService.fetchMessagesBetweenUsers error: $e');
     }
     return [];
+  }
+
+  Future<Map<String, dynamic>?> upDateProfile(String userId) async {
+    final response = await http.patch(
+      Uri.parse('$baseUrl/auth/update-profile/$userId'),
+      headers: _headers,
+    );
+    return null;
   }
 }

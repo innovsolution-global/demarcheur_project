@@ -662,9 +662,9 @@ class _VancyState extends State<Vancy> with TickerProviderStateMixin {
     final enterpriseProvider = context.watch<EnterpriseProvider>();
     final userProvider = context.watch<UserProvider>();
 
-    // Safety fallback: if userProvider has no users and we have enterprise ID, try loading once
+    // Safety fallback: if userProvider has not fetched data yet and we have enterprise ID, trigger load
     if (!userProvider.isLoading &&
-        userProvider.allusers.isEmpty &&
+        !userProvider.hasFetchedCandidates &&
         enterpriseProvider.user?.id != null &&
         enterpriseProvider.token != null) {
       print(
@@ -687,8 +687,17 @@ class _VancyState extends State<Vancy> with TickerProviderStateMixin {
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
         backgroundColor: const Color(0xFFF8FAFC),
-        body: NestedScrollView(
-          headerSliverBuilder: (context, innerBoxIsScrolled) => [
+        body: RefreshIndicator(
+          color: colors.primary,
+          onRefresh: () async {
+            final enterpriseProvider = context.read<EnterpriseProvider>();
+            await context.read<UserProvider>().loadCandidates(
+              enterpriseProvider.token,
+              enterpriseId: enterpriseProvider.user?.id,
+            );
+          },
+          child: NestedScrollView(
+            headerSliverBuilder: (context, innerBoxIsScrolled) => [
             SliverAppBar.large(
               flexibleSpace: FlexibleSpaceBar(
                 centerTitle: true,
@@ -869,7 +878,8 @@ class _VancyState extends State<Vancy> with TickerProviderStateMixin {
             ],
           ),
         ),
-        floatingActionButton: _isFabExtended
+      ),
+      floatingActionButton: _isFabExtended
             ? FloatingActionButton.extended(
                 onPressed: () {
                   Navigator.push(

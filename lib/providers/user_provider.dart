@@ -4,10 +4,18 @@ import 'package:demarcheur_app/services/api_service.dart';
 import 'package:flutter/material.dart';
 
 class UserProvider extends ChangeNotifier {
-  List<UserModel> _allusers = [];
-  bool _isLoading = false;
-  List<UserModel> get allusers => _allusers;
+  bool _hasFetchedCandidates = false;
+  List<UserModel> _allusers  =[];
+   List<UserModel> get allusers => _allusers;
+  bool  _isLoading = false;
   bool get isLoading => _isLoading;
+  bool get hasFetchedCandidates => _hasFetchedCandidates;
+
+  void clearCandidates() {
+    _allusers = [];
+    _hasFetchedCandidates = false;
+    notifyListeners();
+  }
 
   Future<void> loadUsers({String? token}) async {
     await loadCandidates(token);
@@ -164,6 +172,7 @@ class UserProvider extends ChangeNotifier {
     }
 
     _isLoading = false;
+    _hasFetchedCandidates = true;
     notifyListeners();
   }
 }

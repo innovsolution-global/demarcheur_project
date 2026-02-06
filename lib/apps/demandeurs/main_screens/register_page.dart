@@ -390,7 +390,7 @@ class _RegisterPage extends State<RegisterPage>
           ),
           const SizedBox(height: 12),
           SubTitle(
-            text: "Votre photo de profil",
+            text: "Le logo de l'entreprise",
             fontWeight: FontWeight.w600,
             fontsize: 18,
             color: ConstColors().secondary,
@@ -407,9 +407,10 @@ class _RegisterPage extends State<RegisterPage>
       child: Column(
         children: [
           _CustomTextField(
+            isPassword: false,
             textCapitalization: TextCapitalization.sentences,
             controller: _companyNameController,
-            label: "Nom complet",
+            label: "Nom de l'entreprise",
             icon: HugeIcons.strokeRoundedBuilding01,
             validator: (value) => _validateRequired(value, "Le nom"),
           ),
@@ -481,6 +482,7 @@ class _RegisterPage extends State<RegisterPage>
           ),
           const SizedBox(height: 20),
           _CustomTextField(
+            isPassword: false,
             textCapitalization: TextCapitalization.none,
 
             controller: _emailController,
@@ -491,6 +493,7 @@ class _RegisterPage extends State<RegisterPage>
           ),
           const SizedBox(height: 20),
           _CustomTextField(
+            isPassword: false,
             textCapitalization: TextCapitalization.none,
 
             controller: _phoneController,
@@ -501,15 +504,17 @@ class _RegisterPage extends State<RegisterPage>
           ),
           const SizedBox(height: 20),
           _CustomTextField(
+            isPassword: false,
             textCapitalization: TextCapitalization.sentences,
             controller: _locationController,
-            label: "Localisation",
+            label: "Adresse",
             icon: HugeIcons.strokeRoundedLocation01,
-            validator: (value) => _validateRequired(value, "La localisation"),
+            validator: (value) => _validateRequired(value, "L'adresse"),
             textInputAction: TextInputAction.next,
           ),
           const SizedBox(height: 20),
           _CustomTextField(
+            isPassword: true,
             textCapitalization: TextCapitalization.none,
             controller: _passwordController,
             label: "Mot de passe",
@@ -558,7 +563,7 @@ class _RegisterPage extends State<RegisterPage>
   }
 }
 
-class _CustomTextField extends StatelessWidget {
+class _CustomTextField extends StatefulWidget {
   final TextEditingController controller;
   final String label;
   final dynamic icon;
@@ -566,33 +571,53 @@ class _CustomTextField extends StatelessWidget {
   final String? Function(String?)? validator;
   final TextInputAction? textInputAction;
   final TextCapitalization textCapitalization;
+  final bool isPassword;
 
   const _CustomTextField({
     required this.controller,
     required this.label,
     required this.icon,
     required this.textCapitalization,
-
+    required this.isPassword,
     this.keyboardType,
     this.validator,
     this.textInputAction,
   });
 
   @override
+  State<_CustomTextField> createState() => _CustomTextFieldState();
+}
+
+class _CustomTextFieldState extends State<_CustomTextField> {
+  bool obscuredText = false;
+  @override
   Widget build(BuildContext context) {
     final color = ConstColors();
 
     return TextFormField(
-      controller: controller,
-      keyboardType: keyboardType ?? TextInputType.text,
-      textInputAction: textInputAction ?? TextInputAction.next,
-      textCapitalization: textCapitalization,
-      validator: validator,
+      controller: widget.controller,
+      keyboardType: widget.keyboardType ?? TextInputType.text,
+      textInputAction: widget.textInputAction ?? TextInputAction.next,
+      textCapitalization: widget.textCapitalization,
+      obscureText: widget.isPassword,
+      validator: widget.validator,
       style: TextStyle(fontSize: 16, color: color.secondary),
       decoration: InputDecoration(
-        labelText: label,
+        labelText: widget.label,
         labelStyle: TextStyle(color: color.primary, fontSize: 16),
         // prefixIcon: HugeIcon(icon: icon, color: color.primary, size: 10),
+        suffixIcon: widget.isPassword
+            ? IconButton(
+                onPressed: () {
+                  setState(() {
+                    obscuredText = !obscuredText;
+                  });
+                },
+                icon: obscuredText
+                    ? Icon(Icons.visibility_off, color: color.secondary)
+                    : Icon(Icons.visibility, color: color.secondary),
+              )
+            : null,
         filled: true,
         fillColor: color.bgSubmit,
         border: OutlineInputBorder(

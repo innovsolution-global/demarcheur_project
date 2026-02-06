@@ -97,9 +97,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         ChangeNotifierProvider(create: (_) => EnterpriseProvider()),
         ChangeNotifierProvider(create: (_) => CandidatureProvider()),
         ChangeNotifierProvider(create: (_) => MessageProvider()),
-        ChangeNotifierProvider(
-          create: (_) => ChatProvider(),
-        ),
+        ChangeNotifierProvider(create: (_) => ChatProvider()),
       ],
 
       child: Consumer<SettingsProvider>(
@@ -127,12 +125,35 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                 seedColor: ConstColors().primary,
               ),
               useMaterial3: true,
+              splashColor: Colors.transparent,
+              highlightColor: Colors.transparent,
+              hoverColor: Colors.transparent,
+              splashFactory: NoSplash.splashFactory,
+              elevatedButtonTheme: ElevatedButtonThemeData(
+                style: ElevatedButton.styleFrom(
+                  splashFactory: NoSplash.splashFactory,
+                ),
+              ),
+              textButtonTheme: TextButtonThemeData(
+                style: TextButton.styleFrom(
+                  splashFactory: NoSplash.splashFactory,
+                ),
+              ),
+              outlinedButtonTheme: OutlinedButtonThemeData(
+                style: OutlinedButton.styleFrom(
+                  splashFactory: NoSplash.splashFactory,
+                ),
+              ),
             ),
             darkTheme: ThemeData.dark().copyWith(
               colorScheme: ColorScheme.fromSeed(
                 seedColor: ConstColors().primary,
                 brightness: Brightness.dark,
               ),
+              splashColor: Colors.transparent,
+              highlightColor: Colors.transparent,
+              hoverColor: Colors.transparent,
+              splashFactory: NoSplash.splashFactory,
             ),
           );
         },

@@ -1,4 +1,6 @@
 
+import 'package:demarcheur_app/services/config.dart';
+
 class HouseModel {
   String? id;
   String? ownerId;

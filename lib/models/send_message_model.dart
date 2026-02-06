@@ -67,16 +67,6 @@ class SendMessageModel {
 
     final msgId = json['id']?.toString() ?? json['_id']?.toString() ?? '';
 
-    // Comprehensive photo extraction
-    final photo = Config.getImgUrl(
-        (json['userPhoto'] ?? json['photo'] ?? json['avatar'] ?? json['profile'] ?? json['image'])?.toString() ??
-        (json['user'] is Map
-            ? (json['user']['image'] ??
-                json['user']['photo'] ??
-                json['user']['avatar'] ??
-                json['user']['profile'])?.toString()
-            : null));
-
     // Handle multiple images/files (fileUrl, image, attachments)
     List<String> urls = [];
     
@@ -109,6 +99,16 @@ class SendMessageModel {
         addUrl(json['image']['path'] ?? json['image']['url']);
       } else {
         addUrl(json['image']);
+      }
+    }
+    // Check attachments
+    if (json['attachments'] != null && json['attachments'] is List) {
+      for (var a in json['attachments']) {
+        if (a is Map) {
+          addUrl(a['path'] ?? a['url']);
+        } else {
+          addUrl(a);
+        }
       }
     }
 

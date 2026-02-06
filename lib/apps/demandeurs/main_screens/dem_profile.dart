@@ -76,36 +76,6 @@ class _ProfilePageState extends State<DemProfile>
       );
     }
 
-    // if (user == null) {
-    //   return Scaffold(
-    //     backgroundColor: colors.bg,
-    //     body: Center(
-    //       child: Column(
-    //         mainAxisAlignment: MainAxisAlignment.center,
-    //         children: [
-    //           Icon(Icons.error_outline, size: 48, color: colors.primary),
-    //           const SizedBox(height: 16),
-    //           Text(
-    //             "Impossible de charger le profil",
-    //             style: TextStyle(color: colors.primary, fontSize: 16),
-    //           ),
-    //           const SizedBox(height: 16),
-    //           ElevatedButton(
-    //             onPressed: () {
-    //               context.read<EnterpriseProvider>().loadUser();
-    //             },
-    //             style: ElevatedButton.styleFrom(
-    //               backgroundColor: colors.primary,
-    //               foregroundColor: Colors.white,
-    //             ),
-    //             child: const Text("Réessayer"),
-    //           ),
-    //         ],
-    //       ),
-    //     ),
-    //   );
-    // }
-
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       body: RefreshIndicator(
@@ -132,8 +102,6 @@ class _ProfilePageState extends State<DemProfile>
                         child: Column(
                           children: [
                             _EnhancedProfileHeader(colors: colors),
-                            const SizedBox(height: 20),
-                            _ModernStatsSection(colors: colors),
                             const SizedBox(height: 20),
                             _QuickActionsSection(colors: colors),
                             const SizedBox(height: 20),
@@ -545,56 +513,6 @@ class _EnhancedProfileHeaderState extends State<_EnhancedProfileHeader> {
   }
 }
 
-class _ModernStatsSection extends StatelessWidget {
-  final ConstColors colors;
-  const _ModernStatsSection({required this.colors});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: GestureDetector(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => AnnounceList()),
-              );
-            },
-            child: _ModernStatCard(
-              colors: colors,
-              icon: Icons.campaign_outlined,
-              label: "Annonces",
-              value: "12",
-              subtitle: "Actives",
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _ModernStatCard(
-            colors: colors,
-            icon: Icons.message_outlined,
-            label: "Messages",
-            value: "5",
-            subtitle: "Non lus",
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _ModernStatCard(
-            colors: colors,
-            icon: Icons.visibility_outlined,
-            label: "Vues",
-            value: "248",
-            subtitle: "Ce mois",
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class _ModernStatCard extends StatelessWidget {
   final ConstColors colors;
   final IconData icon;
@@ -713,12 +631,12 @@ class _QuickActionsSection extends StatelessWidget {
                 child: _QuickActionButton(
                   colors: colors,
                   icon: Icons.analytics_outlined,
-                  label: "Statistiques",
+                  label: "Mes annonces",
                   onTap: () {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => const StatisticsPage(),
+                        builder: (context) => const AnnounceList(),
                       ),
                     );
                   },
@@ -729,7 +647,7 @@ class _QuickActionsSection extends StatelessWidget {
                 child: _QuickActionButton(
                   colors: colors,
                   icon: Icons.support_agent_outlined,
-                  label: "Support",
+                  label: "Statistiques",
                   onTap: () {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
@@ -979,110 +897,82 @@ class _ActionButtonsSection extends StatelessWidget {
             ),
             SizedBox(width: 8),
             Expanded(
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text("Modification bientôt disponible"),
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  showDialog(
+                    //barrierColor: colors.bg,
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      backgroundColor: const Color(0xFFF8FAFC),
+                      title: Text(
+                        "Déconnexion !",
+                        style: TextStyle(
+                          color: colors.primary,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
-                    );
-                  },
-                  icon: const Icon(Icons.archive, size: 20),
-                  label: const Text(
-                    "Mon portofolio",
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: colors.primary.withValues(alpha: 0.2),
-                    foregroundColor: colors.primary,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+                      content: Text(
+                        "Voulez-vous vraiment vous déconnecter ?",
+                        style: TextStyle(
+                          color: colors.primary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      actionsAlignment: MainAxisAlignment.center,
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          style: OutlinedButton.styleFrom(
+                            backgroundColor: colors.primary.withValues(
+                              alpha: 0.05,
+                            ),
+                            foregroundColor: colors.primary,
+                            side: BorderSide(color: colors.primary),
+                            padding: const EdgeInsets.all(14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          child: const Text("Annuler"),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            context.read<AuthProvider>().logout(context);
+                          },
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.red.shade600,
+                            side: BorderSide(color: Colors.red.shade200),
+                            padding: const EdgeInsets.all(14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          child: Text(
+                            "Déconnexion",
+                            style: TextStyle(color: Colors.red.shade600),
+                          ),
+                        ),
+                      ],
                     ),
-                    elevation: 0,
+                  );
+                },
+                icon: const Icon(Icons.logout_rounded, size: 18),
+                label: const Text(
+                  "Déconnexion",
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.red.shade600,
+                  side: BorderSide(color: Colors.red.shade200),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
                   ),
                 ),
               ),
             ),
           ],
-        ),
-        const SizedBox(height: 24),
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            onPressed: () {
-              showDialog(
-                //barrierColor: colors.bg,
-                context: context,
-                builder: (context) => AlertDialog(
-                  backgroundColor: const Color(0xFFF8FAFC),
-                  title: Text(
-                    "Déconnexion !",
-                    style: TextStyle(
-                      color: colors.primary,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  content: Text(
-                    "Voulez-vous vraiment vous déconnecter ?",
-                    style: TextStyle(
-                      color: colors.primary,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  actionsAlignment: MainAxisAlignment.center,
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: OutlinedButton.styleFrom(
-                        backgroundColor: colors.primary.withValues(alpha: 0.05),
-                        foregroundColor: colors.primary,
-                        side: BorderSide(color: colors.primary),
-                        padding: const EdgeInsets.all(14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
-                      child: const Text("Annuler"),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        context.read<AuthProvider>().logout(context);
-                      },
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.red.shade600,
-                        side: BorderSide(color: Colors.red.shade200),
-                        padding: const EdgeInsets.all(14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
-                      child: Text(
-                        "Déconnexion",
-                        style: TextStyle(color: Colors.red.shade600),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
-            icon: const Icon(Icons.logout_rounded, size: 18),
-            label: const Text(
-              "Déconnexion",
-              style: TextStyle(fontWeight: FontWeight.w600),
-            ),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.red.shade600,
-              side: BorderSide(color: Colors.red.shade200),
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
-            ),
-          ),
         ),
       ],
     );
