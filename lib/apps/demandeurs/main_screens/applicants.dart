@@ -232,7 +232,7 @@ class _ApplicantsState extends State<Applicants> {
           borderRadius: BorderRadius.circular(20),
         ),
         child: Shimmer.fromColors(
-          baseColor: Colors.grey[200]!,
+          baseColor: Colors.grey[100]!,
           highlightColor: Colors.grey[50]!,
           child: Padding(
             padding: const EdgeInsets.all(16.0),

@@ -87,7 +87,8 @@ flutter_native_splash:
   ios: true
   web: true
   color: "#0C315A"
-  image: "assets/appstore.png"
+  image: "assets/demalogo.png"
+  branding: "assets/demarcheur.png"
 
 flutter_launcher_icons:
   flutter_launcher_icons:
@@ -142,6 +143,7 @@ flutter:
     - assets/job.png
     - assets/opportinuity.png
     - assets/real.png
+    - assets/demarcheur.png
 
 
 

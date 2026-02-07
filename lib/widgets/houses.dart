@@ -34,8 +34,8 @@ class _HousePageState extends State<HousePage> {
         ? Padding(
             padding: const EdgeInsets.all(10.0),
             child: Shimmer.fromColors(
-              baseColor: Colors.grey,
-              highlightColor: Colors.white,
+              baseColor: Colors.grey[100]!,
+              highlightColor: Colors.grey[50]!,
               child: Container(
                 width: MediaQuery.of(context).size.width,
                 height: 250,

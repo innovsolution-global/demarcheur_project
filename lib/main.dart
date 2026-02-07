@@ -125,6 +125,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                 seedColor: ConstColors().primary,
               ),
               useMaterial3: true,
+              appBarTheme: const AppBarTheme(
+                surfaceTintColor: Colors.transparent,
+              ),
               splashColor: Colors.transparent,
               highlightColor: Colors.transparent,
               hoverColor: Colors.transparent,

@@ -1344,6 +1344,7 @@ class ApiService {
     final response = await http.patch(
       Uri.parse('$baseUrl/auth/update-profile/$userId'),
       headers: _headers,
+      
     );
     return null;
   }

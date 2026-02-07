@@ -213,7 +213,7 @@ class _ProfilePageState extends State<DemProfile>
 
   Widget _buildShimmerProfile() {
     return Shimmer.fromColors(
-      baseColor: Colors.grey[200]!,
+      baseColor: Colors.grey[100]!,
       highlightColor: Colors.grey[50]!,
       child: CustomScrollView(
         slivers: [

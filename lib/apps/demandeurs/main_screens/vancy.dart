@@ -1,13 +1,9 @@
 import 'package:demarcheur_app/apps/demandeurs/main_screens/user_cv_view.dart';
 import 'package:demarcheur_app/apps/demandeurs/main_screens/add_vacancy_page.dart';
 import 'package:demarcheur_app/consts/color.dart';
-import 'package:demarcheur_app/providers/compa_profile_provider.dart';
 import 'package:demarcheur_app/providers/enterprise_provider.dart';
 import 'package:demarcheur_app/providers/user_provider.dart';
 import 'package:demarcheur_app/services/auth_provider.dart';
-import 'package:demarcheur_app/widgets/header_page.dart';
-import 'package:demarcheur_app/widgets/sub_title.dart';
-import 'package:demarcheur_app/widgets/title_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:hugeicons/hugeicons.dart';
@@ -698,188 +694,186 @@ class _VancyState extends State<Vancy> with TickerProviderStateMixin {
           },
           child: NestedScrollView(
             headerSliverBuilder: (context, innerBoxIsScrolled) => [
-            SliverAppBar.large(
-              flexibleSpace: FlexibleSpaceBar(
-                centerTitle: true,
-                background: Stack(
-                  children: [
-                    Container(
-                      decoration: BoxDecoration(
-                        color: colors.primary,
-                        image: const DecorationImage(
-                          fit: BoxFit.cover,
-                          image: NetworkImage(
-                            "https://www.shutterstock.com/image-photo/job-search-human-resources-recruitment-260nw-1292578582.jpg",
+              SliverAppBar.large(
+                flexibleSpace: FlexibleSpaceBar(
+                  centerTitle: true,
+                  background: Stack(
+                    children: [
+                      Container(
+                        decoration: BoxDecoration(
+                          color: colors.primary,
+                          image: const DecorationImage(
+                            fit: BoxFit.cover,
+                            image: AssetImage('assets/background.png'),
                           ),
                         ),
                       ),
-                    ),
-                    Positioned(
-                      top: 110,
-                      child: Padding(
-                        padding: const EdgeInsets.only(left: 8.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Candidatures',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w800,
-                                color: colors.bg,
-                                fontSize: 25,
-                                letterSpacing: -0.5,
+                      Positioned(
+                        top: 110,
+                        child: Padding(
+                          padding: const EdgeInsets.only(left: 8.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Candidatures',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  color: colors.bg,
+                                  fontSize: 25,
+                                  letterSpacing: -0.5,
+                                ),
                               ),
-                            ),
-                            Text(
-                              apps.length == 1
-                                  ? '${apps.length} dossier actif'
-                                  : '${apps.length} dossiers actifs',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                                color: colors.bg.withOpacity(0.6),
+                              Text(
+                                apps.length == 1
+                                    ? '${apps.length} dossier actif'
+                                    : '${apps.length} dossiers actifs',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: colors.bg.withOpacity(0.6),
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              automaticallyImplyLeading: false,
-              backgroundColor: colors.primary,
-              surfaceTintColor: Colors.white,
-              elevation: 0,
-              pinned: true,
-              expandedHeight: 150,
-            ),
-          ],
-          body: Column(
-            children: [
-              const SizedBox(height: 20),
-              Container(
-                color: Colors.white,
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-                child: Column(
-                  children: [
-                    Container(
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF1F5F9),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: TextField(
-                        controller: _searchController,
-                        style: TextStyle(color: colors.secondary),
-                        onChanged: (val) => setState(() => searchQuery = val),
-                        decoration: InputDecoration(
-                          hintText: 'Rechercher un candidat...',
-                          hintStyle: TextStyle(
-                            color: colors.secondary.withOpacity(0.4),
-                            fontWeight: FontWeight.w500,
-                          ),
-                          suffixIcon: IconButton(
-                            onPressed: () {
-                              setState(() {
-                                _searchController.clear();
-                              });
-                            },
-                            icon: _searchController.text.isNotEmpty
-                                ? Icon(Icons.clear)
-                                : SizedBox.shrink(),
-                          ),
-                          prefixIcon: const Icon(Icons.search),
-                          border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 16,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: statusFilters.map((filter) {
-                          final isSelected = selectedFilter == filter;
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 10),
-                            child: InkWell(
-                              onTap: () =>
-                                  setState(() => selectedFilter = filter),
-                              borderRadius: BorderRadius.circular(20),
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 200),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 8,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: isSelected
-                                      ? colors.primary
-                                      : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(
-                                    color: isSelected
-                                        ? colors.primary
-                                        : colors.secondary.withOpacity(0.1),
-                                  ),
-                                ),
-                                child: Text(
-                                  filter,
-                                  style: TextStyle(
-                                    color: isSelected
-                                        ? Colors.white
-                                        : colors.secondary.withOpacity(0.7),
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: isLoading
-                    ? _buildShimmerLoading()
-                    : filteredApplicants.isEmpty
-                    ? CustomScrollView(slivers: [_buildEmptyState()])
-                    : NotificationListener<UserScrollNotification>(
-                        onNotification: (notification) {
-                          if (notification.direction ==
-                              ScrollDirection.reverse) {
-                            if (_isFabExtended) {
-                              setState(() => _isFabExtended = false);
-                            }
-                          } else if (notification.direction ==
-                              ScrollDirection.forward) {
-                            if (!_isFabExtended) {
-                              setState(() => _isFabExtended = true);
-                            }
-                          }
-                          return true;
-                        },
-                        child: ListView.builder(
-                          padding: const EdgeInsets.fromLTRB(0, 10, 0, 100),
-                          itemCount: filteredApplicants.length,
-                          itemBuilder: (context, index) {
-                            final applicant = filteredApplicants[index];
-                            return _buildApplicantCard(applicant);
-                          },
-                        ),
-                      ),
+                automaticallyImplyLeading: false,
+                backgroundColor: colors.primary,
+                surfaceTintColor: Colors.transparent,
+                elevation: 0,
+                pinned: true,
+                expandedHeight: 150,
               ),
             ],
+            body: Column(
+              children: [
+                const SizedBox(height: 20),
+                Container(
+                  color: Colors.white,
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                  child: Column(
+                    children: [
+                      Container(
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: TextField(
+                          controller: _searchController,
+                          style: TextStyle(color: colors.secondary),
+                          onChanged: (val) => setState(() => searchQuery = val),
+                          decoration: InputDecoration(
+                            hintText: 'Rechercher un candidat...',
+                            hintStyle: TextStyle(
+                              color: colors.secondary.withOpacity(0.4),
+                              fontWeight: FontWeight.w500,
+                            ),
+                            suffixIcon: IconButton(
+                              onPressed: () {
+                                setState(() {
+                                  _searchController.clear();
+                                });
+                              },
+                              icon: _searchController.text.isNotEmpty
+                                  ? Icon(Icons.clear)
+                                  : SizedBox.shrink(),
+                            ),
+                            prefixIcon: const Icon(Icons.search),
+                            border: InputBorder.none,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 16,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: statusFilters.map((filter) {
+                            final isSelected = selectedFilter == filter;
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 10),
+                              child: InkWell(
+                                onTap: () =>
+                                    setState(() => selectedFilter = filter),
+                                borderRadius: BorderRadius.circular(20),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 200),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 8,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: isSelected
+                                        ? colors.primary
+                                        : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(
+                                      color: isSelected
+                                          ? colors.primary
+                                          : colors.secondary.withOpacity(0.1),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    filter,
+                                    style: TextStyle(
+                                      color: isSelected
+                                          ? Colors.white
+                                          : colors.secondary.withOpacity(0.7),
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: isLoading
+                      ? _buildShimmerLoading()
+                      : filteredApplicants.isEmpty
+                      ? CustomScrollView(slivers: [_buildEmptyState()])
+                      : NotificationListener<UserScrollNotification>(
+                          onNotification: (notification) {
+                            if (notification.direction ==
+                                ScrollDirection.reverse) {
+                              if (_isFabExtended) {
+                                setState(() => _isFabExtended = false);
+                              }
+                            } else if (notification.direction ==
+                                ScrollDirection.forward) {
+                              if (!_isFabExtended) {
+                                setState(() => _isFabExtended = true);
+                              }
+                            }
+                            return true;
+                          },
+                          child: ListView.builder(
+                            padding: const EdgeInsets.fromLTRB(0, 10, 0, 100),
+                            itemCount: filteredApplicants.length,
+                            itemBuilder: (context, index) {
+                              final applicant = filteredApplicants[index];
+                              return _buildApplicantCard(applicant);
+                            },
+                          ),
+                        ),
+                ),
+              ],
+            ),
           ),
         ),
-      ),
-      floatingActionButton: _isFabExtended
+        floatingActionButton: _isFabExtended
             ? FloatingActionButton.extended(
                 onPressed: () {
                   Navigator.push(
@@ -934,7 +928,7 @@ class _VancyState extends State<Vancy> with TickerProviderStateMixin {
         borderRadius: BorderRadius.circular(24),
       ),
       child: Shimmer.fromColors(
-        baseColor: Colors.grey[200]!,
+        baseColor: Colors.grey[100]!,
         highlightColor: Colors.grey[50]!,
         child: Padding(
           padding: const EdgeInsets.all(20),

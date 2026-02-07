@@ -398,7 +398,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   ],
                 ),
                 child: Shimmer.fromColors(
-                  baseColor: Colors.grey[300]!,
+                  baseColor: Colors.grey[200]!,
                   highlightColor: Colors.grey[100]!,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -869,7 +869,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Shimmer.fromColors(
-                      baseColor: Colors.grey[300]!,
+                      baseColor: Colors.grey[200]!,
                       highlightColor: Colors.grey[100]!,
                       child: Container(
                         height: 200,

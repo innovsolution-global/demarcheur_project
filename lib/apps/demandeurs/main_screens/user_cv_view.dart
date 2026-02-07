@@ -12,6 +12,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:demarcheur_app/providers/enterprise_provider.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 
 class UserCvView extends StatefulWidget {
@@ -124,10 +125,16 @@ class _UserCvViewState extends State<UserCvView> with TickerProviderStateMixin {
 
   void _handleContact() {
     final authProvider = context.read<AuthProvider>();
-    final myId = authProvider.userId;
+    final enterpriseProvider = context.read<EnterpriseProvider>();
+    
+    // Check both providers for userId
+    final myId = authProvider.userId ?? enterpriseProvider.user?.id;
+    final receiverId = widget.userCv.id;
 
-    if (myId != null) {
-      final receiverId = widget.userCv.id;
+    print("DEBUG: _handleContact - myId: $myId");
+    print("DEBUG: _handleContact - receiverId: $receiverId");
+
+    if (myId != null && myId.isNotEmpty) {
       if (receiverId != null && receiverId.isNotEmpty) {
         Navigator.push(
           context,
@@ -146,7 +153,13 @@ class _UserCvViewState extends State<UserCvView> with TickerProviderStateMixin {
           ),
         );
         return;
+      } else {
+        print("DEBUG: _handleContact - receiverId is null or empty");
       }
+    } else {
+      print("DEBUG: _handleContact - myId (sender) is null or empty");
+      _showMessage("Veuillez vous connecter pour contacter ce candidat", isError: true);
+      return;
     }
 
     // Fallback to clipboard if not logged in or no receiverId
@@ -502,7 +515,7 @@ class _UserCvViewState extends State<UserCvView> with TickerProviderStateMixin {
                   expandedHeight: 180,
                   pinned: true,
                   leading: IconButton(
-                    onPressed: () {},
+                    onPressed: () => Navigator.pop(context),
                     icon: Icon(Icons.arrow_back_ios),
                   ),
                   backgroundColor: colors.primary,
