@@ -1,8 +1,9 @@
 import 'package:demarcheur_app/apps/demandeurs/main_screens/add_vacancy_page.dart';
 import 'package:demarcheur_app/apps/demandeurs/main_screens/announce_list.dart';
+import 'package:demarcheur_app/apps/demandeurs/main_screens/edit_info.dart';
 import 'package:demarcheur_app/apps/demandeurs/main_screens/statistics_page.dart';
 import 'package:demarcheur_app/consts/color.dart';
-import 'package:demarcheur_app/providers/enterprise_provider.dart';
+import 'package:demarcheur_app/providers/dem_user_provider.dart';
 import 'package:demarcheur_app/providers/settings_provider.dart';
 import 'package:demarcheur_app/services/auth_provider.dart';
 import 'package:demarcheur_app/widgets/header_page.dart';
@@ -44,7 +45,7 @@ class _ProfilePageState extends State<DemProfile>
         );
     _animationController.forward();
     Future.microtask(() {
-      context.read<EnterpriseProvider>().loadUser();
+      context.read<DemUserProvider>().loadUser();
     });
   }
 
@@ -57,17 +58,16 @@ class _ProfilePageState extends State<DemProfile>
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsProvider>();
-    final demUser = context.watch<EnterpriseProvider>();
+    final demUser = context.watch<DemUserProvider>();
     final user = demUser.user;
     if (user != null) {
       print("DEBUG PROFILE: User is not null");
-      print("DEBUG PROFILE: Name: ${user.name}");
-      print("DEBUG PROFILE: Phone: ${user.phone}");
+      print("DEBUG PROFILE: Name: ${user.companyName}");
+      print("DEBUG PROFILE: Phone: ${user.phoneNumber}");
+      print("DEBUG PROFILE: Location: ${user.location}");
       print("DEBUG PROFILE: Email: ${user.email}");
-      print("DEBUG PROFILE: Address: ${user.adress}");
-      print("DEBUG PROFILE: City: ${user.city}");
     } else {
-      print("DEBUG PROFILE: User is NULL");
+      print("DEBUG PROFILE: User is NULL in DemUserProvider");
     }
     if (demUser.isLoading) {
       return Scaffold(
@@ -80,7 +80,7 @@ class _ProfilePageState extends State<DemProfile>
       backgroundColor: const Color(0xFFF8FAFC),
       body: RefreshIndicator(
         onRefresh: () async {
-          await context.read<EnterpriseProvider>().loadUser();
+          await context.read<DemUserProvider>().loadUser();
         },
         child: CustomScrollView(
           physics: const BouncingScrollPhysics(),
@@ -110,11 +110,11 @@ class _ProfilePageState extends State<DemProfile>
                               title: "Informations personnelles",
                               icon: Icons.person_outline_rounded,
                               children: [
-                                if (user?.name != null)
+                                if (user?.companyName != null)
                                   _ModernInfoTile(
                                     icon: Icons.business_outlined,
                                     label: "Entreprise",
-                                    value: user!.name,
+                                    value: user!.companyName,
                                     colors: colors,
                                   ),
                                 _ModernInfoTile(
@@ -126,15 +126,14 @@ class _ProfilePageState extends State<DemProfile>
                                 _ModernInfoTile(
                                   icon: Icons.phone_outlined,
                                   label: "Numéro de téléphone",
-                                  value: user?.phone ?? "Non renseigné",
+                                  value: user?.phoneNumber ?? "Non renseigné",
                                   colors: colors,
                                 ),
                                 _ModernInfoTile(
                                   icon: Icons.location_on_outlined,
                                   label: "Localisation",
                                   value:
-                                      user?.adress ??
-                                      user?.city ??
+                                      user?.location ??
                                       "Non renseigné",
                                   colors: colors,
                                 ),
@@ -290,7 +289,7 @@ class _EnhancedProfileHeader extends StatefulWidget {
 
 class _EnhancedProfileHeaderState extends State<_EnhancedProfileHeader> {
   bool isLoading = false;
-  Future<void> submit(BuildContext context, EnterpriseProvider dem) async {
+  Future<void> submit(BuildContext context, DemUserProvider dem) async {
     setState(() {
       isLoading = true;
     });
@@ -313,7 +312,7 @@ class _EnhancedProfileHeaderState extends State<_EnhancedProfileHeader> {
 
   @override
   Widget build(BuildContext context) {
-    final demUser = context.watch<EnterpriseProvider>();
+    final demUser = context.watch<DemUserProvider>();
     final user = demUser.user;
     return Padding(
       padding: const EdgeInsets.only(top: 10.0),
@@ -354,7 +353,7 @@ class _EnhancedProfileHeaderState extends State<_EnhancedProfileHeader> {
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(20),
                       child: Image.network(
-                        demUser.user?.profile ?? "",
+                        demUser.user?.logo ?? "",
                         width: 80,
                         height: 80,
                         fit: BoxFit.cover,
@@ -375,7 +374,7 @@ class _EnhancedProfileHeaderState extends State<_EnhancedProfileHeader> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          user?.name ?? "Nom de l'entreprise",
+                          user?.companyName ?? "Nom de l'entreprise",
                           style: TextStyle(
                             color: widget.colors.primary,
                             fontWeight: FontWeight.w800,
@@ -872,10 +871,9 @@ class _ActionButtonsSection extends StatelessWidget {
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text("Modification bientôt disponible"),
-                      ),
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const EditInfo()),
                     );
                   },
                   icon: const Icon(Icons.edit_outlined, size: 20),

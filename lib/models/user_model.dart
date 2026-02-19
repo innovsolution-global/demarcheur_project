@@ -71,10 +71,13 @@ class UserModel {
           json['photo']?.toString() ??
               json['profile']?.toString() ??
               json['image']?.toString() ??
-              json['avatar'] ??
+              json['avatar']?.toString() ??
               json['photoPath']?.toString() ??
               json['photo_path']?.toString() ??
-              json['profilePath']?.toString()) ??
+              json['picture']?.toString() ??
+              json['profilePath']?.toString() ??
+              json['image_url']?.toString() ??
+              json['imageUrl']?.toString()) ??
           'https://www.pngitem.com/pimgs/m/146-1468479_my-profile-icon-blank-profile-picture-circle-hd.png',
       document: json['documentPath']?.toString() ?? json['document']?.toString(),
       gender: json['gender']?.toString() ?? json['sexe']?.toString() ?? 'N/A',

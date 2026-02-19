@@ -182,7 +182,7 @@ class _PrestataireRegisterState extends State<PrestataireRegister>
       city: _locationController.text,
       password: _passwordController.text,
       serviceId: selectedItem,
-      role: 'SERVICE',
+      role: 'GIVER',
     );
     final succes = await AuthProvider().registerGiver(enterprise);
 

@@ -108,6 +108,12 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             initialRoute: "/",
             locale: settings.locale,
             themeMode: settings.themeMode,
+            builder: (context, child) {
+              return Scaffold(
+                backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+                body: child,
+              );
+            },
             routes: {
               "/": (context) => const SplashScreen(),
               "/intro_onboarding": (context) => const IntroOnboardingPage(),

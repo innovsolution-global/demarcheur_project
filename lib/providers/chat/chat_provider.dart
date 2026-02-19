@@ -410,7 +410,7 @@ class ChatProvider extends ChangeNotifier {
       print('DEBUG: ChatProvider.fetchConversations - Fetching for $userId');
       final parsedList = await _apiService.allConversation(
         userId,
-        token: token,
+       // token: token,
       );
 
       _conversationList = parsedList ?? [];

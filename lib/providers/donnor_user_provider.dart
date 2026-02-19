@@ -1,27 +1,19 @@
 import 'dart:convert';
-import 'package:demarcheur_app/models/enterprise/enterprise_model.dart';
+import 'dart:io';
+import 'package:demarcheur_app/models/donneur/donneur_model.dart';
 import 'package:demarcheur_app/services/api_service.dart';
+import 'package:demarcheur_app/services/storage_service.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class DonnorUserProvider extends ChangeNotifier {
-  EnterpriseModel? _user;
+  DonneurModel? _user;
   bool _isLoading = false;
   String? _token;
+  
   String? get token => _token;
-  EnterpriseModel? get user => _user;
+  DonneurModel? get user => _user;
   bool get isLoading => _isLoading;
-
-  // ------------------------------
-  //  SAVE USER TO SHAREDPREFERENCES
-  // ------------------------------
-  // Future<void> saveUser() async {
-  //   final prefs = await SharedPreferences.getInstance();
-  //   if (_user != null) {
-  //     String jsonString = jsonEncode(_user!.toJson());
-  //     await prefs.setString('demUser', jsonString);
-  //   }
-  // }
 
   // ------------------------------
   //  LOAD USER AT STARTUP
@@ -32,97 +24,134 @@ class DonnorUserProvider extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
 
-      // Load cached user first
-      String? userJson = prefs.getString('giver_user_data');
+      // Load cached user from searcher_user_data first, then fallback to last_user_data
+      String? userJson = prefs.getString('searcher_user_data');
+      
+      // Fallback to last_user_data if searcher_user_data doesn't exist
       userJson ??= prefs.getString('last_user_data');
 
       if (userJson != null) {
         try {
-          final cachedUser = EnterpriseModel.fromJson(jsonDecode(userJson));
-          _user = cachedUser;
+          final decoded = jsonDecode(userJson);
+          if (decoded is Map<String, dynamic>) {
+            final role = decoded['role']?.toString();
+            if (role != 'GIVER') {
+              _user = DonneurModel.fromJson(decoded);
+              print(
+                "DEBUG: DonnorUserProvider - Successfully loaded cached SEARCHER from ${prefs.getString('searcher_user_data') != null ? 'searcher_user_data' : 'last_user_data'}.",
+              );
+            } else {
+              print(
+                "WARNING: DonnorUserProvider - Found GIVER data in searcher key. Ignoring.",
+              );
+              _user = null;
+            }
+          }
           notifyListeners();
         } catch (e) {
-          print('Error parsing cached user: $e');
+          print('Error parsing cached searcher user: $e');
         }
       }
 
-      final token = prefs.getString('token');
-      if (token != null) {
-        _token = token;
+      final storage = StorageService();
+      final tokenStr = await storage.getToken() ?? prefs.getString('token');
+      if (tokenStr != null) {
+        _token = tokenStr;
         
-        // Check user role before calling giverProfile
         final userRole = prefs.getString('user_role');
         print("DEBUG: DonnorUserProvider - User role: $userRole");
         
-        // Only call giverProfile if user is actually a GIVER
-        if (userRole == 'GIVER') {
-          final freshUser = await ApiService().giverProfile(token);
+        if (userRole == 'SEARCHER') {
+          print("DEBUG: DonnorUserProvider - Fetching SEARCHER profile...");
+          // Try searcherProfile first (dedicated endpoint)
+          final freshUser = await ApiService().searcherProfile(tokenStr);
           if (freshUser != null) {
-            _user = freshUser;
-            // Update cache
-            await prefs.setString('giver_user_data', jsonEncode(_user!.toJson()));
+            if (_user != null) {
+              _user = _user!.mergeFrom(freshUser);
+            } else {
+              _user = freshUser;
+            }
+            final encodedUser = jsonEncode(_user!.toJson());
+            await prefs.setString('searcher_user_data', encodedUser);
+            // Also sync generic keys if needed
+            await prefs.setString('last_user_data', encodedUser);
+            if (_user?.id != null) await prefs.setString('userId', _user!.id!);
+            debugPrint("DEBUG: DonnorUserProvider - Fresh profile merged for ${_user?.name}");
+            notifyListeners();
           } else {
-            // API call failed, token might be invalid
-            // Clear invalid token and cached user
-            await prefs.remove('token');
-            await prefs.remove('giver_user_data');
-            _token = null;
-            _user = null;
-            print('Token invalid, cleared authentication data');
+             // Fallback to getUserProfile by ID if dedicated fails
+             final targetId = prefs.getString('userId') ?? _user?.id;
+             if (targetId != null) {
+                final fallbackUser = await ApiService().getUserProfile(targetId, tokenStr);
+                if (fallbackUser != null) {
+                  _user = fallbackUser;
+                  await prefs.setString('searcher_user_data', jsonEncode(_user!.toJson()));
+                  notifyListeners();
+                }
+             }
           }
-        } else {
-          print(
-            "DEBUG: DonnorUserProvider - Skipping giverProfile call for role: $userRole",
-          );
         }
       }
     } catch (e) {
-      print('Error in loadUser: $e');
-      // Clear data on error
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove('token');
-      await prefs.remove('giver_user_data');
-      _token = null;
-      _user = null;
+      print('Error in loadUser (DonnorUserProvider): $e');
     }
     _isLoading = false;
     notifyListeners();
   }
 
   // ------------------------------
-  //  MOCK LOAD (API IN FUTURE)
-  //final response = await http.get(Uri.parse("$baseUrl/user/profile"));
-  //_user = DonnorUserModel.fromJson(jsonDecode(response.body));
-
+  //  UPDATE PROFILE
   // ------------------------------
-  Future<void> loadMockUser() async {
+  Future<bool> updateProfile(
+    String name,
+    String? phone,
+    String? address,
+    String? city,
+    File? image,
+  ) async {
+    if (_user == null) return false;
+
     _isLoading = true;
     notifyListeners();
 
-    await Future.delayed(const Duration(seconds: 2));
+    try {
+      // Local update for immediate UI feedback
+      final updatedUser = DonneurModel(
+        id: _user!.id,
+        name: name,
+        email: _user!.email,
+        phone: phone,
+        adress: address,
+        city: city,
+        profile: _user!.profile, // placeholder, will refresh from API
+      );
 
-    // _user = DonnorUserModel(
-    //   id: '111',
-    //   companyName: 'CodeHub',
-    //   logo:
-    //       "https://i.pinimg.com/474x/2d/d5/2b/2dd52b8c1b437036609e307767cb9206.jpg",
-    //   domaine: 'Web development',
-    //   rate: 2.1,
-    //   email: 'codehub@gmail.com',
-    //   phoneNumber: '22222222222',
-    //   location: 'Sonfonia',
-    //   passWord: 'code123',
-    //   isVerified: false,
-    // );
+      final result = await ApiService().updateDonneurProfile(
+        updatedUser,
+        image,
+      );
 
-    //await saveUser();
+      if (result != null) {
+        print("DEBUG: updateProfile (Donnor) - Success Body: $result");
+
+        // Sync and Load fresh data
+        await loadUser(); 
+
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      }
+    } catch (e) {
+      print('Error updating searcher profile: $e');
+    }
 
     _isLoading = false;
     notifyListeners();
+    return false;
   }
 
   // ------------------------------
-  //  TOGGLE ISVERIFIED + SAVE
+  //  TOGGLE ISVERIFIED (Mock/Placeholder)
   // ------------------------------
   Future<void> toggleIsVerified() async {
     if (_user == null) return;
@@ -132,10 +161,13 @@ class DonnorUserProvider extends ChangeNotifier {
 
     await Future.delayed(const Duration(milliseconds: 200));
 
-    // _user = _user!.copyWith(isVerified: !_user!.isVerified);
+    _user = _user!.copyWith(isVerified: !_user!.isVerified);
 
-    //await saveUser();
-
+    final prefs = await SharedPreferences.getInstance();
+    final encodedUser = jsonEncode(_user!.toJson());
+    await prefs.setString('searcher_user_data', encodedUser);
+    await prefs.setString('last_user_data', encodedUser);
+    
     _isLoading = false;
     notifyListeners();
   }

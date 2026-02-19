@@ -41,6 +41,7 @@ class _ImmoRegistrationPage extends State<ImmoRegistrationPage>
   late Animation<double> _fadeAnimation;
 
   String? selectedItem;
+  bool _obscurePassword = true;
 
   @override
   void initState() {
@@ -514,6 +515,13 @@ class _ImmoRegistrationPage extends State<ImmoRegistrationPage>
             controller: _passwordController,
             label: "Mot de passe",
             icon: HugeIcons.strokeRoundedLocation01,
+            isPassword: true,
+            obscureText: _obscurePassword,
+            onToggleVisibility: () {
+              setState(() {
+                _obscurePassword = !_obscurePassword;
+              });
+            },
             validator: (value) => _validateRequired(value, "Mot de passe"),
             textInputAction: TextInputAction.done,
           ),
@@ -566,13 +574,18 @@ class _CustomTextField extends StatelessWidget {
   final String? Function(String?)? validator;
   final TextInputAction? textInputAction;
   final TextCapitalization textCapitalization;
+  final bool isPassword;
+  final bool? obscureText;
+  final VoidCallback? onToggleVisibility;
 
   const _CustomTextField({
     required this.controller,
     required this.label,
     required this.icon,
     required this.textCapitalization,
-
+    this.isPassword = false,
+    this.obscureText,
+    this.onToggleVisibility,
     this.keyboardType,
     this.validator,
     this.textInputAction,
@@ -588,11 +601,22 @@ class _CustomTextField extends StatelessWidget {
       textInputAction: textInputAction ?? TextInputAction.next,
       textCapitalization: textCapitalization,
       validator: validator,
+      obscureText: isPassword ? (obscureText ?? true) : false,
       style: TextStyle(fontSize: 16, color: color.secondary),
       decoration: InputDecoration(
         labelText: label,
         labelStyle: TextStyle(color: color.primary, fontSize: 16),
-        // prefixIcon: HugeIcon(icon: icon, color: color.primary, size: 10),
+        suffixIcon: isPassword
+            ? IconButton(
+                icon: Icon(
+                  (obscureText ?? true)
+                      ? Icons.visibility_off_outlined
+                      : Icons.visibility_outlined,
+                  color: color.primary.withOpacity(0.5),
+                ),
+                onPressed: onToggleVisibility,
+              )
+            : null,
         filled: true,
         fillColor: color.bgSubmit,
         border: OutlineInputBorder(

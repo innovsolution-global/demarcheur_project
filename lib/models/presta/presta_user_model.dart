@@ -9,6 +9,9 @@ class PrestaUserModel {
   final String categorie;
   final String about;
   final int salary;
+  final String? email;
+  final String? phoneNumber;
+  final double? rate;
 
   PrestaUserModel({
     this.id,
@@ -19,21 +22,28 @@ class PrestaUserModel {
     required this.categorie,
     required this.about,
     required this.salary,
+    this.email,
+    this.phoneNumber,
+    this.rate,
   });
+
   factory PrestaUserModel.fromJson(Map<String, dynamic> json) {
     return PrestaUserModel(
       id: json['id'],
-      companyName: json['companyName'],
+      companyName: json['companyName'] ?? '',
       imageUrl: (json['imageUrl'] as List? ?? [])
           .map((e) => Config.getImgUrl(e.toString()))
           .where((e) => e != null)
           .cast<String>()
           .toList(),
-      location: json['location'],
-      status: json['status'],
-      categorie: json['categorie'],
-      about: json['about'],
+      location: json['location'] ?? '',
+      status: json['status'] ?? '',
+      categorie: json['categorie'] ?? '',
+      about: json['about'] ?? '',
       salary: int.tryParse(json['salary']?.toString() ?? '0') ?? 0,
+      email: json['email'],
+      phoneNumber: json['phoneNumber'],
+      rate: double.tryParse(json['rate']?.toString() ?? '0') ?? 0.0,
     );
   }
 
@@ -47,5 +57,10 @@ class PrestaUserModel {
     'categorie': categorie,
     'about': about,
     'salary': salary,
+    'email': email,
+    'phoneNumber': phoneNumber,
+    'rate': rate,
   };
 }
+
+

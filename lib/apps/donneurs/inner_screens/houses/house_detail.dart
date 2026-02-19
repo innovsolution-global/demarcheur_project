@@ -23,6 +23,7 @@ class DetailHouse extends StatefulWidget {
 
 class _DetailHouseState extends State<DetailHouse> {
   final ConstColors _color = ConstColors();
+  int _currentImageIndex = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -113,21 +114,93 @@ class _DetailHouseState extends State<DetailHouse> {
         background: Stack(
           fit: StackFit.expand,
           children: [
-            Image.network(
-              Config.getImgUrl(
-                    house.imageUrl.isNotEmpty ? house.imageUrl.first : null,
-                  ) ??
-                  "https://via.placeholder.com/400x400",
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => Container(
-                color: Colors.grey[200],
-                child: Icon(
-                  Icons.home_outlined,
-                  size: 80,
-                  color: Colors.grey[400],
+            Hero(
+              tag: 'donneur_house_${house.id}',
+              child: house.imageUrl.isEmpty
+                  ? Container(
+                      color: Colors.grey[200],
+                      child: Icon(
+                        Icons.home_outlined,
+                        size: 80,
+                        color: Colors.grey[400],
+                      ),
+                    )
+                  : PageView.builder(
+                      itemCount: house.imageUrl.length,
+                      physics: const BouncingScrollPhysics(),
+                      onPageChanged: (index) {
+                        setState(() => _currentImageIndex = index);
+                      },
+                      itemBuilder: (context, index) {
+                        return Image.network(
+                          house.imageUrl[index],
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) =>
+                              Container(
+                            color: Colors.grey[200],
+                            child: Icon(
+                              Icons.home_outlined,
+                              size: 80,
+                              color: Colors.grey[400],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+
+            // Image Counter
+            if (house.imageUrl.length > 1)
+              Positioned(
+                bottom: 30,
+                right: 20,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black54,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '${_currentImageIndex + 1}/${house.imageUrl.length}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               ),
-            ),
+
+            // Dots Indicator
+            if (house.imageUrl.length > 1)
+              Positioned(
+                bottom: 35,
+                left: 0,
+                right: 0,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(
+                    house.imageUrl.length,
+                    (index) => AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      width: _currentImageIndex == index ? 20 : 8,
+                      height: 8,
+                      margin: const EdgeInsets.symmetric(horizontal: 4),
+                      decoration: BoxDecoration(
+                        color: _currentImageIndex == index
+                            ? Colors.white
+                            : Colors.white54,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+            // Gradient Overlay
             const DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(

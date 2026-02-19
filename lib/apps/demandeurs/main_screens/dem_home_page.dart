@@ -1,6 +1,7 @@
 import 'package:demarcheur_app/apps/demandeurs/main_screens/applicant_detail.dart';
 import 'package:demarcheur_app/apps/demandeurs/main_screens/applicants.dart';
 import 'package:demarcheur_app/apps/demandeurs/main_screens/post_vancy.dart';
+import 'package:demarcheur_app/apps/demandeurs/main_screens/add_vacancy_page.dart';
 import 'package:demarcheur_app/apps/demandeurs/main_screens/user_cv_view.dart';
 import 'package:demarcheur_app/apps/demandeurs/main_screens/vancy.dart';
 import 'package:demarcheur_app/consts/color.dart';
@@ -163,7 +164,7 @@ class _DemHomePageState extends State<DemHomePage> {
         onPressed: () {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => PostVancy()),
+            MaterialPageRoute(builder: (context) => const AddVacancyPage()),
           );
         },
         icon: const Icon(Icons.add_rounded, color: Colors.white),

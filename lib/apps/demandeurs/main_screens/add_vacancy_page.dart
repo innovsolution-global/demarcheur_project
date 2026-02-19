@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:demarcheur_app/consts/color.dart';
 import 'package:demarcheur_app/models/add_vancy_model.dart';
@@ -7,7 +8,8 @@ import 'package:demarcheur_app/services/auth_provider.dart';
 import 'package:hugeicons/hugeicons.dart';
 
 class AddVacancyPage extends StatefulWidget {
-  const AddVacancyPage({super.key});
+  final AddVancyModel? vacancyToEdit;
+  const AddVacancyPage({super.key, this.vacancyToEdit});
 
   @override
   State<AddVacancyPage> createState() => _AddVacancyPageState();
@@ -61,6 +63,43 @@ class _AddVacancyPageState extends State<AddVacancyPage>
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
     _animationController.forward();
+
+    if (widget.vacancyToEdit != null) {
+      final v = widget.vacancyToEdit!;
+      _titleController.text = v.title;
+      _descriptionController.text = v.description;
+      _cityController.text = v.city;
+      _salaryController.text = v.salary.toString();
+      _experienceController.text = v.experience;
+      _levelController.text = v.level;
+      _deadlineController.text = v.deadline;
+
+      // Map job type back to UI Label
+      String mapTypeToUi(String type) {
+        switch (type) {
+          case 'CDI':
+            return 'Plein temps';
+          case 'PART_TIME':
+            return 'Temps partiel';
+          case 'CDD':
+            return 'Contrat';
+          case 'FREELANCE':
+            return 'Freelance';
+          case 'STAGE':
+            return 'Stage';
+          default:
+            return type;
+        }
+      }
+
+      _selectedJobType = mapTypeToUi(v.typeJobe);
+
+      _missions.addAll(v.missions.map((e) => e.toString()));
+      _benefits.addAll(v.benefits.map((e) => e.toString()));
+      _conditions.addAll(v.conditions.map((e) => e.toString()));
+      _reqProfile.addAll(v.reqProfile.map((e) => e.toString()));
+      _otherInfo.addAll(v.otherInfo.map((e) => e.toString()));
+    }
 
     Future.microtask(() {
       context.read<EnterpriseProvider>().loadUser();
@@ -144,6 +183,7 @@ class _AddVacancyPageState extends State<AddVacancyPage>
     }
 
     final vancy = AddVancyModel(
+      id: widget.vacancyToEdit?.id,
       title: _titleController.text,
       description: _descriptionController.text,
       city: _cityController.text,
@@ -153,22 +193,40 @@ class _AddVacancyPageState extends State<AddVacancyPage>
       experience: _experienceController.text,
       deadline: _deadlineController.text,
       companyId: companyId,
-      missions: _missions,
+      missions: _missions.isNotEmpty ? _missions : [_descriptionController.text],
       benefits: _benefits,
       conditions: _conditions,
       reqProfile: _reqProfile,
       otherInfo: _otherInfo,
     );
 
-    final success = await context.read<AuthProvider>().addVancyJob(vancy);
+    bool success;
+    if (widget.vacancyToEdit != null) {
+      success = await context.read<AuthProvider>().updateJobOffer(
+        widget.vacancyToEdit!.id!,
+        vancy,
+      );
+    } else {
+      success = await context.read<AuthProvider>().addVancyJob(vancy, []);
+    }
 
     if (mounted) {
       setState(() => _isSubmitting = false);
       if (success) {
-        _showSnackBar("Offre publiée avec succès !", isError: false);
+        _showSnackBar(
+          widget.vacancyToEdit != null
+              ? "Offre mise à jour avec succès !"
+              : "Offre publiée avec succès !",
+          isError: false,
+        );
         Navigator.pop(context);
       } else {
-        _showSnackBar("Erreur lors de la publication", isError: true);
+        _showSnackBar(
+          widget.vacancyToEdit != null
+              ? "Erreur lors de la mise à jour"
+              : "Erreur lors de la publication",
+          isError: true,
+        );
       }
     }
   }
@@ -199,6 +257,11 @@ class _AddVacancyPageState extends State<AddVacancyPage>
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
+        appBar: AppBar(
+          automaticallyImplyLeading: false,
+          backgroundColor: Colors.transparent,
+        ),
+        extendBodyBehindAppBar: true,
         backgroundColor: const Color(0xFFFBFBFB),
         body: Column(
           children: [
@@ -212,6 +275,7 @@ class _AddVacancyPageState extends State<AddVacancyPage>
                   _buildStepContainer(_buildStep1(), 0),
                   _buildStepContainer(_buildStep2(), 1),
                   _buildStepContainer(_buildStep3(), 2),
+                  // _buildStepContainer(_buildStep4(), 3),
                 ],
               ),
             ),
@@ -267,13 +331,17 @@ class _AddVacancyPageState extends State<AddVacancyPage>
             children: [
               GestureDetector(
                 onTap: () => Navigator.pop(context),
-                child: Icon(
-                  Icons.arrow_back_ios_new,
-                  size: 20,
-                  color: colors.bg,
+                child: IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: HugeIcon(
+                    icon: HugeIcons.strokeRoundedArrowTurnBackward,
+                    color: colors.bg,
+                    strokeWidth: 2,
+                    size: 30,
+                  ),
                 ),
               ),
-              const SizedBox(width: 20),
+              const SizedBox(width: 15),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [

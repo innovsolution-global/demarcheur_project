@@ -407,14 +407,24 @@ class _VancyState extends State<Vancy> with TickerProviderStateMixin {
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             color: colors.primary.withOpacity(0.05),
-                            image:
-                                applicant.photo != null &&
-                                    applicant.photo.isNotEmpty
-                                ? DecorationImage(
-                                    image: NetworkImage(applicant.photo),
-                                    fit: BoxFit.cover,
-                                  )
-                                : null,
+                            image: () {
+                              final photoUrl = applicant.photo;
+                              if (photoUrl != null && photoUrl.isNotEmpty) {
+                                print(
+                                  "DEBUG: Vancy - Rendering image for ${applicant.name}: '$photoUrl'",
+                                );
+                                return DecorationImage(
+                                  image: NetworkImage(photoUrl),
+                                  fit: BoxFit.cover,
+                                  onError: (obj, stack) {
+                                    print(
+                                      "ERROR: Failed to load image for ${applicant.name}: $photoUrl\n$obj",
+                                    );
+                                  },
+                                );
+                              }
+                              return null;
+                            }(),
                           ),
                           child:
                               (applicant.photo == null ||
@@ -675,6 +685,7 @@ class _VancyState extends State<Vancy> with TickerProviderStateMixin {
     }
 
     final apps = userProvider.allusers;
+    print("DEBUG: Vancy build - apps count: ${apps.length}, isLoading: ${userProvider.isLoading}");
     final filteredApplicants = _getFilteredApplicants(apps);
 
     final isLoading = userProvider.isLoading;

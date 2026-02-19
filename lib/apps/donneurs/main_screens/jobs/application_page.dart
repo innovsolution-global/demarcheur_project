@@ -177,22 +177,27 @@ class _ApplicationPageState extends State<ApplicationPage> {
     Color statusColor;
     Color statusBgColor;
 
-    switch (app.status.toLowerCase()) {
-      case 'accepte':
-        statusColor = const Color(0xFF08875C);
-        statusBgColor = const Color(0xFFE6F4EA);
-        break;
-      case 'en attente':
-        statusColor = const Color(0xFFC56D2A);
-        statusBgColor = const Color(0xFFFFF4E5);
-        break;
-      case 'interview':
-        statusColor = colors.primary;
-        statusBgColor = colors.primary.withOpacity(0.1);
-        break;
-      default:
-        statusColor = const Color(0xFFEB3223);
-        statusBgColor = const Color(0xFFFEEFEF);
+    final lowerStatus = app.status.toLowerCase();
+    if (lowerStatus.contains('accept')) {
+      statusColor = const Color(0xFF08875C);
+      statusBgColor = const Color(0xFFE6F4EA);
+    } else if (lowerStatus.contains('attente') || 
+               lowerStatus.contains('soumis') || 
+               lowerStatus.contains('pending')) {
+      statusColor = const Color(0xFFC56D2A);
+      statusBgColor = const Color(0xFFFFF4E5);
+    } else if (lowerStatus.contains('interview') || 
+               lowerStatus.contains('entretien')) {
+      statusColor = colors.primary;
+      statusBgColor = colors.primary.withOpacity(0.1);
+    } else if (lowerStatus.contains('rejet') || 
+               lowerStatus.contains('reject')) {
+      statusColor = const Color(0xFFEB3223);
+      statusBgColor = const Color(0xFFFEEFEF);
+    } else {
+      // Default / Unknown
+      statusColor = colors.secondary;
+      statusBgColor = Colors.grey.shade100;
     }
 
     return Container(
@@ -261,28 +266,34 @@ class _ApplicationPageState extends State<ApplicationPage> {
                               HugeIcon(
                                 icon: HugeIcons.strokeRoundedLocation01,
                                 size: 14,
-                                color: Colors.grey[500]!,
+                                color: Colors.grey.shade500,
                               ),
                               const SizedBox(width: 4),
-                              Text(
-                                app.location,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey[500],
+                              Flexible(
+                                child: Text(
+                                  app.location,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey.shade500,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                               const SizedBox(width: 12),
                               HugeIcon(
                                 icon: HugeIcons.strokeRoundedClock01,
                                 size: 14,
-                                color: Colors.grey[500]!,
+                                color: Colors.grey.shade500,
                               ),
                               const SizedBox(width: 4),
-                              Text(
-                                app.postDate,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey[500],
+                              Flexible(
+                                child: Text(
+                                  app.postDate.split('T')[0],
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey.shade500,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                             ],

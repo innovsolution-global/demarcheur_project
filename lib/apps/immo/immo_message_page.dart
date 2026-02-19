@@ -54,9 +54,19 @@ class _ImmoMessagePageState extends State<ImmoMessagePage> {
 
   Widget _buildHeader() {
     return SliverAppBar.large(
+      
       automaticallyImplyLeading: false,
       title: Text('Messages', style: TextStyle(color: colors.bg)),
       backgroundColor: colors.primary,
+      flexibleSpace: Container(
+        decoration: BoxDecoration(
+          color: colors.primary,
+          image: DecorationImage(
+            fit: BoxFit.cover,
+            image: AssetImage("assets/background.png"),
+          ),
+        ),
+      ),
     );
   }
 

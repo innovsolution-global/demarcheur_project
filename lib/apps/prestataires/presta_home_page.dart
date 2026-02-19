@@ -229,13 +229,18 @@ class _PrestaHomePageState extends State<PrestaHomePage> {
 
   Widget _buildJobList(PrestaProvider provider) {
     final jobs = provider.allJobs;
-    // Only show vacancies posted by SEARCHERs (heuristic: no company name)
+    // Filter vacancies: only from SEARCHER role
     List<PrestaModel> filteredJobs = jobs.where((job) {
-      final original = job.originalVancy;
-      if (original == null) return false;
-      return original.companyName == null ||
-          original.companyName!.trim().isEmpty;
+      if (job.ownerRole != null) {
+        return job.ownerRole == 'SEARCHER';
+      }
+      // Heuristic: SEARCHERs (donneurs) often don't have a company name set 
+      // or it defaults to their personal name, while GIVERS (employers) always have it.
+      return job.companyName.isEmpty || 
+             job.companyName == 'Entreprise' || 
+             job.companyName == 'N/A';
     }).toList();
+
 
     if (_selectedCategoryIndex != 0 &&
         _selectedCategoryIndex < provider.categories.length) {

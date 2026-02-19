@@ -1,4 +1,5 @@
 import 'package:demarcheur_app/apps/donneurs/inner_screens/jobs/job_detail.dart';
+import 'package:demarcheur_app/apps/donneurs/inner_screens/jobs/job_posting.dart';
 import 'package:demarcheur_app/consts/color.dart';
 import 'package:demarcheur_app/models/add_vancy_model.dart';
 import 'package:demarcheur_app/services/api_service.dart';
@@ -36,24 +37,32 @@ class _MyAnnouncementsState extends State<MyAnnouncements> {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final token = authProvider.token;
     final userId = authProvider.userId;
-    // For GIVER (Enterprise), we use the enterprise ID if available
-    final companyId = authProvider.enterprise?.id ?? userId;
+    
+    // For SEARCHER, we filter by their own userId
+    // For GIVER, we also check enterprise ID
+    final isGiver = authProvider.role == 'GIVER';
+    final companyId = isGiver ? authProvider.enterprise?.id : userId;
 
     if (token == null) {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) setState(() => _isLoading = false);
       return;
     }
 
     try {
       final allJobs = await _apiService.getMyVacancies(token);
 
-      // Filter jobs where the companyId matches the current user's ID
+      print('DEBUG: MyAnnouncements - Role: ${authProvider.role}, userId: $userId, companyId: $companyId');
       final userJobs = allJobs.where((job) {
         if (job.companyId == null) return false;
-        return job.companyId == companyId || job.companyId == userId;
+        
+        // Robust filtering:
+        // 1. If ID matches companyId (Enterprise for GIVER, UserID for SEARCHER)
+        // 2. Or if ID matches the direct UserID
+        final match = job.companyId == companyId || job.companyId == userId;
+        return match;
       }).toList();
+      
+      print('DEBUG: MyAnnouncements - total filtered jobs: ${userJobs.length}');
 
       // Enrich jobs with local user data if missing
       final enrichedJobs = userJobs.map((job) {
@@ -66,17 +75,15 @@ class _MyAnnouncementsState extends State<MyAnnouncements> {
 
         // Fallback for location/city
         if (job.city.isEmpty || job.city == "Non spécifié") {
-          job.city =
-              authProvider.enterprise?.city ??
-              authProvider.enterprise?.adress ??
-              "Non spécifié";
+          job.city = isGiver 
+              ? (authProvider.enterprise?.city ?? authProvider.enterprise?.adress ?? "Non spécifié")
+              : "Non spécifié";
         }
 
         // Fallback for image
         if (job.companyImage == null ||
             job.companyImage!.isEmpty ||
             job.companyImage!.contains("placeholder")) {
-          // Use provider's user photo but ensure we handle potential nulls
           final userPhoto = authProvider.userPhoto;
           if (userPhoto != null && userPhoto.isNotEmpty) {
             job.companyImage = userPhoto;
@@ -94,9 +101,7 @@ class _MyAnnouncementsState extends State<MyAnnouncements> {
     } catch (e) {
       print("Error fetching my jobs: $e");
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+        setState(() => _isLoading = false);
       }
     }
   }
@@ -279,7 +284,7 @@ class _MyAnnouncementsState extends State<MyAnnouncements> {
                 children: [
                   Text(
                     DateFormat.yMMMd().format(
-                      DateTime.tryParse(job.companyName ?? "") ??
+                      DateTime.tryParse(job.createdAt ?? "") ??
                           DateTime.now(),
                     ),
                     style: TextStyle(color: colors.secondary, fontSize: 12),
@@ -329,9 +334,20 @@ class _MyAnnouncementsState extends State<MyAnnouncements> {
         //SizedBox(width: 5),
         PopupMenuButton<String>(
           style: ButtonStyle(),
-          onSelected: (value) {
+          onSelected: (value) async {
             if (value == 'Modifier') {
-            } else {}
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => JobPostings(jobToEdit: job),
+                ),
+              );
+              if (result == true) {
+                _fetchMyJobs();
+              }
+            } else if (value == 'Supprimer') {
+              _showDeleteConfirmation(job);
+            }
           },
           color: colors.bg,
           borderRadius: BorderRadius.circular(20),
@@ -370,6 +386,41 @@ class _MyAnnouncementsState extends State<MyAnnouncements> {
           ],
         ),
       ],
+    );
+  }
+
+  void _showDeleteConfirmation(AddVancyModel job) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirmer la suppression'),
+        content: Text('Voulez-vous vraiment supprimer l\'annonce "${job.title}" ?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              final token = context.read<AuthProvider>().token;
+              final success = await _apiService.deleteJobOffer(job.id!, token);
+              if (!context.mounted) return;
+              if (success) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Annonce supprimée')),
+                );
+                _fetchMyJobs();
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Échec de la suppression')),
+                );
+              }
+            },
+            child: const Text('Supprimer', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
     );
   }
 

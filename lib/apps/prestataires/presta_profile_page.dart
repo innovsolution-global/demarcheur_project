@@ -1,5 +1,6 @@
 import 'package:demarcheur_app/consts/color.dart';
-import 'package:demarcheur_app/providers/enterprise_provider.dart';
+import 'package:demarcheur_app/apps/demandeurs/main_screens/edit_info.dart';
+import 'package:demarcheur_app/providers/presta/presta_provider.dart';
 import 'package:demarcheur_app/providers/settings_provider.dart';
 import 'package:demarcheur_app/services/auth_provider.dart';
 import 'package:demarcheur_app/widgets/header_page.dart';
@@ -41,7 +42,7 @@ class _ProfilePageState extends State<PrestaProfilePage>
         );
     _animationController.forward();
     Future.microtask(() {
-      context.read<EnterpriseProvider>().loadUser();
+      context.read<PrestaProvider>().loadUser();
     });
   }
 
@@ -54,15 +55,14 @@ class _ProfilePageState extends State<PrestaProfilePage>
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsProvider>();
-    final demUser = context.watch<EnterpriseProvider>();
+    final demUser = context.watch<PrestaProvider>();
     final user = demUser.user;
     if (user != null) {
       print("DEBUG PROFILE: User is not null");
-      print("DEBUG PROFILE: Name: ${user.name}");
-      print("DEBUG PROFILE: Phone: ${user.phone}");
+      print("DEBUG PROFILE: Name: ${user.companyName}");
+      print("DEBUG PROFILE: Phone: ${user.phoneNumber}");
       print("DEBUG PROFILE: Email: ${user.email}");
-      print("DEBUG PROFILE: Address: ${user.adress}");
-      print("DEBUG PROFILE: City: ${user.city}");
+      print("DEBUG PROFILE: Address: ${user.location}");
     } else {
       print("DEBUG PROFILE: User is NULL");
     }
@@ -89,7 +89,7 @@ class _ProfilePageState extends State<PrestaProfilePage>
     //           const SizedBox(height: 16),
     //           ElevatedButton(
     //             onPressed: () {
-    //               context.read<EnterpriseProvider>().loadUser();
+    //               context.read<PrestaProvider>().loadUser();
     //             },
     //             style: ElevatedButton.styleFrom(
     //               backgroundColor: colors.primary,
@@ -107,7 +107,7 @@ class _ProfilePageState extends State<PrestaProfilePage>
       backgroundColor: const Color(0xFFF8FAFC),
       body: RefreshIndicator(
         onRefresh: () async {
-          await context.read<EnterpriseProvider>().loadUser();
+          await context.read<PrestaProvider>().loadUser();
         },
         child: CustomScrollView(
           physics: const BouncingScrollPhysics(),
@@ -139,11 +139,11 @@ class _ProfilePageState extends State<PrestaProfilePage>
                               title: "Informations personnelles",
                               icon: Icons.person_outline_rounded,
                               children: [
-                                if (user?.name != null)
+                                if (user?.companyName != null)
                                   _ModernInfoTile(
                                     icon: Icons.business_outlined,
-                                    label: "Entreprise",
-                                    value: user!.name,
+                                    label: "Nom / Entreprise",
+                                    value: user!.companyName,
                                     colors: colors,
                                   ),
                                 _ModernInfoTile(
@@ -155,15 +155,14 @@ class _ProfilePageState extends State<PrestaProfilePage>
                                 _ModernInfoTile(
                                   icon: Icons.phone_outlined,
                                   label: "Numéro de téléphone",
-                                  value: user?.phone ?? "Non renseigné",
+                                  value: user?.phoneNumber ?? "Non renseigné",
                                   colors: colors,
                                 ),
                                 _ModernInfoTile(
                                   icon: Icons.location_on_outlined,
                                   label: "Localisation",
                                   value:
-                                      user?.adress ??
-                                      user?.city ??
+                                      user?.location ??
                                       "Non renseigné",
                                   colors: colors,
                                 ),
@@ -319,7 +318,7 @@ class _EnhancedProfileHeader extends StatefulWidget {
 
 class _EnhancedProfileHeaderState extends State<_EnhancedProfileHeader> {
   bool isLoading = false;
-  Future<void> submit(BuildContext context, EnterpriseProvider dem) async {
+  Future<void> submit(BuildContext context, PrestaProvider dem) async {
     setState(() {
       isLoading = true;
     });
@@ -328,7 +327,7 @@ class _EnhancedProfileHeaderState extends State<_EnhancedProfileHeader> {
 
     if (!mounted) return;
 
-    await dem.toggleIsVerified();
+    //await dem.toggleIsVerified();
 
     setState(() {
       isLoading = false;
@@ -342,7 +341,7 @@ class _EnhancedProfileHeaderState extends State<_EnhancedProfileHeader> {
 
   @override
   Widget build(BuildContext context) {
-    final demUser = context.watch<EnterpriseProvider>();
+    final demUser = context.watch<PrestaProvider>();
     final user = demUser.user;
     return Padding(
       padding: const EdgeInsets.only(top: 10.0),
@@ -383,7 +382,9 @@ class _EnhancedProfileHeaderState extends State<_EnhancedProfileHeader> {
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(20),
                       child: Image.network(
-                        demUser.user?.profile ?? "",
+                        (demUser.user?.imageUrl != null && demUser.user!.imageUrl.isNotEmpty)
+                            ? demUser.user!.imageUrl[0]
+                            : "",
                         width: 80,
                         height: 80,
                         fit: BoxFit.cover,
@@ -404,7 +405,7 @@ class _EnhancedProfileHeaderState extends State<_EnhancedProfileHeader> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          user?.name ?? "Nom de l'entreprise",
+                          user?.companyName ?? "Nom / Entreprise",
                           style: TextStyle(
                             color: widget.colors.primary,
                             fontWeight: FontWeight.w800,
@@ -412,7 +413,7 @@ class _EnhancedProfileHeaderState extends State<_EnhancedProfileHeader> {
                           ),
                         ),
 
-                        if (user?.isVerified ?? false)
+                         if (user?.status == 'Vérifié')
                           Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 10,
@@ -521,7 +522,7 @@ class _EnhancedProfileHeaderState extends State<_EnhancedProfileHeader> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        (demUser.user?.isVerified ?? false)
+                         (demUser.user?.status == 'Vérifié')
                             ? "Profil à 100%"
                             : "Profil à 80%",
                         style: const TextStyle(
@@ -704,10 +705,9 @@ class _ActionButtonsSection extends StatelessWidget {
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text("Modification bientôt disponible"),
-                      ),
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const EditInfo()),
                     );
                   },
                   icon: const Icon(Icons.edit_outlined, size: 20),

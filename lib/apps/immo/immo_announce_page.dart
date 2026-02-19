@@ -126,42 +126,82 @@ class _ImmoAnnouncePageState extends State<ImmoAnnouncePage>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (house.imageUrl.isNotEmpty)
-                  Container(
-                    width: 60,
-                    height: 60,
-                    margin: const EdgeInsets.only(right: 12),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      image: DecorationImage(
-                        image: NetworkImage(house.imageUrl.first),
-                        fit: BoxFit.cover,
-                      ),
-                      color: Colors.grey[200],
+                  SizedBox(
+                    width: 100,
+                    height: 100,
+                    child: Stack(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: PageView.builder(
+                            itemCount: house.imageUrl.length,
+                            itemBuilder: (context, idx) {
+                              return Hero(
+                                tag: idx == 0
+                                    ? 'announce_house_${house.id}'
+                                    : 'announce_house_${house.id}_$idx',
+                                child: Image.network(
+                                  house.imageUrl[idx],
+                                  fit: BoxFit.cover,
+                                  errorBuilder:
+                                      (context, error, stackTrace) =>
+                                          Container(
+                                            color: Colors.grey[100],
+                                            child: const Icon(
+                                              Icons.broken_image_rounded,
+                                              size: 30,
+                                            ),
+                                          ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        if (house.imageUrl.length > 1)
+                          Positioned(
+                            bottom: 4,
+                            right: 4,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.6),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                "${house.imageUrl.length}",
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
+                const SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              house.title ?? house.countType ?? 'Sans titre',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
-                                color: colors.secondary,
-                                letterSpacing: -0.5,
-                              ),
-                            ),
-                          ),
-                        ],
+                      Text(
+                        house.title ?? house.countType ?? 'Sans titre',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: colors.secondary,
+                          letterSpacing: -0.5,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       if (house.location != null)
                         Padding(
-                          padding: const EdgeInsets.only(top: 4.0),
+                          padding: const EdgeInsets.only(top: 6.0),
                           child: Row(
                             children: [
                               HugeIcon(

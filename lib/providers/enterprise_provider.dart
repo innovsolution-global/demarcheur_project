@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:demarcheur_app/models/enterprise/enterprise_model.dart';
 import 'package:demarcheur_app/services/api_service.dart';
 import 'package:flutter/material.dart';
@@ -8,20 +9,10 @@ class EnterpriseProvider extends ChangeNotifier {
   EnterpriseModel? _user;
   bool _isLoading = false;
   String? _token;
-  String? get token => _token;
+
   EnterpriseModel? get user => _user;
   bool get isLoading => _isLoading;
-
-  // ------------------------------
-  //  SAVE USER TO SHAREDPREFERENCES
-  // ------------------------------
-  // Future<void> saveUser() async {
-  //   final prefs = await SharedPreferences.getInstance();
-  //   if (_user != null) {
-  //     String jsonString = jsonEncode(_user!.toJson());
-  //     await prefs.setString('demUser', jsonString);
-  //   }
-  // }
+  String? get token => _token;
 
   // ------------------------------
   //  LOAD USER AT STARTUP
@@ -32,109 +23,104 @@ class EnterpriseProvider extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
 
-      // Load cached user first
-      final userJson = prefs.getString('giver_user_data');
+      // Load cached user ONLY from giver key
+      String? userJson = prefs.getString('giver_user_data');
       if (userJson != null) {
-        print(
-          "DEBUG: EnterpriseProvider - Cached JSON mapping from: $userJson",
-        );
         try {
-          final cachedUser = EnterpriseModel.fromJson(jsonDecode(userJson));
-          _user = cachedUser;
-          print("DEBUG: EnterpriseProvider - ID from cache: ${_user?.id}");
+          final decoded = jsonDecode(userJson);
+          if (decoded is Map<String, dynamic> && decoded['role'] == 'GIVER') {
+            _user = EnterpriseModel.fromJson(decoded);
+            print("DEBUG: EnterpriseProvider - Successfully loaded cached GIVER.");
+          }
           notifyListeners();
         } catch (e) {
-          print('Error parsing cached user: $e');
+          print('Error parsing cached giver user: $e');
         }
       }
 
-      final token = prefs.getString('token');
-      if (token != null) {
-        _token = token;
-        
-        // Check user role before calling giverProfile (Support both keys for resilience)
-        final userRole = prefs.getString('user_role') ?? prefs.getString('role');
-        print("DEBUG: EnterpriseProvider - Resolved role: $userRole");
-        
-        // Only call giverProfile if user is actually a GIVER
-        if (userRole == 'GIVER') {
-          print(
-            "DEBUG: EnterpriseProvider - Fetching fresh profile from /auth/profile-giver...",
-          );
-          final freshUser = await ApiService().giverProfile(token);
-          if (freshUser != null) {
-            print(
-              "DEBUG: EnterpriseProvider - freshUser DETAILS: ID=${freshUser.id}, Name=${freshUser.name}",
-            );
+      final tokenStr = prefs.getString('token');
+      if (tokenStr != null) {
+        _token = tokenStr;
+        final userRole = prefs.getString('user_role');
 
-            // CRITICAL: Merge data to avoid overwriting good login/cache data with nulls from profile endpoint
+        // This provider only fetches if user is a GIVER
+        if (userRole == 'GIVER') {
+          print("DEBUG: EnterpriseProvider - Fetching fresh GIVER profile...");
+          final freshUser = await ApiService().giverProfile(tokenStr);
+          if (freshUser != null) {
             if (_user != null) {
               _user = _user!.mergeFrom(freshUser);
-              print("DEBUG: EnterpriseProvider - ID after merge: ${_user?.id}");
             } else {
               _user = freshUser;
             }
+            final encodedUser = jsonEncode(_user!.toJson());
+            await prefs.setString('giver_user_data', encodedUser);
+            // Sync with generic key for shared usage
+            await prefs.setString('last_user_data', encodedUser);
+            if (_user?.id != null) await prefs.setString('userId', _user!.id!);
 
-            // Update cache
-            final updatedJson = jsonEncode(_user!.toJson());
-            await prefs.setString('giver_user_data', updatedJson);
             notifyListeners();
-          } else {
-            print(
-              "DEBUG: EnterpriseProvider - freshUser is NULL from ApiService",
-            );
           }
-        } else {
-          print(
-            "DEBUG: EnterpriseProvider - Skipping giverProfile call for role: $userRole",
-          );
         }
-      } else {
-        print(
-          "DEBUG: EnterpriseProvider - No token found in SharedPreferences",
-        );
       }
     } catch (e) {
-      print(e);
+      print('Error in loadUser (EnterpriseProvider): $e');
     }
     _isLoading = false;
     notifyListeners();
   }
 
   // ------------------------------
-  //  MOCK LOAD (API IN FUTURE)
-  //final response = await http.get(Uri.parse("$baseUrl/user/profile"));
-  //_user = DonnorUserModel.fromJson(jsonDecode(response.body));
-
+  //  UPDATE PROFILE
   // ------------------------------
-  Future<void> loadMockUser() async {
+  Future<bool> updateProfile(
+    String name,
+    String? phone,
+    String? address,
+    String? city,
+    File? image, // Optional image
+  ) async {
+    if (_user == null) return false;
+
     _isLoading = true;
     notifyListeners();
 
-    await Future.delayed(const Duration(seconds: 2));
+    try {
+      // Create a temporary updated model to send
+      final updatedUser = _user!.copyWith(
+        name: name,
+        phone: phone,
+        adress: address,
+        city: city,
+        image: image,
+      );
 
-    // _user = DonnorUserModel(
-    //   id: '111',
-    //   companyName: 'CodeHub',
-    //   logo:
-    //       "https://i.pinimg.com/474x/2d/d5/2b/2dd52b8c1b437036609e307767cb9206.jpg",
-    //   domaine: 'Web development',
-    //   rate: 2.1,
-    //   email: 'codehub@gmail.com',
-    //   phoneNumber: '22222222222',
-    //   location: 'Sonfonia',
-    //   passWord: 'code123',
-    //   isVerified: false,
-    // );
+      final result = await ApiService().updateEnterpriseProfile(
+        updatedUser,
+        image,
+      );
 
-    //await saveUser();
+      if (result != null) {
+        print("DEBUG: updateProfile (EnterpriseProvider) - Success");
+
+        // Sync and Load fresh data
+        await loadUser();
+
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      }
+    } catch (e) {
+      print('Error updating giver profile: $e');
+    }
 
     _isLoading = false;
     notifyListeners();
+    return false;
   }
 
   // ------------------------------
-  //  TOGGLE ISVERIFIED + SAVE
+  //  TOGGLE ISVERIFIED (Mock/Placeholder)
   // ------------------------------
   Future<void> toggleIsVerified() async {
     if (_user == null) return;
@@ -142,13 +128,14 @@ class EnterpriseProvider extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
 
-    // In a real app, this would be an API call
-    await Future.delayed(const Duration(milliseconds: 500));
+    await Future.delayed(const Duration(milliseconds: 200));
+
     //_user = _user!.copyWith(isVerified: !_user!.isVerified);
 
-    // Save to cache
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('giver_user_data', jsonEncode(_user!.toJson()));
+    final encodedUser = jsonEncode(_user!.toJson());
+    await prefs.setString('giver_user_data', encodedUser);
+    await prefs.setString('last_user_data', encodedUser);
 
     _isLoading = false;
     notifyListeners();

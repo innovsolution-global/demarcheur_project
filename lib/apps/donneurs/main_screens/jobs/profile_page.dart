@@ -1,7 +1,10 @@
+import 'package:demarcheur_app/apps/demandeurs/main_screens/edit_info.dart';
+import 'package:demarcheur_app/apps/donneurs/inner_screens/jobs/edit_information.dart';
 import 'package:demarcheur_app/apps/donneurs/inner_screens/jobs/job_applicants_page.dart';
 import 'package:demarcheur_app/apps/donneurs/inner_screens/jobs/job_posting.dart';
 import 'package:demarcheur_app/apps/donneurs/inner_screens/jobs/my_announcements.dart';
 import 'package:demarcheur_app/consts/color.dart';
+import 'package:demarcheur_app/models/donneur/donneur_model.dart';
 import 'package:demarcheur_app/providers/donnor_user_provider.dart';
 import 'package:demarcheur_app/providers/settings_provider.dart';
 import 'package:demarcheur_app/services/auth_provider.dart';
@@ -63,12 +66,12 @@ class _ProfilePageState extends State<ProfilePage>
       print("DEBUG PROFILE: User is not null");
       print("DEBUG PROFILE: Name: ${user.name}");
       print("DEBUG PROFILE: Phone: ${user.phone}");
+      print("DEBUG PROFILE: Role: ${user is DonneurModel ? 'SEARCHER' : 'UNKNOWN'}");
       print("DEBUG PROFILE: Email: ${user.email}");
-      print("DEBUG PROFILE: Address: ${user.adress}");
-      print("DEBUG PROFILE: City: ${user.city}");
     } else {
-      print("DEBUG PROFILE: User is NULL");
+      print("DEBUG PROFILE: User is NULL in DonnorUserProvider");
     }
+
     if (demUser.isLoading) {
       return Scaffold(
         backgroundColor: colors.bg,
@@ -261,7 +264,7 @@ class _EnhancedProfileHeaderState extends State<_EnhancedProfileHeader> {
 
     if (!mounted) return;
 
-    await dem.toggleIsVerified();
+    // await dem.toggleIsVerified();
 
     setState(() {
       isLoading = false;
@@ -883,9 +886,10 @@ class _ActionButtonsSection extends StatelessWidget {
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text("Modification bientôt disponible"),
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const EditInformation(),
                       ),
                     );
                   },

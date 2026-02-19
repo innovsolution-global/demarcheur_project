@@ -10,7 +10,8 @@ import 'package:demarcheur_app/services/auth_provider.dart';
 import 'package:demarcheur_app/models/add_vancy_model.dart';
 
 class JobPostings extends StatefulWidget {
-  const JobPostings({super.key});
+  final AddVancyModel? jobToEdit;
+  const JobPostings({super.key, this.jobToEdit});
 
   @override
   State<JobPostings> createState() => _JobPostingsState();
@@ -58,7 +59,34 @@ class _JobPostingsState extends State<JobPostings>
     'Mensuel',
     'À discuter',
   ];
+  @override
+  void initState() {
+    super.initState();
+    if (widget.jobToEdit != null) {
+      final job = widget.jobToEdit!;
+      _titleController.text = job.title;
+      _descriptionController.text = job.description;
+      _budgetController.text = job.salary.toString();
+      _locationController.text = job.city;
+      _requirementsController.text = job.conditions.isNotEmpty ? job.conditions.first : '';
+      _levelController.text = job.level;
+      _experienceController.text = job.experience;
+      _deadlineController.text = job.deadline;
+      _contactController.text = job.otherInfo.isNotEmpty ? job.otherInfo.first : '';
+      
+      selectedDuration = _mapJobTypeToDuration(job.typeJobe);
+      // Note: Images from API are handled separately or just not shown in this simple edit mode
+    }
+  }
 
+  String _mapJobTypeToDuration(String type) {
+    switch (type) {
+      case 'FREELANCE':
+        return 'Ponctuel';
+      default:
+        return 'Ponctuel';
+    }
+  }
   @override
   void dispose() {
     _titleController.dispose();
@@ -155,6 +183,7 @@ class _JobPostingsState extends State<JobPostings>
       });
 
       final vancy = AddVancyModel(
+        id: widget.jobToEdit?.id,
         title: _titleController.text,
         description: _descriptionController.text,
         city: _locationController.text,
@@ -174,13 +203,19 @@ class _JobPostingsState extends State<JobPostings>
                   .split(' ')[0],
         companyId: companyId,
         missions: [_descriptionController.text],
-        benefits: [],
+        benefits: widget.jobToEdit?.benefits ?? [],
         conditions: [_requirementsController.text],
         reqProfile: [_requirementsController.text],
         otherInfo: [_contactController.text],
+        createdAt: widget.jobToEdit?.createdAt,
       );
 
-      final success = await authProvider.addVancyJob(vancy);
+      bool success;
+      if (widget.jobToEdit != null) {
+        success = await authProvider.updateJobOffer(widget.jobToEdit!.id!, vancy);
+      } else {
+        success = await authProvider.addVancyJob(vancy, selectedImages);
+      }
 
       if (!mounted) return;
 
@@ -189,10 +224,14 @@ class _JobPostingsState extends State<JobPostings>
       });
 
       if (success) {
-        _showSnackBar('Annonce publiée avec succès !');
-        Navigator.pop(context);
+        _showSnackBar(widget.jobToEdit != null 
+          ? 'Annonce mise à jour avec succès !' 
+          : 'Annonce publiée avec succès !');
+        Navigator.pop(context, true);
       } else {
-        _showSnackBar('Échec de la publication de l\'annonce', isError: true);
+        _showSnackBar(widget.jobToEdit != null 
+          ? 'Échec de la mise à jour' 
+          : 'Échec de la publication', isError: true);
       }
     }
   }
@@ -217,7 +256,7 @@ class _JobPostingsState extends State<JobPostings>
                     children: [
                       const SizedBox(height: 24),
                       Text(
-                        "Nouvelle Offre",
+                        widget.jobToEdit != null ? "Modifier l'Offre" : "Nouvelle Offre",
                         style: TextStyle(
                           color: colors.primary,
                           fontSize: 32,
@@ -402,16 +441,17 @@ class _JobPostingsState extends State<JobPostings>
                         ],
                       ).animate().fadeIn(delay: 800.ms).slideY(begin: 0.05),
 
-                      const SizedBox(height: 32),
-                      _buildSectionTitle(
-                        "Photos",
-                        Icons.photo_library_outlined,
-                      ),
-                      _buildImagePickerSection()
-                          .animate()
-                          .fadeIn(delay: 1000.ms)
-                          .slideY(begin: 0.05),
-
+                      if (widget.jobToEdit == null) ...[
+                        const SizedBox(height: 32),
+                        _buildSectionTitle(
+                          "Photos",
+                          Icons.photo_library_outlined,
+                        ),
+                        _buildImagePickerSection()
+                            .animate()
+                            .fadeIn(delay: 1000.ms)
+                            .slideY(begin: 0.05),
+                      ],
                       const SizedBox(height: 48),
                       _buildPremiumSubmitButton(),
                       const SizedBox(height: 48),
@@ -743,9 +783,9 @@ class _JobPostingsState extends State<JobPostings>
                   strokeWidth: 3,
                 ),
               )
-            : const Text(
-                "Publier l'Offre",
-                style: TextStyle(
+            : Text(
+                widget.jobToEdit != null ? "Mettre à jour" : "Publier l'Offre",
+                style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 0.5,

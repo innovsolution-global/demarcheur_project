@@ -1,6 +1,7 @@
 // lib/services/api_service.dart
 import 'dart:io';
 import 'dart:convert';
+import 'dart:async';
 
 import 'package:demarcheur_app/models/add_vancy_model.dart';
 import 'package:demarcheur_app/models/candidate_model.dart';
@@ -16,6 +17,7 @@ import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:mime/mime.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:path_provider/path_provider.dart';
 
 class ApiService {
   final StorageService _storage = StorageService();
@@ -205,6 +207,11 @@ class ApiService {
       if (response.statusCode == 200 || response.statusCode == 201) {
         final data = jsonDecode(response.body);
         if (data != null && data is Map<String, dynamic>) {
+          print('DEBUG: setLogin response keys: ${data.keys.toList()}');
+          print('DEBUG: setLogin token: ${data['token'] != null}');
+          print('DEBUG: setLogin refreshToken: ${data['refreshToken']}');
+          print('DEBUG: setLogin refresh_token: ${data['refresh_token']}');
+
           // Defensive extraction
           String? userIdString = data['userId']?.toString();
           // Fallback to nested user object if top-level ID is missing
@@ -215,11 +222,21 @@ class ApiService {
           }
 
           final tokenString = data['token']?.toString();
+          // Extract refresh token from likely keys
+          final refreshTokenString =
+              data['refreshToken']?.toString() ??
+              data['refresh_token']?.toString();
 
           if (userIdString != null && tokenString != null) {
             SharedPreferences pref = await SharedPreferences.getInstance();
             await pref.setString('userId', userIdString);
             await pref.setString('token', tokenString);
+
+            // Save refresh token if available
+            if (refreshTokenString != null) {
+              await pref.setString('refreshToken', refreshTokenString);
+              await StorageService().saveRefreshToken(refreshTokenString);
+            }
           } else {
             print(
               'DEBUG: setLogin - Missing userId or token in response: data=$data',
@@ -266,6 +283,7 @@ class ApiService {
     try {
       if (response.statusCode == 200) {
         final body = jsonDecode(response.body);
+        print('DEBUG: giverProfile - Raw Response Body: $body');
         if (body is Map<String, dynamic>) {
           if (body['data'] != null) {
             return EnterpriseModel.fromJson(body['data']);
@@ -281,14 +299,61 @@ class ApiService {
     return null;
   }
 
-  //load the givers
-  Future<DonneurModel?> searcherProfile(String? token) async {
-    final headers = await _getAuthHeaders(token);
-    final response = await http.get(
-      Uri.parse('$baseUrl/auth/profile-searcher'),
-      headers: headers,
-    );
+  // Refresh token method
+  Future<String?> refreshToken() async {
     try {
+      final refreshToken = await _storage.getRefreshToken();
+
+      print('DEBUG: refreshToken - Found in storage: ${refreshToken != null}');
+      if (refreshToken == null) {
+        print('DEBUG: refreshToken - Aborting, no refresh token available.');
+        return null;
+      }
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/auth/refresh-token'), // Verify endpoint name
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'refreshToken': refreshToken}),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = jsonDecode(response.body);
+        final newToken = data['token'] ?? data['accessToken'];
+        final newRefreshToken = data['refreshToken'] ?? data['refresh_token'];
+
+        if (newToken != null) {
+          await _storage.saveToken(newToken);
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('token', newToken);
+
+          if (newRefreshToken != null) {
+            await _storage.saveRefreshToken(newRefreshToken);
+            await prefs.setString('refreshToken', newRefreshToken);
+          }
+          return newToken;
+        }
+      } else {
+        print(
+          'Token refresh failed: ${response.statusCode} - ${response.body}',
+        );
+        // Optional: clear tokens if refresh fails to force login
+        // await _storage.clearAll();
+      }
+    } catch (e) {
+      print('Error refreshing token: $e');
+    }
+    return null;
+  }
+
+  Future<DonneurModel?> searcherProfile(String? ignoreToken) async {
+    return await _authenticatedRequest<DonneurModel?>((token) async {
+      final response = await http.get(
+        Uri.parse('$baseUrl/auth/profile-searcher'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      );
       if (response.statusCode == 200) {
         final body = jsonDecode(response.body);
         if (body is Map<String, dynamic>) {
@@ -299,266 +364,535 @@ class ApiService {
           }
           return DonneurModel.fromJson(body);
         }
+      } else if (response.statusCode == 401) {
+        throw '401';
       }
-    } catch (e) {
-      print('Error parsing searcher profile: $e');
-    }
-    return null;
+      return null;
+    });
   }
 
   // Get user profile by userId
-  Future<DonneurModel?> getUserProfile(String userId, String? token) async {
-    // Known endpoints in this project's backend structure
-    final endpoints = [
-      '$baseUrl/auth/searcher/$userId', // Most likely based on auth provider
-      '$baseUrl/users/$userId',
-    ];
+  Future<DonneurModel?> getUserProfile(
+    String userId,
+    String? ignoreToken,
+  ) async {
+    return await _authenticatedRequest<DonneurModel?>((token) async {
+      final endpoints = [
+        '$baseUrl/auth/searcher/$userId',
+        '$baseUrl/users/$userId',
+        '$baseUrl/auth/user/$userId',
+        '$baseUrl/api/user/users/$userId',
+        '$baseUrl/user/$userId',
+        '$baseUrl/donneurs/$userId',
+        '$baseUrl/searchers/$userId',
+        '$baseUrl/auth/donneur/$userId',
+      ];
 
-    for (final url in endpoints) {
-      try {
-        final headers = await _getAuthHeaders(token);
-        final response = await http.get(Uri.parse(url), headers: headers);
-
-        if (response.statusCode == 200) {
-          final body = jsonDecode(response.body);
-          if (body is Map<String, dynamic>) {
-            if (body['data'] != null) {
-              return DonneurModel.fromJson(body['data']);
-            } else if (body['user'] != null) {
-              return DonneurModel.fromJson(body['user']);
+      for (final url in endpoints) {
+        try {
+          final response = await http.get(
+            Uri.parse(url),
+            headers: {
+              'Authorization': 'Bearer $token',
+              'Accept': 'application/json',
+            },
+          );
+          if (response.statusCode == 200) {
+            final body = jsonDecode(response.body);
+            if (body is Map<String, dynamic>) {
+              if (body['data'] != null) {
+                return DonneurModel.fromJson(body['data']);
+              } else if (body['user'] != null) {
+                return DonneurModel.fromJson(body['user']);
+              }
+              return DonneurModel.fromJson(body);
             }
-            return DonneurModel.fromJson(body);
+          } else if (response.statusCode == 401) {
+            throw '401';
           }
+        } catch (e) {
+          if (e.toString().contains('401')) rethrow;
+          print('ApiService.getUserProfile error for $url: $e');
         }
-      } catch (e) {
-        print('ApiService.getUserProfile error for $url: $e');
       }
-    }
-    return null;
+      return null;
+    });
   }
+
+  Future<Map<String, dynamic>?> canditures() async {}
 
   //adding job vancy
   Future<Map<String, dynamic>?> addVancy(
     AddVancyModel vancy,
-    String? token,
+    List<File> images,
+    String? token, // token argument kept for compatibility
   ) async {
-    try {
-      final body = jsonEncode(vancy);
+    return await _authenticatedRequest<Map<String, dynamic>?>((
+      authToken,
+    ) async {
+      try {
+        print('=== ADD VANCY DEBUG ===');
+        print('Number of images to upload: ${images.length}');
 
-      final headers = await _getAuthHeaders(token);
+        // If no images, use regular JSON POST for better backend validation compatibility
+        if (images.isEmpty) {
+          print('Adding vacancy via JSON POST (no images)...');
+          final response = await http.post(
+            Uri.parse('$baseUrl/job-offers'),
+            headers: {
+              'Authorization': 'Bearer $authToken',
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: jsonEncode(vancy.toJson()),
+          );
 
-      final response = await http.post(
-        Uri.parse('$baseUrl/job-offers'),
-        headers: headers,
-        body: body,
-      );
+          print('Response status code: ${response.statusCode}');
+          print('Response body: ${response.body}');
 
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        return jsonDecode(response.body);
+          if (response.statusCode == 200 || response.statusCode == 201) {
+            return jsonDecode(response.body);
+          } else {
+            //if (response.statusCode == 401) rethrow; // Let _authenticatedRequest handle it
+            print('ERROR: Failed to add vancy via JSON');
+            return null;
+          }
+        }
+
+        // If images exist, use MultipartRequest
+        final request = http.MultipartRequest(
+          'POST',
+          Uri.parse('$baseUrl/job-offers'),
+        );
+
+        request.headers.addAll({
+          'Authorization': 'Bearer $authToken',
+          'Accept': 'application/json',
+        });
+
+        // Add text fields from vancy model
+        final fields = vancy.toJson();
+        fields.forEach((key, value) {
+          if (value != null) {
+            if (value is List) {
+              if (value.isEmpty) {
+                request.fields[key] = "[]";
+              } else {
+                request.fields[key] = jsonEncode(value);
+              }
+            } else {
+              request.fields[key] = value.toString();
+            }
+          }
+        });
+
+        print('Vancy fields: ${request.fields.keys.toList()}');
+
+        // Add images (max 10)
+        for (var i = 0; i < images.length; i++) {
+          final file = images[i];
+          final mimeType = lookupMimeType(file.path);
+          final contentType = mimeType != null
+              ? MediaType.parse(mimeType)
+              : MediaType('image', 'jpeg');
+
+          final fieldName = 'image';
+          print(
+            'Adding image $i as $fieldName: ${file.path} (${contentType.mimeType})',
+          );
+
+          request.files.add(
+            await http.MultipartFile.fromPath(
+              fieldName,
+              file.path,
+              contentType: contentType,
+            ),
+          );
+        }
+
+        print('Total files attached: ${request.files.length}');
+        print('Sending multipart request to: ${request.url}');
+
+        final streamedResponse = await request.send();
+        final response = await http.Response.fromStream(streamedResponse);
+
+        print('Response status code: ${response.statusCode}');
+        print('Response body: ${response.body}');
+
+        if (response.statusCode == 200 || response.statusCode == 201) {
+          final responseData = jsonDecode(response.body);
+          print('Job vacancy added successfully via Multipart!');
+          return responseData;
+        } else {
+          if (response.statusCode == 401)
+            throw '401'; // Let _authenticatedRequest handle it
+          print('ERROR: Failed to add vancy via Multipart');
+          print('Status: ${response.statusCode}');
+          print('Body: ${response.body}');
+        }
+      } catch (e) {
+        if (e.toString().contains('401')) rethrow;
+        print('ERROR adding vancy: $e');
       }
-    } catch (e) {
-      print('The catch message: $e');
-    }
-
-    return null;
+      return null;
+    });
   }
 
   // Get company vacancies
-  Future<List<AddVancyModel>> getMyVacancies(String? token) async {
-    try {
-      final headers = await _getAuthHeaders(token);
-      final response = await http.get(
-        Uri.parse(
-          '$baseUrl/job-offers',
-        ), // Assuming this endpoint exists, or fallback to /job-offers
-        headers: headers,
-      );
+  Future<List<AddVancyModel>> getMyVacancies(String? ignoreToken) async {
+    return await _authenticatedRequest<List<AddVancyModel>>((token) async {
+          List<AddVancyModel> allVacancies = [];
+          int page = 1;
+          bool hasMore = true;
 
-      if (response.statusCode == 200) {
-        final dynamic decodedBody = jsonDecode(response.body);
+          while (hasMore) {
+            final url = '$baseUrl/job-offers?page=$page&limit=50';
+            print('DEBUG: getMyVacancies fetching page $page: $url');
 
-        if (decodedBody is List) {
-          return decodedBody.map((e) => AddVancyModel.fromJson(e)).toList();
-        } else if (decodedBody is Map<String, dynamic>) {
-          // Check for common keys like 'data', 'offers', 'results'
-          final List<dynamic>? list =
-              decodedBody['data'] ??
-              decodedBody['offers'] ??
-              decodedBody['results'] ??
-              decodedBody['vancies']; // Based on developer naming patterns observed
+            final response = await http.get(
+              Uri.parse(url),
+              headers: {
+                'Authorization': 'Bearer $token',
+                'Accept': 'application/json',
+              },
+            );
 
-          if (list != null) {
-            return list.map((e) => AddVancyModel.fromJson(e)).toList();
+            if (response.statusCode == 200) {
+              final dynamic decodedBody = jsonDecode(response.body);
+              List<dynamic>? list;
+              int? totalPages;
+
+              if (decodedBody is List) {
+                list = decodedBody;
+                hasMore = false;
+              } else if (decodedBody is Map<String, dynamic>) {
+                list =
+                    decodedBody['data'] ??
+                    decodedBody['offers'] ??
+                    decodedBody['results'] ??
+                    decodedBody['vancies'];
+
+                if (decodedBody['meta'] != null) {
+                  totalPages = decodedBody['meta']['totalPages'];
+                  final int currentPage = decodedBody['meta']['page'] ?? page;
+                  if (totalPages != null && currentPage >= totalPages) {
+                    hasMore = false;
+                  }
+                } else if (decodedBody['totalPages'] != null) {
+                  totalPages = decodedBody['totalPages'];
+                  if (page >= totalPages!) hasMore = false;
+                } else {
+                  if (list == null || list.isEmpty) hasMore = false;
+                }
+              }
+
+              if (list != null && list.isNotEmpty) {
+                final pageItems = list
+                    .map((e) => AddVancyModel.fromJson(e))
+                    .toList();
+                allVacancies.addAll(pageItems);
+                print(
+                  'DEBUG: getMyVacancies page $page added ${pageItems.length} items',
+                );
+                page++;
+              } else {
+                hasMore = false;
+              }
+            } else if (response.statusCode == 401) {
+              throw '401';
+            } else {
+              print(
+                'DEBUG: getMyVacancies failed with status: ${response.statusCode}',
+              );
+              hasMore = false;
+            }
           }
-        }
-      }
-    } catch (e) {
-      print('Error fetching vacancies: $e');
-    }
-    return [];
+          return allVacancies;
+        }) ??
+        [];
   }
 
+  Future<bool> updateJobOffer(
+    String id,
+    AddVancyModel jobOffer,
+    String?
+    token, // token argument kept for compatibility but will be overridden by _authenticatedRequest
+  ) async {
+    final result = await _authenticatedRequest<bool>((authToken) async {
+      try {
+        print(
+          'DEBUG: updateJobOffer - Sending PATCH to $baseUrl/job-offers/$id',
+        );
+
+        // Filter payload to match API documentation strictly
+        final Map<String, dynamic> payload = jobOffer.toJson();
+        payload.remove('companyId');
+        payload.remove('ownerRole');
+        payload.remove('createdAt');
+        payload.remove('companyName');
+        payload.remove('companyImage');
+        payload.remove('id'); // ID is in URL
+
+        print('DEBUG: updateJobOffer - Payload: ${jsonEncode(payload)}');
+
+        final response = await http.patch(
+          Uri.parse('$baseUrl/job-offers/$id'),
+          headers: {
+            'Authorization': 'Bearer $authToken',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: jsonEncode(payload),
+        );
+
+        print(
+          'DEBUG: updateJobOffer - Response Status: ${response.statusCode}',
+        );
+        print('DEBUG: updateJobOffer - Response Body: ${response.body}');
+
+        if (response.statusCode == 200 || response.statusCode == 201) {
+          return true;
+        } else if (response.statusCode == 401) {
+          throw '401'; // Force retry
+        } else {
+          print(
+            'Error updating job offer: ${response.statusCode} - ${response.body}',
+          );
+          return false;
+        }
+      } catch (e) {
+        if (e.toString().contains('401')) rethrow;
+        print('Exception updating job offer: $e');
+        return false;
+      }
+    });
+    return result ?? false;
+  }
+
+  Future<bool> deleteJobOffer(String id, String? token) async {
+    final result = await _authenticatedRequest<bool>((authToken) async {
+      try {
+        final response = await http.delete(
+          Uri.parse('$baseUrl/job-offers/$id'),
+          headers: {
+            'Authorization': 'Bearer $authToken',
+            'Accept': 'application/json',
+          },
+        );
+
+        if (response.statusCode == 200) {
+          return true;
+        } else if (response.statusCode == 401) {
+          throw '401'; // Force retry
+        } else {
+          print(
+            'Error deleting job offer: ${response.statusCode} - ${response.body}',
+          );
+          if (response.body.contains('Foreign key constraint violated')) {
+            throw 'API_ERROR: FOREIGN_KEY';
+          }
+          return false;
+        }
+      } catch (e) {
+        if (e.toString().contains('401')) rethrow;
+        if (e.toString().contains('API_ERROR:')) rethrow;
+        print('Exception deleting job offer: $e');
+        return false;
+      }
+    });
+    return result ?? false;
+  }
+
+  // Used for adding a candidate (apply for job)
   Future<Map<String, dynamic>?> addCandidate(
     CandidateModel candidate,
-    String? token,
+    String? ignoreToken,
   ) async {
-    try {
-      final request = http.MultipartRequest(
-        'POST',
-        Uri.parse('$baseUrl/candidatures'),
-      );
-
-      final headers = await _getAuthHeaders(token);
-      request.headers.addAll(headers);
-
-      request.fields['JobId'] = candidate.jobId;
-      request.fields['appliquantId'] = candidate.appliquantId;
-
-      if (candidate.document != null) {
-        final file = candidate.document!;
-        final mimeType = lookupMimeType(file.path);
-
-        // Default to application/pdf if mimeType lookup fails, or handle error
-        final contentType = mimeType != null
-            ? MediaType.parse(mimeType)
-            : MediaType('application', 'pdf');
-
-        request.files.add(
-          await http.MultipartFile.fromPath(
-            'document', // Changed from 'cv' to 'document' based on error
-            file.path,
-            contentType: contentType,
-          ),
+    return await _authenticatedRequest<Map<String, dynamic>?>((token) async {
+      try {
+        final request = http.MultipartRequest(
+          'POST',
+          Uri.parse('$baseUrl/candidatures'),
         );
-      }
 
-      final streamedResponse = await request.send();
-      final response = await http.Response.fromStream(streamedResponse);
+        request.headers.addAll({
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        });
 
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        return jsonDecode(response.body);
-      } else {
-        print('AddCandidate failed: ${response.statusCode}');
+        request.fields['JobId'] = candidate.jobId;
+        request.fields['appliquantId'] = candidate.appliquantId;
+
+        if (candidate.document != null) {
+          final file = candidate.document!;
+          final mimeType = lookupMimeType(file.path);
+          final contentType = mimeType != null
+              ? MediaType.parse(mimeType)
+              : MediaType('application', 'pdf');
+
+          request.files.add(
+            await http.MultipartFile.fromPath(
+              'document',
+              file.path,
+              contentType: contentType,
+            ),
+          );
+        }
+
+        final streamedResponse = await request.send();
+        final response = await http.Response.fromStream(streamedResponse);
+
+        if (response.statusCode == 200 || response.statusCode == 201) {
+          return jsonDecode(response.body);
+        } else if (response.statusCode == 401) {
+          throw '401';
+        } else {
+          print('AddCandidate failed: ${response.statusCode}');
+        }
+      } catch (e) {
+        if (e.toString().contains('401')) rethrow;
+        print('An exception occurred at $e');
       }
-    } catch (e) {
-      print('An exception occurred at $e');
-    }
-    return null;
+      return null;
+    });
   }
 
   Future<List<CandidateModel>> getJobApplicants(
     String jobId,
-    String? token, {
+    String? initialToken, {
     int page = 1,
     int limit = 10,
   }) async {
-    try {
-      final url = '$baseUrl/candidatures/job/$jobId';
+    final result = await _authenticatedRequest<List<CandidateModel>>((
+      token,
+    ) async {
+      try {
+        final url = '$baseUrl/candidatures/job/$jobId';
+        print('DEBUG: getJobApplicants fetching for jobId: $jobId');
 
-      final response = await http.get(
-        Uri.parse(url),
-        headers: {
-          if (token != null) 'Authorization': 'Bearer $token',
-          'Accept': 'application/json',
-        },
-      );
+        final response = await http.get(
+          Uri.parse(url),
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/json',
+          },
+        );
 
-      if (response.statusCode == 200) {
-        final dynamic decoded = jsonDecode(response.body);
-        List<dynamic> data = [];
+        print('DEBUG: getJobApplicants response code: ${response.statusCode}');
+        print('DEBUG: getJobApplicants response body: ${response.body}');
 
-        if (decoded is List) {
-          data = decoded;
-        } else if (decoded is Map<String, dynamic>) {
-          data =
-              decoded['data'] ??
-              decoded['candidatures'] ??
-              decoded['results'] ??
-              [];
+        if (response.statusCode == 200) {
+          final dynamic decoded = jsonDecode(response.body);
+          List<dynamic> data = [];
+
+          if (decoded is List) {
+            data = decoded;
+          } else if (decoded is Map<String, dynamic>) {
+            data =
+                decoded['data'] ??
+                decoded['candidatures'] ??
+                decoded['results'] ??
+                [];
+          }
+
+          print(
+            'DEBUG: getJobApplicants found ${data.length} applicants for job $jobId',
+          );
+
+          final candidates = data.map((json) {
+            return CandidateModel.fromJson(json);
+          }).toList();
+          return candidates;
+        } else if (response.statusCode == 401) {
+          throw '401'; // Force retry in _authenticatedRequest
+        } else {
+          print(
+            "DEBUG: getJobApplicants failed with ${response.statusCode}: ${response.body}",
+          );
         }
-
-        final candidates = data.map((json) {
-          return CandidateModel.fromJson(json);
-        }).toList();
-        return candidates;
+      } catch (e) {
+        if (e.toString().contains('401'))
+          rethrow; // Pass up to _authenticatedRequest
+        print('ApiService.getJobApplicants error: $e');
       }
-    } catch (e) {
-      print('ApiService.getJobApplicants error: $e');
-    }
-    return [];
+      return [];
+    });
+    return result ?? [];
   }
 
+  // Rebuild comment
+  // Rebuild comment
   Future<List<CandidateModel>> getEnterpriseCandidates(
     String enterpriseId,
-    String? token,
+    String? ignoreToken,
   ) async {
-    try {
-      // First, get all jobs for this enterprise
-      final allJobs = await getMyVacancies(token);
+    return await _authenticatedRequest<List<CandidateModel>>((token) async {
+          try {
+            print(
+              'DEBUG: getEnterpriseCandidates called for enterpriseId: $enterpriseId',
+            );
+            final allJobs = await getMyVacancies(token);
+            final jobs = allJobs.where((job) {
+              return job.companyId.toString().trim() ==
+                  enterpriseId.toString().trim();
+            }).toList();
 
-      // Filter to only jobs that belong to this specific enterprise
-      final jobs = allJobs
-          .where((job) => job.companyId == enterpriseId)
-          .toList();
+            if (jobs.isEmpty) return [];
 
-      if (jobs.isEmpty) {
-        return [];
-      }
-
-      // Then, fetch candidates for each job
-      List<CandidateModel> allCandidates = [];
-
-      for (var job in jobs) {
-        if (job.id != null && job.id!.isNotEmpty) {
-          final jobCandidates = await getJobApplicants(job.id!, token);
-          allCandidates.addAll(jobCandidates);
-        }
-      }
-      return allCandidates;
-    } catch (e) {
-      print('ApiService.getEnterpriseCandidates error: $e');
-    }
-    return [];
+            List<CandidateModel> allCandidates = [];
+            for (var job in jobs) {
+              if (job.id != null && job.id!.isNotEmpty) {
+                final jobCandidates = await getJobApplicants(job.id!, token);
+                allCandidates.addAll(jobCandidates);
+              }
+            }
+            return allCandidates;
+          } catch (e) {
+            if (e.toString().contains('401')) rethrow;
+            print('ApiService.getEnterpriseCandidates error: $e');
+          }
+          return [];
+        }) ??
+        [];
   }
 
   Future<List<CandidateModel>> getJobApplicantById(
     String jobId,
-    String? token,
+    String? ignoreToken,
   ) async {
-    try {
-      final url = '$baseUrl/candidatures/$jobId';
-
-      final response = await http.get(
-        Uri.parse(url),
-        headers: {
-          if (token != null) 'Authorization': 'Bearer $token',
-          'Accept': 'application/json',
-        },
-      );
-
-      if (response.statusCode == 200) {
-        final dynamic decoded = jsonDecode(response.body);
-        List<dynamic> data = [];
-
-        if (decoded is List) {
-          data = decoded;
-        } else if (decoded is Map<String, dynamic>) {
-          data =
-              decoded['data'] ??
-              decoded['candidatures'] ??
-              decoded['results'] ??
-              [];
-        }
-
-        final candidates = data.map((json) {
-          return CandidateModel.fromJson(json);
-        }).toList();
-        return candidates;
-      }
-    } catch (e) {
-      print('ApiService.getJobApplicants error: $e');
-    }
-    return [];
+    return await _authenticatedRequest<List<CandidateModel>>((token) async {
+          try {
+            final url = '$baseUrl/candidatures/$jobId';
+            final response = await http.get(
+              Uri.parse(url),
+              headers: {
+                'Authorization': 'Bearer $token',
+                'Accept': 'application/json',
+              },
+            );
+            if (response.statusCode == 200) {
+              final dynamic decoded = jsonDecode(response.body);
+              List<dynamic> data = [];
+              if (decoded is List) {
+                data = decoded;
+              } else if (decoded is Map) {
+                data =
+                    decoded['data'] ??
+                    decoded['candidatures'] ??
+                    decoded['results'] ??
+                    [];
+              }
+              return data.map((json) => CandidateModel.fromJson(json)).toList();
+            } else if (response.statusCode == 401) {
+              throw '401';
+            }
+          } catch (e) {
+            if (e.toString().contains('401')) rethrow;
+            print('ApiService.getJobApplicantById error: $e');
+          }
+          return [];
+        }) ??
+        [];
   }
 
   Future<Map<String, dynamic>?> updateStatus(
@@ -566,159 +900,328 @@ class ApiService {
     String newStatus, [
     String? token,
   ]) async {
-    final headers = await _getAuthHeaders(token);
-    final response = await http.patch(
-      Uri.parse('$baseUrl/candidatures/$candidatureId'),
-      headers: headers,
-      body: jsonEncode({'status': newStatus}),
-    );
+    return _authenticatedRequest<Map<String, dynamic>?>((authToken) async {
+      try {
+        final response = await http.patch(
+          Uri.parse('$baseUrl/candidatures/$candidatureId'),
+          headers: {
+            'Authorization': 'Bearer $authToken',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: jsonEncode({'status': newStatus}),
+        );
 
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    } else {
-      print('Update failed: ${response.body}');
-      return null;
-    }
+        if (response.statusCode == 200) {
+          return jsonDecode(response.body);
+        } else if (response.statusCode == 401) {
+          throw '401'; // Force retry
+        } else {
+          print('Update failed: ${response.body}');
+          return null;
+        }
+      } catch (e) {
+        if (e.toString().contains('401')) rethrow;
+        print('Exception updating status: $e');
+        return null;
+      }
+    });
   }
 
   Future<List<Map<String, dynamic>>> getUserApplications(
-    String? token, {
+    String? ignoreToken, {
     String? userId,
   }) async {
     if (userId == null) return [];
-
-    try {
-      final url = '$baseUrl/candidatures/$userId';
-
-      final response = await http.get(
-        Uri.parse(url),
-        headers: {
-          if (token != null) 'Authorization': 'Bearer $token',
-          'Accept': 'application/json',
-        },
-      );
-
-      if (response.statusCode == 200) {
-        final dynamic decoded = jsonDecode(response.body);
-        List<dynamic> list = [];
-
-        if (decoded is List) {
-          list = decoded;
-        } else if (decoded is Map<String, dynamic>) {
-          list =
-              decoded['data'] ??
-              decoded['candidatures'] ??
-              decoded['results'] ??
-              [];
-        }
-
-        return List<Map<String, dynamic>>.from(list);
-      }
-    } catch (e) {
-      print('ApiService.getUserApplications error: $e');
-    }
-    return [];
+    return await _authenticatedRequest<List<Map<String, dynamic>>>((
+          token,
+        ) async {
+          try {
+            final url = '$baseUrl/candidatures/$userId';
+            final response = await http.get(
+              Uri.parse(url),
+              headers: {
+                'Authorization': 'Bearer $token',
+                'Accept': 'application/json',
+              },
+            );
+            if (response.statusCode == 200) {
+              final dynamic decoded = jsonDecode(response.body);
+              List<dynamic> list = [];
+              if (decoded is List) {
+                list = decoded;
+              } else if (decoded is Map<String, dynamic>) {
+                list =
+                    decoded['data'] ??
+                    decoded['candidatures'] ??
+                    decoded['results'] ??
+                    [];
+              }
+              return List<Map<String, dynamic>>.from(list);
+            } else if (response.statusCode == 401) {
+              throw '401';
+            }
+          } catch (e) {
+            if (e.toString().contains('401')) rethrow;
+            print('ApiService.getUserApplications error: $e');
+          }
+          return [];
+        }) ??
+        [];
   }
 
-  Future<Map<String, dynamic>?> getJobById(String jobId, String? token) async {
-    try {
-      final url = '$baseUrl/job-offers/$jobId';
-      final response = await http.get(
-        Uri.parse(url),
-        headers: {
-          if (token != null) 'Authorization': 'Bearer $token',
-          'Accept': 'application/json',
-        },
-      );
+  // Get job applications for a specific user (Searcher)
+  Future<List<Map<String, dynamic>>> getUserJobApplications({
+    required String userId,
+    String? token,
+    int page = 1,
+    int limit = 10,
+  }) async {
+    return await _authenticatedRequest<List<Map<String, dynamic>>>((
+          authToken,
+        ) async {
+          try {
+            final url =
+                '$baseUrl/candidatures/job/by-user/$userId?page=$page&limit=$limit';
+            print('DEBUG: getUserJobApplications fetching: $url');
 
-      if (response.statusCode == 200) {
-        final decoded = jsonDecode(response.body);
-        return decoded['data'] ?? decoded['job'] ?? decoded;
+            final response = await http.get(
+              Uri.parse(url),
+              headers: {
+                'Authorization': 'Bearer $authToken',
+                'Accept': 'application/json',
+              },
+            );
+
+            print('DEBUG: getUserJobApplications response: ${response.body}');
+
+            if (response.statusCode == 200) {
+              final dynamic decoded = jsonDecode(response.body);
+              List<dynamic> list = [];
+
+              if (decoded is List) {
+                list = decoded;
+              } else if (decoded is Map<String, dynamic>) {
+                list =
+                    decoded['data'] ??
+                    decoded['candidatures'] ??
+                    decoded['results'] ??
+                    [];
+              }
+              return List<Map<String, dynamic>>.from(list);
+            } else if (response.statusCode == 401) {
+              throw '401';
+            } else {
+              print(
+                'getUserJobApplications failed: ${response.statusCode} - ${response.body}',
+              );
+              return [];
+            }
+          } catch (e) {
+            if (e.toString().contains('401')) rethrow;
+            print('ApiService.getUserJobApplications error: $e');
+            return [];
+          }
+        }) ??
+        [];
+  }
+
+  Future<Map<String, dynamic>?> getJobById(
+    String jobId,
+    String? ignoreToken,
+  ) async {
+    return await _authenticatedRequest<Map<String, dynamic>?>((token) async {
+      try {
+        final url = '$baseUrl/job-offers/$jobId';
+        final response = await http.get(
+          Uri.parse(url),
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/json',
+          },
+        );
+        if (response.statusCode == 200) {
+          return jsonDecode(response.body);
+        } else if (response.statusCode == 401) {
+          throw '401';
+        }
+      } catch (e) {
+        if (e.toString().contains('401')) rethrow;
+        print('ApiService.getJobById error: $e');
       }
-    } catch (e) {
-      print('ApiService.getJobById error: $e');
-    }
-    return null;
+      return null;
+    });
   }
 
   Future<Map<String, dynamic>?> addProperties(
     HouseModel property,
     List<File> images,
-    String? token,
+    String? ignoreToken,
   ) async {
-    try {
-      final request = http.MultipartRequest(
-        'POST',
-        Uri.parse('$baseUrl/properties'),
-      );
+    return await _authenticatedRequest<Map<String, dynamic>?>((token) async {
+      try {
+        print('=== ADD PROPERTIES DEBUG ===');
+        print('Number of images to upload: ${images.length}');
 
-      request.headers.addAll({
-        'Authorization': 'Bearer $token',
-        'Accept': 'application/json',
-      });
-
-      // Add text fields
-      final fields = property.toJson();
-      fields.forEach((key, value) {
-        if (value != null && key != 'imageUrl') {
-          if (value is List) {
-            request.fields[key] = jsonEncode(value);
-          } else {
-            request.fields[key] = value.toString();
-          }
-        }
-      });
-
-      // Add images
-      for (var file in images) {
-        final mimeType = lookupMimeType(file.path);
-        final contentType = mimeType != null
-            ? MediaType.parse(mimeType)
-            : MediaType('image', 'jpeg');
-
-        request.files.add(
-          await http.MultipartFile.fromPath(
-            'image', // Changed from 'images' to match other endpoints like donneurRegistration
-            file.path,
-            contentType: contentType,
-          ),
+        final request = http.MultipartRequest(
+          'POST',
+          Uri.parse('$baseUrl/properties'),
         );
+
+        request.headers.addAll({
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        });
+
+        final fields = property.toJson();
+        fields.forEach((key, value) {
+          if (value != null) {
+            if (value is List) {
+              request.fields[key] = jsonEncode(value);
+            } else {
+              request.fields[key] = value.toString();
+            }
+          }
+        });
+
+        for (var i = 0; i < images.length; i++) {
+          final file = images[i];
+          final mimeType = lookupMimeType(file.path);
+          final contentType = mimeType != null
+              ? MediaType.parse(mimeType)
+              : MediaType('image', 'jpeg');
+
+          request.files.add(
+            await http.MultipartFile.fromPath(
+              'image',
+              file.path,
+              contentType: contentType,
+            ),
+          );
+        }
+
+        final response = await http.Response.fromStream(await request.send());
+
+        if (response.statusCode == 200 || response.statusCode == 201) {
+          return jsonDecode(response.body);
+        } else if (response.statusCode == 401) {
+          throw '401';
+        } else {
+          print(
+            'ERROR: Failed to add property. Status: ${response.statusCode}',
+          );
+        }
+      } catch (e) {
+        if (e.toString().contains('401')) rethrow;
+        print('ERROR adding property: $e');
       }
-
-      final streamedResponse = await request.send();
-      final response = await http.Response.fromStream(streamedResponse);
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        return jsonDecode(response.body);
-      }
-    } catch (e) {
-      print('Error adding property: $e');
-    }
-
-    return null;
+      return null;
+    });
   }
 
-  Future<List<TypeProperties>> typeProperties(String? token) async {
-    try {
-      final headers = await _getAuthHeaders(token);
-      final response = await http.get(
-        Uri.parse('$baseUrl/type-properties'),
-        headers: headers,
-      );
+  Future<Map<String, dynamic>?> updateGalleryImage(
+    String propertyId,
+    List<File> images,
+    String? ignoreToken,
+  ) async {
+    return await _authenticatedRequest<Map<String, dynamic>?>((token) async {
+      try {
+        final request = http.MultipartRequest(
+          'PATCH',
+          Uri.parse('$baseUrl/properties/update-galery-image/$propertyId'),
+        );
 
-      if (response.statusCode == 200) {
-        final dynamic decoded = jsonDecode(response.body);
-        List<dynamic> body = [];
-        if (decoded is List) {
-          body = decoded;
-        } else if (decoded is Map<String, dynamic>) {
-          body =
-              decoded['data'] ?? decoded['types'] ?? decoded['results'] ?? [];
+        request.headers.addAll({
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        });
+
+        for (var i = 0; i < images.length; i++) {
+          final file = images[i];
+          final mimeType = lookupMimeType(file.path);
+          final contentType = mimeType != null
+              ? MediaType.parse(mimeType)
+              : MediaType('image', 'jpeg');
+
+          request.files.add(
+            await http.MultipartFile.fromPath(
+              'image',
+              file.path,
+              contentType: contentType,
+            ),
+          );
         }
-        return body.map((e) => TypeProperties.fromJson(e)).toList();
-      } else {
-        // If API fails, return hardcoded list for now
-        return [
+
+        final response = await http.Response.fromStream(await request.send());
+
+        if (response.statusCode == 200 || response.statusCode == 201) {
+          return jsonDecode(response.body);
+        } else if (response.statusCode == 401) {
+          throw '401';
+        }
+      } catch (e) {
+        if (e.toString().contains('401')) rethrow;
+        print('ERROR updating gallery: $e');
+      }
+      return null;
+    });
+  }
+
+  Future<bool> deleteProperty(String id, String? ignoreToken) async {
+    return await _authenticatedRequest<bool>((token) async {
+          final response = await http.delete(
+            Uri.parse('$baseUrl/properties/$id'),
+            headers: {
+              'Authorization': 'Bearer $token',
+              'Accept': 'application/json',
+            },
+          );
+
+          if (response.statusCode == 200) {
+            print('Property deleted successfully');
+            return true;
+          } else if (response.statusCode == 401) {
+            throw '401';
+          } else {
+            print('Delete Property failed: ${response.statusCode}');
+            print('Body: ${response.body}');
+            return false;
+          }
+        }) ??
+        false;
+  }
+
+  Future<List<TypeProperties>> typeProperties(String? ignoreToken) async {
+    return await _authenticatedRequest<List<TypeProperties>>((token) async {
+          final response = await http.get(
+            Uri.parse('$baseUrl/type-properties'),
+            headers: {
+              'Authorization': 'Bearer $token',
+              'Accept': 'application/json',
+            },
+          );
+
+          if (response.statusCode == 200) {
+            final dynamic decoded = jsonDecode(response.body);
+            List<dynamic> body = [];
+            if (decoded is List) {
+              body = decoded;
+            } else if (decoded is Map<String, dynamic>) {
+              body =
+                  decoded['data'] ??
+                  decoded['types'] ??
+                  decoded['results'] ??
+                  [];
+            }
+            return body.map((e) => TypeProperties.fromJson(e)).toList();
+          } else if (response.statusCode == 401) {
+            throw '401';
+          } else {
+            print('API fetch typeProperties failed: ${response.statusCode}');
+            return null; // Let the wrapper handle it or return fallback
+          }
+        }) ??
+        [
           TypeProperties(
             id: '1',
             tyPePropertyName: 'Appartement',
@@ -770,49 +1273,162 @@ class ApiService {
             typeEnum: 'COMMERCIAL',
           ),
         ];
-      }
-    } catch (e) {
-      print('DEBUG: types exception: $e');
-    }
-    return [];
   }
 
   Future<List<HouseModel>> getProperties(
-    String? token, {
+    String? ignoreToken, {
     String? companyId,
   }) async {
-    try {
-      final headers = await _getAuthHeaders(token);
-      final response = await http.get(
-        Uri.parse('$baseUrl/properties'),
+    return await _authenticatedRequest<List<HouseModel>>((token) async {
+          final response = await http.get(
+            Uri.parse('$baseUrl/properties'),
+            headers: {
+              'Authorization': 'Bearer $token',
+              'Accept': 'application/json',
+            },
+          );
+
+          if (response.statusCode == 200) {
+            final dynamic decoded = jsonDecode(response.body);
+            List<dynamic> body = [];
+            if (decoded is List) {
+              body = decoded;
+            } else if (decoded is Map<String, dynamic>) {
+              body =
+                  decoded['data'] ??
+                  decoded['properties'] ??
+                  decoded['results'] ??
+                  [];
+            }
+            List<HouseModel> all = body
+                .map((e) => HouseModel.fromJson(e))
+                .toList();
+
+            if (companyId != null) {
+              return all
+                  .where(
+                    (h) => h.companyId == companyId || h.ownerId == companyId,
+                  )
+                  .toList();
+            }
+            return all;
+          } else if (response.statusCode == 401) {
+            throw '401';
+          } else {
+            print('ApiService.getProperties failed: ${response.statusCode}');
+            return null;
+          }
+        }) ??
+        [];
+  }
+
+  Future<Map<String, dynamic>?> updateProperty(
+    String id,
+    Map<String, dynamic> data,
+    String? token,
+  ) async {
+    return _authenticatedRequest((token) async {
+      print('=== ApiService.updateProperty - START ===');
+      final url = Uri.parse('$baseUrl/properties/$id');
+      final headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $token',
+      };
+
+      print('DEBUG: Using standard JSON PATCH for metadata');
+
+      if (data.containsKey('area') && data['area'] != null) {
+        data['area'] = data['area'].toString();
+      }
+
+      if (data.containsKey('advantage') && data['advantage'] is String) {
+        data['advantage'] = [data['advantage']];
+      }
+      if (data.containsKey('condition') && data['condition'] is String) {
+        data['condition'] = [data['condition']];
+      }
+
+      // Check for empty strings in the lists and replace with null as requested
+      void cleanList(String key) {
+        if (data.containsKey(key) && data[key] is List) {
+          final list = data[key] as List;
+          if (list.isEmpty ||
+              (list.length == 1 && list.first.toString().trim().isEmpty)) {
+            data[key] = null;
+          }
+        }
+      }
+
+      cleanList('advantage');
+      cleanList('condition');
+
+      print('DEBUG: Payload: ${jsonEncode(data)}');
+
+      final response = await http.patch(
+        url,
         headers: headers,
+        body: jsonEncode(data),
       );
 
-      if (response.statusCode == 200) {
-        final dynamic decoded = jsonDecode(response.body);
-        List<dynamic> body = [];
-        if (decoded is List) {
-          body = decoded;
-        } else if (decoded is Map<String, dynamic>) {
-          body =
-              decoded['data'] ??
-              decoded['properties'] ??
-              decoded['results'] ??
-              [];
-        }
-        List<HouseModel> all = body.map((e) => HouseModel.fromJson(e)).toList();
-
-        if (companyId != null) {
-          return all
-              .where((h) => h.companyId == companyId || h.ownerId == companyId)
-              .toList();
-        }
-        return all;
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return jsonDecode(response.body);
+      } else if (response.statusCode == 401) {
+        throw '401';
+      } else {
+        print(
+          '=== ApiService.updateProperty - FAILED: ${response.statusCode} ===',
+        );
+        print('Body: ${response.body}');
+        return null;
       }
-    } catch (e) {
-      print('DEBUG: getProperties exception: $e');
-    }
-    return [];
+    });
+  }
+
+  Future<bool> updateGalleryImages(
+    String id,
+    List<File> images,
+    String? ignoreToken,
+  ) async {
+    return await _authenticatedRequest<bool>((token) async {
+          print('=== ApiService.updateGalleryImages - START ===');
+          final url = Uri.parse('$baseUrl/properties/update-galery-image/$id');
+          final request = http.MultipartRequest('PATCH', url);
+          request.headers.addAll({
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/json',
+          });
+
+          for (var file in images) {
+            final mimeType = lookupMimeType(file.path);
+            final contentType = mimeType != null
+                ? MediaType.parse(mimeType)
+                : MediaType('image', 'jpeg');
+            request.files.add(
+              await http.MultipartFile.fromPath(
+                'image',
+                file.path,
+                contentType: contentType,
+              ),
+            );
+          }
+
+          final response = await http.Response.fromStream(await request.send());
+          print('Gallery update response status: ${response.statusCode}');
+
+          if (response.statusCode == 200 || response.statusCode == 201) {
+            return true;
+          } else if (response.statusCode == 401) {
+            throw '401';
+          } else {
+            print(
+              'ERROR: Failed to update gallery images: ${response.statusCode}',
+            );
+            print('Body: ${response.body}');
+            return false;
+          }
+        }) ??
+        false;
   }
 
   Future<Map<String, dynamic>?> sendMessage(
@@ -826,22 +1442,12 @@ class ApiService {
       final headers = await _getAuthHeaders(token);
       request.headers.addAll(headers);
 
-      // Required fields as per doc: senderId, receiverId, content
       request.fields['senderId'] = chat.senderId;
       request.fields['receiverId'] = chat.receiverId;
       request.fields['content'] = chat.content;
 
-      // Optional property: image (array of files, max 15)
       if (chat.attachments != null && chat.attachments!.isNotEmpty) {
-        // Enforce max 15 files as mentioned in doc
-        final filesToSend = chat.attachments!.take(15).toList();
-        if (chat.attachments!.length > 15) {
-          print(
-            'WARNING: ApiService.sendMessage - More than 15 images provided. Only the first 15 will be sent.',
-          );
-        }
-
-        for (var file in filesToSend) {
+        for (var file in chat.attachments!.take(15)) {
           final mimeType = lookupMimeType(file.path);
           final contentType = mimeType != null
               ? MediaType.parse(mimeType)
@@ -849,7 +1455,7 @@ class ApiService {
 
           request.files.add(
             await http.MultipartFile.fromPath(
-              'image', // Field name 'image' as per documentation
+              'image',
               file.path,
               contentType: contentType,
             ),
@@ -864,11 +1470,10 @@ class ApiService {
         return jsonDecode(response.body);
       } else {
         print('DEBUG: sendMessage FAILED Status: ${response.statusCode}');
-        print('DEBUG: sendMessage error body: ${response.body}');
         return null;
       }
     } catch (e) {
-      print('Error during message sending: $e');
+      print('DEBUG: sendMessage error: $e');
       return null;
     }
   }
@@ -889,11 +1494,9 @@ class ApiService {
         if (list is List) {
           return list.map((j) => SendMessageModel.fromJson(j)).toList();
         }
-      } else {
-        print('Failed to fetch message by ID: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error fetching message by ID: $e');
+      print('Failed to fetch message by ID: $e');
     }
     return [];
   }
@@ -903,9 +1506,6 @@ class ApiService {
     String? token,
   }) async {
     try {
-      print(
-        'DEBUG: ApiService.allConversation - Requesting for userId: $userId',
-      );
       final headers = await _getAuthHeaders(token);
       final response = await http.get(
         Uri.parse('$baseUrl/chats/by-user/$userId'),
@@ -934,10 +1534,8 @@ class ApiService {
             .toList();
       }
 
-      // Fallback Strategy: If targeted fetch empty or failed, try more exhaustive search
       if (allMessages.isEmpty) {
         final fallbackData = await fetchConversations(token, userId: userId);
-
         final List<SendMessageModel> fallbackModels = [];
         for (final e in fallbackData) {
           if (e is Map<String, dynamic>) {
@@ -945,7 +1543,6 @@ class ApiService {
                 (e['receiverId'] ?? e['otherUserId'] ?? e['id'])?.toString() ??
                 '';
             if (partnerId.isEmpty || partnerId == 'null') continue;
-
             fallbackModels.add(
               SendMessageModel(
                 id: partnerId,
@@ -959,23 +1556,13 @@ class ApiService {
                     : null,
               ),
             );
-          } else if (e is SendMessageModel) {
-            fallbackModels.add(e);
           }
         }
         return fallbackModels;
       }
 
-      // Grouping Logic: If endpoint returned raw messages, we must group them by conversation partner
       final Map<String, SendMessageModel> conversationsMap = {};
-
-      print(
-        'DEBUG: ApiService.allConversation - Total messages to group: ${allMessages.length}',
-      );
       for (var msg in allMessages) {
-        // Identify the partner ID.
-        // Logic: The partner is the ID that is NOT mine.
-        // If one is empty, the other is the partner.
         String partnerId = '';
         if (msg.senderId.isNotEmpty && msg.senderId != userId) {
           partnerId = msg.senderId;
@@ -983,18 +1570,9 @@ class ApiService {
           partnerId = msg.receiverId;
         }
 
-        print(
-          'DEBUG: ApiService.allConversation - msg: s="${msg.senderId}", r="${msg.receiverId}", partnerId="$partnerId"',
-        );
+        if (partnerId.isEmpty || partnerId == userId) continue;
 
-        if (partnerId.isEmpty || partnerId == userId) {
-          continue;
-        }
-
-        // Identify if I was the sender of the last message
         final wasMe = (msg.senderId == userId || msg.senderId.trim().isEmpty);
-
-        // Create a normalized message where IDs are guaranteed for the UI
         final normalizedMsg = SendMessageModel(
           id: msg.id,
           content: msg.content,
@@ -1005,14 +1583,9 @@ class ApiService {
           timestamp: msg.timestamp,
         );
 
-        print(
-          'DEBUG: ApiService.allConversation - Produced normalized: s="${normalizedMsg.senderId}", r="${normalizedMsg.receiverId}"',
-        );
-
         if (!conversationsMap.containsKey(partnerId)) {
           conversationsMap[partnerId] = normalizedMsg;
         } else {
-          // Keep the newest message for the conversation
           final existing = conversationsMap[partnerId]!;
           if (normalizedMsg.timestamp != null &&
               (existing.timestamp == null ||
@@ -1021,22 +1594,16 @@ class ApiService {
           }
         }
       }
-
       final result = conversationsMap.values.toList();
-      // Sort newest first
       result.sort(
         (a, b) =>
             (b.timestamp ?? DateTime(0)).compareTo(a.timestamp ?? DateTime(0)),
       );
-
-      print(
-        'DEBUG: ApiService.allConversation - Final grouped conversations: ${result.length}',
-      );
       return result;
     } catch (e) {
-      print('DEBUG: ApiService.allConversation - Exception: $e');
+      print('ApiService.allConversation error: $e');
+      return null;
     }
-    return [];
   }
 
   Future<List<dynamic>> fetchConversations(
@@ -1044,138 +1611,48 @@ class ApiService {
     String? userId,
   }) async {
     try {
-      // Since there is no DIRECT conversation endpoint in Swagger, we simulate it
-      // by fetching ALL messages for the user and grouping them.
-
+      final headers = await _getAuthHeaders(token);
       List<SendMessageModel> allMessages = [];
 
       Future<void> fetchAndAdd(String url) async {
-        try {
-          print('DEBUG: fetchConversations - Requesting $url');
-          final headers = await _getAuthHeaders(token);
-          final resp = await http.get(Uri.parse(url), headers: headers);
-          if (resp.statusCode == 200) {
-            final d = jsonDecode(resp.body);
-            List l = [];
-            if (d is List) {
-              l = d;
-            } else if (d is Map) {
-              l =
-                  d['data'] ??
-                  d['messages'] ??
-                  d['chats'] ??
-                  d['results'] ??
-                  [];
-            }
-            print(
-              'DEBUG: fetchConversations - Fetched ${l.length} messages from $url',
-            );
-            if (l.isEmpty) {
-              print('DEBUG: fetchConversations - Empty Body: ${resp.body}');
-            }
-
-            allMessages.addAll(l.map((e) => SendMessageModel.fromJson(e)));
-          } else {
-            print(
-              'DEBUG: fetchConversations - Failed $url status: ${resp.statusCode} Body: ${resp.body}',
-            );
-          }
-        } catch (e) {
-          print('Error fetching messages: $e');
+        final resp = await http.get(Uri.parse(url), headers: headers);
+        if (resp.statusCode == 200) {
+          final d = jsonDecode(resp.body);
+          List l = [];
+          if (d is List)
+            l = d;
+          else if (d is Map)
+            l = d['data'] ?? d['messages'] ?? d['results'] ?? [];
+          allMessages.addAll(l.map((e) => SendMessageModel.fromJson(e)));
         }
       }
 
-      // Use CamelCase parameters as per Swagger documentation
-      // Swagger says /chats requires senderId and receiverId.
-      // We try to request with just one to get all conversations.
       await fetchAndAdd('$baseUrl/chats?senderId=$userId&limit=100');
       await fetchAndAdd('$baseUrl/chats?receiverId=$userId&limit=100');
 
-      if (allMessages.isEmpty) {
-        // Fallback: Fetch ALL chats for the user (assuming /chats returns the authenticated user's messages)
-        print(
-          'DEBUG: fetchConversations - Targeted fetch empty. Trying generic /chats endpoint',
-        );
-        await fetchAndAdd('$baseUrl/chats?limit=100');
-
-        // If still empty, try without limit
-        if (allMessages.isEmpty) {
-          await fetchAndAdd('$baseUrl/chats');
-        }
-      }
-
-      if (allMessages.isEmpty && userId == null) {
-        // Fallback if userId wasn't provided, try the old endpoint just in case it exists undocumented
-        print('DEBUG: fetchConversations - userId null, trying /chat fallback');
-        final fallbackUrl = '$baseUrl/chat';
-        try {
-          final resp = await http.get(
-            Uri.parse(fallbackUrl),
-            headers: {
-              if (token != null) 'Authorization': 'Bearer $token',
-              'Accept': 'application/json',
-            },
-          );
-          if (resp.statusCode == 200) {
-            final decoded = jsonDecode(resp.body);
-            List<dynamic> list = (decoded is List)
-                ? decoded
-                : (decoded['data'] ?? []);
-            return list;
-          }
-        } catch (_) {}
-        return [];
-      }
-
-      // Group by partner ID
       final Map<String, Map<String, dynamic>> conversations = {};
-
       for (var msg in allMessages) {
-        String partnerId;
-        String partnerName = "Utilisateur"; // Default
-
-        // Determine who is the partner
-        if (msg.senderId == userId) {
-          partnerId = msg.receiverId;
-        } else {
-          partnerId = msg.senderId;
-        }
-
+        String partnerId = (msg.senderId == userId)
+            ? msg.receiverId
+            : msg.senderId;
         if (partnerId.isEmpty || partnerId == 'null') continue;
 
-        // Add to map if not present or update if this message is newer
         if (!conversations.containsKey(partnerId)) {
           conversations[partnerId] = {
             'id': partnerId,
-            'name': msg.userName.isNotEmpty ? msg.userName : partnerName,
+            'name': msg.userName.isNotEmpty ? msg.userName : "Utilisateur",
             'lastMessage': msg.content,
             'timestamp': msg.timestamp?.toIso8601String(),
             'receiverId': partnerId,
-            'otherUserId': partnerId,
             'image': msg.userPhoto,
           };
-        } else {
-          // Update if newer
-          final existing = conversations[partnerId];
-          final oldTime = DateTime.tryParse(existing?['timestamp'] ?? '');
-          final newTime = msg.timestamp;
-          if (oldTime == null ||
-              (newTime != null && newTime.isAfter(oldTime))) {
-            conversations[partnerId]!['lastMessage'] = msg.content;
-            conversations[partnerId]!['timestamp'] = msg.timestamp
-                ?.toIso8601String();
-          }
         }
       }
-
-      print(
-        'DEBUG: fetchConversations - Constructed ${conversations.length} conversations from messages',
-      );
       return conversations.values.toList();
     } catch (e) {
       print('ApiService.fetchConversations error: $e');
+      return [];
     }
-    return [];
   }
 
   // Fetch messages between two users
@@ -1187,165 +1664,386 @@ class ApiService {
     int limit = 30,
   }) async {
     try {
-      // Normalize IDs
-      final String myId = senderId.trim();
-      final String otherId = receiverId.trim();
       final headers = await _getAuthHeaders(token);
-      print(
-        'DEBUG: fetchMessages - Starting fetch for Me=$myId, Other=$otherId',
-      );
-
       List<SendMessageModel> allRelevantMessages = [];
 
       Future<void> fetchAndAdd(String url) async {
-        try {
-          print('DEBUG: fetchMessages - Requesting $url');
-          final resp = await http.get(Uri.parse(url), headers: headers);
-          if (resp.statusCode == 200) {
-            final d = jsonDecode(resp.body);
-            List l = [];
-            if (d is List) {
-              l = d;
-            } else if (d is Map) {
-              l =
-                  d['data'] ??
-                  d['messages'] ??
-                  d['chats'] ??
-                  d['results'] ??
-                  [];
-            }
-            if (l.isEmpty && d is Map) {
-              print(
-                'DEBUG: fetchMessages - Empty list from $url. Body keys: ${d.keys}',
-              );
-            } else {
-              print(
-                'DEBUG: fetchMessages - Fetched ${l.length} messages from $url',
-              );
-            }
-            if (l.isEmpty) {
-              print('DEBUG: fetchMessages - Empty Body: ${resp.body}');
-            }
-
-            if (l.isNotEmpty) {
-              print('DEBUG: fetchMessages - Sample JSON from $url: ${l.first}');
-            }
-            allRelevantMessages.addAll(
-              l.map((e) => SendMessageModel.fromJson(e)),
-            );
-          } else {
-            print(
-              'DEBUG: fetchMessages - Failed $url status: ${resp.statusCode}',
-            );
-          }
-        } catch (e) {
-          print('DEBUG: fetchMessages - Error fetching from $url: $e');
+        final resp = await http.get(Uri.parse(url), headers: headers);
+        if (resp.statusCode == 200) {
+          final d = jsonDecode(resp.body);
+          List l = [];
+          if (d is List)
+            l = d;
+          else if (d is Map)
+            l = d['data'] ?? d['messages'] ?? d['results'] ?? [];
+          allRelevantMessages.addAll(
+            l.map((e) => SendMessageModel.fromJson(e)),
+          );
         }
       }
 
-      // Use confirmed parameters from Swagger
-      // 1. Direction Me -> Other
       await fetchAndAdd(
-        '$baseUrl/chats?senderId=$myId&receiverId=$otherId&limit=100',
+        '$baseUrl/chats?senderId=$senderId&receiverId=$receiverId&limit=$limit&page=$page',
       );
-
-      // 2. Direction Other -> Me (just in case the endpoint is directional)
       await fetchAndAdd(
-        '$baseUrl/chats?senderId=$otherId&receiverId=$myId&limit=100',
-      );
-
-      // PROBE: If still empty, try to fetch ANY messages to debug the endpoint
-      if (allRelevantMessages.isEmpty) {
-        print(
-          'DEBUG: fetchMessages - Targeted fetch empty. Trying generic /chats endpoint and filtering locally.',
-        );
-
-        List<SendMessageModel> genericList = [];
-        // Use a temporary list to fetch generic
-        Future<void> fetchGeneric(String url) async {
-          try {
-            final resp = await http.get(Uri.parse(url), headers: headers);
-            if (resp.statusCode == 200) {
-              final d = jsonDecode(resp.body);
-              List l = [];
-              if (d is List)
-                l = d;
-              else if (d is Map)
-                l = d['data'] ?? d['messages'] ?? d['chats'] ?? [];
-              if (l.isNotEmpty) {
-                print(
-                  'DEBUG: fetchMessages - Generic fetch found ${l.length} messages',
-                );
-                genericList.addAll(l.map((e) => SendMessageModel.fromJson(e)));
-              }
-            }
-          } catch (e) {
-            print('DEBUG: fetchMessages - Generic error $e');
-          }
-        }
-
-        await fetchGeneric('$baseUrl/chats?limit=300'); // Fetch more to be safe
-        if (genericList.isEmpty) await fetchGeneric('$baseUrl/chats');
-
-        // Filter locally
-        final filtered = genericList.where((m) {
-          final s = m.senderId;
-          final r = m.receiverId;
-          return (s == myId && r == otherId) || (s == otherId && r == myId);
-        }).toList();
-
-        print(
-          'DEBUG: fetchMessages - Locally filtered ${filtered.length} relevant messages from ${genericList.length} total.',
-        );
-        allRelevantMessages.addAll(filtered);
-      }
-
-      // 3. Filter for the specific conversation partner
-      print(
-        'DEBUG: fetchMessages - Filtering ${allRelevantMessages.length} candidates...',
+        '$baseUrl/chats?senderId=$receiverId&receiverId=$senderId&limit=$limit&page=$page',
       );
 
       final filtered = allRelevantMessages.where((msg) {
         final s = msg.senderId.trim();
         final r = msg.receiverId.trim();
-
-        // Check for direction 1: Me -> Other
-        final match1 = (s == myId && r == otherId);
-        // Check for direction 2: Other -> Me
-        final match2 = (s == otherId && r == myId);
-
-        if (match1 || match2) {
-          return true;
-        }
-        return false;
+        return (s == senderId && r == receiverId) ||
+            (s == receiverId && r == senderId);
       }).toList();
 
-      // Deduplicate based on ID
       final uniqueMessages = {for (var m in filtered) m.id: m}.values.toList();
-
-      // Sort by timestamp (newest first)
-      uniqueMessages.sort((a, b) {
-        final tA = a.timestamp ?? DateTime(0);
-        final tB = b.timestamp ?? DateTime(0);
-        return tB.compareTo(tA);
-      });
-
-      print(
-        'DEBUG: fetchMessages - Found ${uniqueMessages.length} final messages for conversation',
+      uniqueMessages.sort(
+        (a, b) =>
+            (b.timestamp ?? DateTime(0)).compareTo(a.timestamp ?? DateTime(0)),
       );
       return uniqueMessages;
     } catch (e) {
       print('ApiService.fetchMessagesBetweenUsers error: $e');
+      return [];
     }
-    return [];
   }
 
-  Future<Map<String, dynamic>?> upDateProfile(String userId) async {
-    final response = await http.patch(
-      Uri.parse('$baseUrl/auth/update-profile/$userId'),
-      headers: _headers,
-      
-    );
+  Future<Map<String, dynamic>?> updateEnterpriseProfile(
+    EnterpriseModel request, [
+    File? image, // Optional image
+  ]) async {
+    return _authenticatedRequest<Map<String, dynamic>?>((token) async {
+      // List of potential update endpoints to try if one fails to persist
+      // Actually, we'll stick to the one that gives 200 first, but we'll try to find the "richest" one
+      final endpoints = [
+        Uri.parse('$baseUrl/auth/update-profile/${request.id}'),
+        Uri.parse('$baseUrl/auth/update-profile-giver/${request.id}'),
+        Uri.parse('$baseUrl/auth/update-giver/${request.id}'),
+      ];
+
+      Map<String, dynamic>? lastResult;
+
+      for (final url in endpoints) {
+        print('DEBUG: updateEnterpriseProfile - Trying URL: $url');
+
+        final req = http.MultipartRequest('PATCH', url);
+        req.headers.addAll({
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        });
+
+        // Add text fields (all variants from toUpdateJson)
+        final fields = request.toUpdateJson();
+        fields.forEach((key, value) {
+          if (value != null) {
+            req.fields[key] = value.toString();
+          }
+        });
+
+        // Log fields once per request
+        print(
+          'DEBUG: updateEnterpriseProfile - Sending fields: ${req.fields.keys.toList()}',
+        );
+
+        File? imageToSend = image;
+
+        // MANDATORY IMAGE: Backend requirement. Download current if no new one provided.
+        if (imageToSend == null &&
+            request.profile != null &&
+            request.profile!.isNotEmpty) {
+          print(
+            'DEBUG: updateEnterpriseProfile - No new image, downloading existing for re-upload: ${request.profile}',
+          );
+          imageToSend = await _downloadFile(
+            request.profile!,
+            'temp_current_profile_${DateTime.now().millisecondsSinceEpoch}.jpg',
+          );
+        }
+
+        if (imageToSend != null) {
+          final mimeType = lookupMimeType(imageToSend.path);
+          final contentType = mimeType != null
+              ? MediaType.parse(mimeType)
+              : MediaType('image', 'jpeg');
+          req.files.add(
+            await http.MultipartFile.fromPath(
+              'image',
+              imageToSend.path,
+              contentType: contentType,
+            ),
+          );
+        }
+
+        final streamedResponse = await req.send();
+        final response = await http.Response.fromStream(streamedResponse);
+
+        print(
+          'DEBUG: updateEnterpriseProfile - Status for $url: ${response.statusCode}',
+        );
+        if (response.statusCode == 200 || response.statusCode == 201) {
+          final result = jsonDecode(response.body);
+          print(
+            'DEBUG: updateEnterpriseProfile - Success Body for $url: $result',
+          );
+          lastResult = result;
+          break;
+        } else if (response.statusCode == 401) {
+          throw '401';
+        } else {
+          print(
+            'DEBUG: updateEnterpriseProfile - Failed for $url: ${response.body}',
+          );
+        }
+      }
+      return lastResult;
+    });
+  }
+
+  Future<Map<String, dynamic>?> updateDonneurProfile(
+    DonneurModel request, [
+    File? image,
+  ]) async {
+    return _authenticatedRequest<Map<String, dynamic>?>((token) async {
+      final req = http.MultipartRequest(
+        'PATCH',
+        Uri.parse('$baseUrl/auth/update-profile/${request.id}'),
+      );
+
+      req.headers.addAll({
+        'Authorization': 'Bearer $token',
+        'Accept': 'application/json',
+      });
+
+      final jsonMap = request.toJson();
+      jsonMap.forEach((key, value) {
+        if (value != null) {
+          req.fields[key] = value.toString();
+        }
+      });
+
+      File? imageToSend = image;
+
+      if (imageToSend == null &&
+          request.profile != null &&
+          request.profile!.isNotEmpty) {
+        final receivedFile = await _downloadFile(
+          request.profile!,
+          'temp_donneur_${DateTime.now().millisecondsSinceEpoch}.jpg',
+        );
+        if (receivedFile != null) {
+          imageToSend = receivedFile;
+        }
+      }
+
+      if (imageToSend != null) {
+        final mimeType = lookupMimeType(imageToSend.path);
+        final contentType = mimeType != null
+            ? MediaType.parse(mimeType)
+            : MediaType('image', 'jpeg');
+
+        req.files.add(
+          await http.MultipartFile.fromPath(
+            'image',
+            imageToSend.path,
+            contentType: contentType,
+          ),
+        );
+      }
+
+      final streamedResponse = await req.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else if (response.statusCode == 401) {
+        throw '401';
+      } else {
+        print('Update Donneur Profile (Multipart) failed: ${response.body}');
+      }
+      return null;
+    });
+  }
+
+  Future<File?> _downloadFile(String url, String filename) async {
+    try {
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        final directory = await getTemporaryDirectory();
+        final file = File('${directory.path}/$filename');
+        return await file.writeAsBytes(response.bodyBytes);
+      }
+    } catch (e) {
+      print('Error downloading file: $e');
+    }
+    return null;
+  }
+
+  Future<Map<String, dynamic>?> verifyOtp(String email, String otp) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/auth/verify-otp'),
+        headers: _headers,
+        body: jsonEncode({'email': email, 'otp': otp}),
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        print('Verify OTP failed: ${response.statusCode} - ${response.body}');
+        return {
+          'error': true,
+          'statusCode': response.statusCode,
+          'body': response.body,
+        };
+      }
+    } catch (e) {
+      print('Error verifying OTP: $e');
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> createNewPassword(
+    String email,
+    String password,
+    String confirmPassword,
+  ) async {
+    try {
+      final response = await http.patch(
+        Uri.parse('$baseUrl/auth/create-new-password/$email'),
+        headers: _headers,
+        body: jsonEncode({'password': password, 'cpassword': confirmPassword}),
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        print(
+          'Create new password failed: ${response.statusCode} - ${response.body}',
+        );
+        return {
+          'error': true,
+          'statusCode': response.statusCode,
+          'body': response.body,
+        };
+      }
+    } catch (e) {
+      print('Error creating new password: $e');
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> sendOtpByMail(String email) async {
+    int retryCount = 0;
+    const int maxRetries = 2;
+
+    while (retryCount < maxRetries) {
+      try {
+        print(
+          'DEBUG: sendOtpByMail - START (Attempt ${retryCount + 1}) for $email',
+        );
+        final response = await http
+            .post(
+              Uri.parse('$baseUrl/auth/send-otp-by-mail'),
+              headers: _headers,
+              body: jsonEncode({'email': email}),
+            )
+            .timeout(const Duration(seconds: 60));
+
+        print('DEBUG: sendOtpByMail - STATUS: ${response.statusCode}');
+        print('DEBUG: sendOtpByMail - BODY: ${response.body}');
+
+        if (response.statusCode == 200) {
+          return jsonDecode(response.body);
+        } else if (response.statusCode >= 500 && retryCount < maxRetries - 1) {
+          print('DEBUG: Server error 500, retrying...');
+          retryCount++;
+          await Future.delayed(const Duration(seconds: 2));
+          continue;
+        } else {
+          print('Send OTP failed: ${response.statusCode} - ${response.body}');
+          return {
+            'error': true,
+            'statusCode': response.statusCode,
+            'body': response.body,
+            'message': _parseErrorMessage(response.body),
+          };
+        }
+      } catch (e) {
+        print('Error sending OTP (Attempt ${retryCount + 1}): $e');
+        if (retryCount < maxRetries - 1) {
+          retryCount++;
+          await Future.delayed(const Duration(seconds: 2));
+          continue;
+        }
+
+        String errorMessage = e.toString();
+        if (e is TimeoutException) {
+          errorMessage =
+              "Le serveur est trop lent (Timeout 60s). Il se peut que le service soit en cours de démarrage.";
+        }
+        return {'error': true, 'message': errorMessage};
+      }
+    }
+    return null;
+  }
+
+  String _parseErrorMessage(String body) {
+    try {
+      final data = jsonDecode(body);
+      return data['message'] ?? data['error'] ?? 'Une erreur est survenue';
+    } catch (_) {
+      return 'Une erreur serveur est survenue';
+    }
+  }
+
+  // Helper for automatic token refresh
+  Future<T?> _authenticatedRequest<T>(
+    Future<T?> Function(String token) request, [
+    int depth = 0,
+  ]) async {
+    if (depth > 1) {
+      print('Max refresh retries reached. Aborting.');
+      return null;
+    }
+
+    // 1. Get current token
+    String? token = await _storage.getToken();
+    if (token == null) {
+      final prefs = await SharedPreferences.getInstance();
+      token = prefs.getString('token');
+    }
+
+    if (token == null) return null;
+
+    try {
+      // 2. Try request
+      return await request(token);
+    } catch (e) {
+      final errorStr = e.toString();
+      if (errorStr.contains('API_ERROR:')) {
+        rethrow;
+      }
+
+      // 3. Catch 401 - Robust detection
+      final isUnauthorized =
+          errorStr.contains('401') ||
+          errorStr.toLowerCase().contains('unauthorized') ||
+          errorStr.contains('Token expiré');
+
+      if (isUnauthorized) {
+        print('Session expired (detected: $errorStr), attempting refresh...');
+        final newToken = await refreshToken();
+
+        if (newToken != null) {
+          print('Token refreshed successfully, retrying...');
+          return await _authenticatedRequest(request, depth + 1);
+        } else {
+          print('Token refresh failed. Directing to login state.');
+        }
+      } else {
+        print('Authenticated request error: $e');
+      }
+    }
     return null;
   }
 }

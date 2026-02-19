@@ -18,11 +18,12 @@ class ImmoDetailPage extends StatefulWidget {
 
 class _ImmoDetailPageState extends State<ImmoDetailPage> {
   final ConstColors _color = ConstColors();
+  int _currentImageIndex = 0;
 
   @override
   Widget build(BuildContext context) {
     final house = widget.house;
-    
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: CustomScrollView(
@@ -55,6 +56,9 @@ class _ImmoDetailPageState extends State<ImmoDetailPage> {
   }
 
   Widget _buildSliverAppBar(HouseModel house) {
+    final images = house.imageUrl;
+    final hasMultipleImages = images.length > 1;
+
     return SliverAppBar(
       expandedHeight: 400,
       pinned: true,
@@ -65,7 +69,11 @@ class _ImmoDetailPageState extends State<ImmoDetailPage> {
         child: CircleAvatar(
           backgroundColor: Colors.white.withOpacity(0.9),
           child: IconButton(
-            icon: Icon(Icons.arrow_back_ios_new, color: _color.secondary, size: 18),
+            icon: Icon(
+              Icons.arrow_back_ios_new,
+              color: _color.secondary,
+              size: 18,
+            ),
             onPressed: () => Navigator.pop(context),
           ),
         ),
@@ -76,7 +84,11 @@ class _ImmoDetailPageState extends State<ImmoDetailPage> {
           child: CircleAvatar(
             backgroundColor: Colors.white.withOpacity(0.9),
             child: IconButton(
-              icon: Icon(Icons.share_outlined, color: _color.secondary, size: 20),
+              icon: Icon(
+                Icons.share_outlined,
+                color: _color.secondary,
+                size: 20,
+              ),
               onPressed: () {},
             ),
           ),
@@ -86,14 +98,92 @@ class _ImmoDetailPageState extends State<ImmoDetailPage> {
         background: Stack(
           fit: StackFit.expand,
           children: [
-            Image.network(
-              Config.getImgUrl(house.imageUrl.isNotEmpty ? house.imageUrl.first : null) ?? "https://via.placeholder.com/400x400",
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => Container(
-                color: Colors.grey[200],
-                child: Icon(Icons.home_outlined, size: 80, color: Colors.grey[400]),
-              ),
+            Hero(
+              tag: 'house_${house.id}',
+              child: images.isEmpty
+                  ? Container(
+                      color: Colors.grey[200],
+                      child: Icon(
+                        Icons.home_outlined,
+                        size: 80,
+                        color: Colors.grey[400],
+                      ),
+                    )
+                    : PageView.builder(
+                        itemCount: images.length,
+                        physics: const BouncingScrollPhysics(),
+                        onPageChanged: (index) {
+                          setState(() => _currentImageIndex = index);
+                        },
+                        itemBuilder: (context, index) {
+                          return Image.network(
+                            images[index],
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) =>
+                                Container(
+                                  color: Colors.grey[200],
+                                  child: Icon(
+                                    Icons.broken_image_rounded,
+                                    size: 80,
+                                    color: Colors.grey[400],
+                                  ),
+                                ),
+                          );
+                        },
+                      ),
             ),
+
+            // Image Counter
+            if (hasMultipleImages)
+              Positioned(
+                bottom: 30,
+                right: 20,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black54,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '${_currentImageIndex + 1}/${images.length}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+
+            // Dots Indicator
+            if (hasMultipleImages)
+              Positioned(
+                bottom: 35,
+                left: 0,
+                right: 0,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(
+                    images.length,
+                    (index) => AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      width: _currentImageIndex == index ? 20 : 8,
+                      height: 8,
+                      margin: const EdgeInsets.symmetric(horizontal: 4),
+                      decoration: BoxDecoration(
+                        color: _currentImageIndex == index
+                            ? Colors.white
+                            : Colors.white54,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
             // Gradient Overlay for visibility
             const DecoratedBox(
               decoration: BoxDecoration(
@@ -139,13 +229,17 @@ class _ImmoDetailPageState extends State<ImmoDetailPage> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: house.status == 'AVAILABLE' ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
+                color: house.status == 'AVAILABLE'
+                    ? Colors.green.withOpacity(0.1)
+                    : Colors.red.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
                 house.status == 'AVAILABLE' ? 'Disponible' : 'Occupé',
                 style: TextStyle(
-                  color: house.status == 'AVAILABLE' ? Colors.green : Colors.red,
+                  color: house.status == 'AVAILABLE'
+                      ? Colors.green
+                      : Colors.red,
                   fontWeight: FontWeight.bold,
                   fontSize: 12,
                 ),
@@ -210,10 +304,26 @@ class _ImmoDetailPageState extends State<ImmoDetailPage> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _FeatureItem(icon: Icons.meeting_room_outlined, label: "Chambres", value: "${house.rooms ?? 0}"),
-          _FeatureItem(icon: Icons.weekend_outlined, label: "Salons", value: "${house.livingRooms ?? 0}"),
-          _FeatureItem(icon: Icons.square_foot_outlined, label: "Surface", value: "${house.area ?? 0} m²"),
-          _FeatureItem(icon: Icons.garage_outlined, label: "Garage", value: "${house.garage ?? 0}"),
+          _FeatureItem(
+            icon: Icons.meeting_room_outlined,
+            label: "Chambres",
+            value: "${house.rooms ?? 0}",
+          ),
+          _FeatureItem(
+            icon: Icons.weekend_outlined,
+            label: "Salons",
+            value: "${house.livingRooms ?? 0}",
+          ),
+          _FeatureItem(
+            icon: Icons.square_foot_outlined,
+            label: "Surface",
+            value: "${house.area ?? 0} m²",
+          ),
+          _FeatureItem(
+            icon: Icons.garage_outlined,
+            label: "Garage",
+            value: "${house.garage ?? 0}",
+          ),
         ],
       ),
     );
@@ -234,11 +344,7 @@ class _ImmoDetailPageState extends State<ImmoDetailPage> {
         const SizedBox(height: 12),
         Text(
           house.description ?? "Aucune description fournie.",
-          style: TextStyle(
-            fontSize: 16,
-            color: Colors.grey[600],
-            height: 1.6,
-          ),
+          style: TextStyle(fontSize: 16, color: Colors.grey[600], height: 1.6),
         ),
       ],
     );
@@ -246,10 +352,14 @@ class _ImmoDetailPageState extends State<ImmoDetailPage> {
 
   Widget _buildAmenities(HouseModel house) {
     final List<Map<String, dynamic>> amenities = [
-      if (house.kitchen != null && house.kitchen! > 0) {"icon": Icons.kitchen_outlined, "label": "Cuisine"},
-      if (house.garden == true) {"icon": Icons.park_outlined, "label": "Jardin"},
-      if (house.piscine != null && house.piscine! > 0) {"icon": Icons.pool_outlined, "label": "Piscine"},
-      if (house.store != null && house.store! > 0) {"icon": Icons.store_mall_directory_outlined, "label": "Magasin"},
+      if (house.kitchen != null && house.kitchen! > 0)
+        {"icon": Icons.kitchen_outlined, "label": "Cuisine"},
+      if (house.garden == true)
+        {"icon": Icons.park_outlined, "label": "Jardin"},
+      if (house.piscine != null && house.piscine! > 0)
+        {"icon": Icons.pool_outlined, "label": "Piscine"},
+      if (house.store != null && house.store! > 0)
+        {"icon": Icons.store_mall_directory_outlined, "label": "Magasin"},
     ];
 
     if (amenities.isEmpty) return const SizedBox.shrink();
@@ -287,7 +397,11 @@ class _ImmoDetailPageState extends State<ImmoDetailPage> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(item["icon"] as IconData, size: 18, color: _color.primary),
+                  Icon(
+                    item["icon"] as IconData,
+                    size: 18,
+                    color: _color.primary,
+                  ),
                   const SizedBox(width: 8),
                   Text(
                     item["label"] as String,
@@ -341,7 +455,9 @@ class _ImmoDetailPageState extends State<ImmoDetailPage> {
                           house.logo!,
                           fit: BoxFit.cover,
                           errorBuilder: (context, error, stackTrace) {
-                            debugPrint("DEBUG IMMO DETAIL: Image load error: $error");
+                            debugPrint(
+                              "DEBUG IMMO DETAIL: Image load error: $error",
+                            );
                             return Icon(
                               Icons.business,
                               size: 32,
@@ -349,11 +465,7 @@ class _ImmoDetailPageState extends State<ImmoDetailPage> {
                             );
                           },
                         )
-                      : Icon(
-                          Icons.business,
-                          size: 32,
-                          color: Colors.grey[400],
-                        ),
+                      : Icon(Icons.business, size: 32, color: Colors.grey[400]),
                 ),
               ),
               const SizedBox(width: 16),
@@ -387,7 +499,9 @@ class _ImmoDetailPageState extends State<ImmoDetailPage> {
                   final myId = authProvider.userId;
                   if (myId == null) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("Connectez-vous pour envoyer un message")),
+                      const SnackBar(
+                        content: Text("Connectez-vous pour envoyer un message"),
+                      ),
                     );
                     return;
                   }
@@ -395,7 +509,9 @@ class _ImmoDetailPageState extends State<ImmoDetailPage> {
                   final receiverId = house.ownerId ?? house.companyId ?? '';
                   if (receiverId.isEmpty) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("ID du destinataire introuvable")),
+                      const SnackBar(
+                        content: Text("ID du destinataire introuvable"),
+                      ),
                     );
                     return;
                   }
@@ -423,7 +539,11 @@ class _ImmoDetailPageState extends State<ImmoDetailPage> {
                     color: _color.primary.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  child: Icon(Icons.chat_bubble_outline_rounded, color: _color.primary, size: 22),
+                  child: Icon(
+                    Icons.chat_bubble_outline_rounded,
+                    color: _color.primary,
+                    size: 22,
+                  ),
                 ),
               ),
             ],
@@ -455,7 +575,9 @@ class _ImmoDetailPageState extends State<ImmoDetailPage> {
               style: OutlinedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 20),
                 side: BorderSide(color: _color.primary, width: 2),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(18),
+                ),
               ),
               child: Text(
                 "Modifier",
@@ -480,7 +602,9 @@ class _ImmoDetailPageState extends State<ImmoDetailPage> {
                 padding: const EdgeInsets.symmetric(vertical: 20),
                 elevation: 8,
                 shadowColor: _color.primary.withOpacity(0.4),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(18),
+                ),
               ),
             ),
           ),
@@ -495,7 +619,11 @@ class _FeatureItem extends StatelessWidget {
   final String label;
   final String value;
 
-  const _FeatureItem({required this.icon, required this.label, required this.value});
+  const _FeatureItem({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -507,10 +635,7 @@ class _FeatureItem extends StatelessWidget {
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
             boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.03),
-                blurRadius: 10,
-              ),
+              BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10),
             ],
           ),
           child: Icon(icon, color: ConstColors().primary, size: 24),

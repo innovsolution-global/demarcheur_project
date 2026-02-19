@@ -107,6 +107,21 @@ class HouseModel {
       return images.toSet().toList(); // Unique resolved images
     }
 
+    String? parseListToString(dynamic value) {
+      if (value == null) return null;
+      if (value is List) {
+        if (value.isEmpty) return null;
+        // Check for nested empty lists like [[]] or [[[]]]
+        var cleanValue = value.first;
+        while (cleanValue is List && cleanValue.isNotEmpty) {
+          cleanValue = cleanValue.first;
+        }
+        if (cleanValue is List && cleanValue.isEmpty) return null;
+        return cleanValue?.toString();
+      }
+      return value.toString();
+    }
+
     return HouseModel(
       id: (json['id'] ?? json['_id'])?.toString(),
       ownerId: json['ownerId']?.toString() ??
@@ -187,8 +202,8 @@ class HouseModel {
       garden: json['garden'] is bool ? json['garden'] : (json['garden']?.toString() == 'true'),
       price: parsePrice(json['price'] ?? json['rent']),
       otherDescription: json['other_description'],
-      advantage: json['advantage']?.toString(),
-      condition: json['condition']?.toString(),
+      advantage: parseListToString(json['advantage']),
+      condition: parseListToString(json['condition']),
       typePropertId: json['typePropertId']?.toString() ?? json['typeProperty']?['id']?.toString(),
       companyId: json['companyId']?.toString() ??
           json['entrepriseId']?.toString() ??
@@ -219,8 +234,8 @@ class HouseModel {
     'piscine': piscine ?? 0,
     'price': price ?? rent ?? 0.0,
     'other_description': otherDescription ?? "",
-    'advantage': (advantage != null && advantage!.isNotEmpty) ? [advantage] : [],
-    'condition': (condition != null && condition!.isNotEmpty) ? [condition] : [],
+    'advantage': (advantage != null && advantage!.trim().isNotEmpty) ? [advantage] : null,
+    'condition': (condition != null && condition!.trim().isNotEmpty) ? [condition] : null,
     'typePropertId': typePropertId ?? type,
     'companyId': companyId ?? ownerId,
     'category': category ?? "Location",
@@ -238,6 +253,27 @@ class HouseModel {
     'type': type,
     'status': status,
     'rate': rate,
+  };
+
+  Map<String, dynamic> toUpdateJson() => {
+    if (title != null) 'title': title,
+    if (description != null) 'description': description,
+    if (district != null) 'district': district,
+    if (city != null) 'city': city,
+    if (rooms != null) 'rooms': rooms,
+    if (livingRooms != null) 'living_rooms': livingRooms,
+    if (area != null) 'area': int.tryParse(area ?? '') ?? 0,
+    if (statusProperty != null) 'statusProperty': _mapStatus(statusProperty!),
+    if (garage != null) 'garage': garage,
+    if (kitchen != null) 'kitchen': kitchen,
+    if (store != null) 'store': store,
+    if (garden != null) 'garden': garden,
+    if (price != null) 'price': price,
+    if (otherDescription != null) 'other_description': otherDescription,
+    if (advantage != null && advantage!.trim().isNotEmpty) 'advantage': [advantage],
+    if (condition != null && condition!.trim().isNotEmpty) 'condition': [condition],
+    if (typePropertId != null) 'typePropertId': typePropertId,
+    if (companyId != null) 'companyId': companyId,
   };
 
   String _mapStatus(String statusStr) {

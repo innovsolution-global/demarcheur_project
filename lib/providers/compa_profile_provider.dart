@@ -45,6 +45,51 @@ class CompaProfileProvider extends ChangeNotifier {
     return false;
   }
 
+  Future<bool> updateJobOffer(
+    String id,
+    AddVancyModel jobOffer,
+    String? token,
+  ) async {
+    _isLoading = true;
+    notifyListeners();
+
+    final success = await ApiService().updateJobOffer(id, jobOffer, token);
+    if (success) {
+      await loadVancies(token); // Refresh list
+    }
+
+    _isLoading = false;
+    notifyListeners();
+    return success;
+  }
+
+  Future<dynamic> deleteJobOffer(String id, String? token) async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final success = await ApiService().deleteJobOffer(id, token);
+      if (success) {
+        _vacancies.removeWhere((v) => v.id == id);
+        _filterVancy.removeWhere((v) => v.id == id);
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      }
+    } catch (e) {
+      if (e.toString().contains('API_ERROR: FOREIGN_KEY')) {
+        _isLoading = false;
+        notifyListeners();
+        return 'FOREIGN_KEY_VIOLATION';
+      }
+      print('Error in provider delete: $e');
+    }
+
+    _isLoading = false;
+    notifyListeners();
+    return false;
+  }
+
   void search(String query) {
     if (query.isEmpty) {
       _filterVancy = List.from(_vacancies);

@@ -47,7 +47,11 @@ class _MessagePageState extends State<MessagePage> {
       backgroundColor: colors.bg,
       body: CustomScrollView(
         physics: BouncingScrollPhysics(),
-        slivers: [_buildHeader(), _builMessageCard()],
+        slivers: [
+          _buildHeader(),
+          _builMessageCard(),
+          SliverToBoxAdapter(child: SizedBox(height: 50)),
+        ],
       ),
     );
   }
@@ -55,8 +59,18 @@ class _MessagePageState extends State<MessagePage> {
   Widget _buildHeader() {
     return SliverAppBar.large(
       automaticallyImplyLeading: false,
-      title: Text('Messages', style: TextStyle(color: colors.bg)),
       backgroundColor: colors.primary,
+      flexibleSpace: FlexibleSpaceBar(
+        title: Text('Messages', style: TextStyle(color: colors.bg)),
+        background: Container(
+          decoration: BoxDecoration(
+            image: DecorationImage(
+              fit: BoxFit.cover,
+              image: AssetImage('assets/background.png'),
+            ),
+          ),
+        ),
+      ),
     );
   }
 

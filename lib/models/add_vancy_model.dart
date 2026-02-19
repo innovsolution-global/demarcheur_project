@@ -19,6 +19,7 @@ class AddVancyModel {
   String? companyName;
   String? companyImage;
   String? createdAt;
+  String? ownerRole;
 
   AddVancyModel({
     this.id,
@@ -39,9 +40,36 @@ class AddVancyModel {
     this.companyName,
     this.companyImage,
     this.createdAt,
+    this.ownerRole,
   });
 
   factory AddVancyModel.fromJson(Map<String, dynamic> json) {
+    // Attempt to find role in nested objects if not at top level
+    final job = json['jobId'] ?? json['job'] ?? {};
+    final company = job is Map ? (job['company'] ?? job['enterprise'] ?? {}) : {};
+    
+    // Debug logging for location/city
+    print('DEBUG AddVancyModel: city=${json['city']}, location=${json['location']}');
+    
+    // Try to get location from various sources
+    String? cityValue = json['city']?.toString() ?? json['location']?.toString();
+    
+    // If city is still null, try to get it from nested company/enterprise data
+    if ((cityValue == null || cityValue.isEmpty) && company is Map) {
+      cityValue = company['city']?.toString() ?? 
+                  company['location']?.toString() ?? 
+                  company['adress']?.toString() ??
+                  company['address']?.toString();
+      print('DEBUG AddVancyModel: Extracted city from company: $cityValue');
+    }
+    
+    // If still null, try from job object
+    if ((cityValue == null || cityValue.isEmpty) && job is Map) {
+      cityValue = job['city']?.toString() ?? 
+                  job['location']?.toString();
+      print('DEBUG AddVancyModel: Extracted city from job: $cityValue');
+    }
+    
     return AddVancyModel(
       id: (json['id'] ?? json['_id'])?.toString(),
       title: json['title']?.toString() ?? '',
@@ -51,7 +79,7 @@ class AddVancyModel {
       experience: (json['experience'] ?? json['experienceYear'] ?? '')?.toString() ?? '',
       salary: int.tryParse(json['salary']?.toString() ?? '0') ?? 0,
       deadline: json['deadline']?.toString() ?? '',
-      city: (json['city'] ?? json['location'] ?? '')?.toString() ?? '',
+      city: cityValue ?? '',
       companyId: (json['companyId'] ?? json['entrepriseId'] ?? json['ownerId'] ?? '')?.toString(),
       reqProfile: json['reqProfile'] ?? json['requiredProdfile'] ?? json['requiredProfile'] ?? [],
       conditions: json['conditions'] ?? [],
@@ -71,6 +99,10 @@ class AddVancyModel {
                      json['image'] ??
                      json['photo'])?.toString()),
       createdAt: json['createdAt']?.toString() ?? json['dateCreation']?.toString(),
+      ownerRole: json['role']?.toString() ?? 
+                 json['ownerRole']?.toString() ?? 
+                 (company is Map ? company['role']?.toString() : null) ??
+                 (job is Map ? job['role']?.toString() : null),
     );
   }
   Map<String, dynamic> toJson() {
@@ -89,6 +121,8 @@ class AddVancyModel {
       'benefits': benefits,
       'missions': missions,
       'otherInfo': otherInfo,
+      'ownerRole': ownerRole,
     };
   }
 }
+

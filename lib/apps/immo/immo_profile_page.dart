@@ -1,10 +1,11 @@
 import 'package:demarcheur_app/apps/demandeurs/main_screens/add_vacancy_page.dart';
 import 'package:demarcheur_app/apps/demandeurs/main_screens/announce_list.dart';
+import 'package:demarcheur_app/apps/demandeurs/main_screens/edit_info.dart';
 import 'package:demarcheur_app/apps/demandeurs/main_screens/statistics_page.dart';
 import 'package:demarcheur_app/apps/immo/immo_announce_page.dart';
 import 'package:demarcheur_app/apps/immo/immo_post_page.dart';
 import 'package:demarcheur_app/consts/color.dart';
-import 'package:demarcheur_app/providers/enterprise_provider.dart';
+import 'package:demarcheur_app/providers/house_provider.dart';
 import 'package:demarcheur_app/providers/settings_provider.dart';
 import 'package:demarcheur_app/services/auth_provider.dart';
 import 'package:demarcheur_app/widgets/header_page.dart';
@@ -46,7 +47,7 @@ class _ProfilePageState extends State<ImmoProfilePage>
         );
     _animationController.forward();
     Future.microtask(() {
-      context.read<EnterpriseProvider>().loadUser();
+      context.read<HouseProvider>().loadUser();
     });
   }
 
@@ -59,7 +60,7 @@ class _ProfilePageState extends State<ImmoProfilePage>
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsProvider>();
-    final demUser = context.watch<EnterpriseProvider>();
+    final demUser = context.watch<HouseProvider>();
     final user = demUser.user;
     if (user != null) {
       print("DEBUG PROFILE: User is not null");
@@ -69,7 +70,7 @@ class _ProfilePageState extends State<ImmoProfilePage>
       print("DEBUG PROFILE: Address: ${user.adress}");
       print("DEBUG PROFILE: City: ${user.city}");
     } else {
-      print("DEBUG PROFILE: User is NULL");
+      print("DEBUG PROFILE: User is NULL in HouseProvider");
     }
     if (demUser.isLoading) {
       return Scaffold(
@@ -92,27 +93,23 @@ class _ProfilePageState extends State<ImmoProfilePage>
     //             style: TextStyle(color: colors.primary, fontSize: 16),
     //           ),
     //           const SizedBox(height: 16),
-    //           ElevatedButton(
-    //             onPressed: () {
-    //               context.read<EnterpriseProvider>().loadUser();
-    //             },
-    //             style: ElevatedButton.styleFrom(
-    //               backgroundColor: colors.primary,
-    //               foregroundColor: Colors.white,
-    //             ),
-    //             child: const Text("Réessayer"),
-    //           ),
-    //         ],
-    //       ),
-    //     ),
-    //   );
-    // }
+    ElevatedButton(
+      onPressed: () {
+        context.read<HouseProvider>().loadUser();
+      },
+
+      style: ElevatedButton.styleFrom(
+        backgroundColor: colors.primary,
+        foregroundColor: Colors.white,
+      ),
+      child: const Text("Réessayer"),
+    );
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       body: RefreshIndicator(
         onRefresh: () async {
-          await context.read<EnterpriseProvider>().loadUser();
+          await context.read<HouseProvider>().loadUser();
         },
         child: CustomScrollView(
           physics: const BouncingScrollPhysics(),
@@ -324,7 +321,7 @@ class _EnhancedProfileHeader extends StatefulWidget {
 
 class _EnhancedProfileHeaderState extends State<_EnhancedProfileHeader> {
   bool isLoading = false;
-  Future<void> submit(BuildContext context, EnterpriseProvider dem) async {
+  Future<void> submit(BuildContext context, HouseProvider dem) async {
     setState(() {
       isLoading = true;
     });
@@ -333,7 +330,7 @@ class _EnhancedProfileHeaderState extends State<_EnhancedProfileHeader> {
 
     if (!mounted) return;
 
-    await dem.toggleIsVerified();
+    //await dem.toggleIsVerified();
 
     setState(() {
       isLoading = false;
@@ -347,7 +344,7 @@ class _EnhancedProfileHeaderState extends State<_EnhancedProfileHeader> {
 
   @override
   Widget build(BuildContext context) {
-    final demUser = context.watch<EnterpriseProvider>();
+    final demUser = context.watch<HouseProvider>();
     final user = demUser.user;
     return Padding(
       padding: const EdgeInsets.only(top: 10.0),
@@ -936,10 +933,9 @@ class _ActionButtonsSection extends StatelessWidget {
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text("Modification bientôt disponible"),
-                      ),
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const EditInfo()),
                     );
                   },
                   icon: const Icon(Icons.edit_outlined, size: 20),
@@ -950,35 +946,6 @@ class _ActionButtonsSection extends StatelessWidget {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: colors.primary,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    elevation: 0,
-                  ),
-                ),
-              ),
-            ),
-            SizedBox(width: 8),
-            Expanded(
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text("Modification bientôt disponible"),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.archive, size: 20),
-                  label: const Text(
-                    "Mon portofolio",
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: colors.primary.withValues(alpha: 0.2),
-                    foregroundColor: colors.primary,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),

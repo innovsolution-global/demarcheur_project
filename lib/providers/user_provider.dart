@@ -83,17 +83,13 @@ class UserProvider extends ChangeNotifier {
                   UserModel(
                     id: fullProfile.id,
                     name: fullProfile.name,
-                    speciality:
-                        'N/A', // Speciality field doesn't exist in DonneurModel
+                    speciality: 'N/A',
                     exp: fullProfile.phone ?? 'N/A',
                     postDate: cand.createdAt ?? "",
-                    location:
-                        fullProfile.city ??
+                    location: fullProfile.city ??
                         fullProfile.adress ??
                         cand.applicant!.location,
-                    photo:
-                        fullProfile.profile ??
-                        'https://www.pngitem.com/pimgs/m/146-1468479_my-profile-icon-blank-profile-picture-circle-hd.png',
+                    photo: fullProfile.profile ?? cand.applicant!.photo,
                     gender: 'N/A',
                     status: cand.status ?? 'En cours',
                     email: fullProfile.email ?? 'Non renseigné',

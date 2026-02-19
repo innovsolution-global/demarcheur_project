@@ -1,6 +1,9 @@
 import 'dart:io';
 
 import 'package:demarcheur_app/consts/color.dart';
+import 'package:demarcheur_app/providers/donnor_user_provider.dart';
+import 'package:demarcheur_app/providers/enterprise_provider.dart';
+import 'package:demarcheur_app/providers/presta/presta_provider.dart';
 import 'package:demarcheur_app/widgets/btn.dart';
 import 'package:demarcheur_app/widgets/header_page.dart';
 import 'package:demarcheur_app/widgets/sub_title.dart';
@@ -9,6 +12,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
 
 class EditInfo extends StatefulWidget {
   const EditInfo({super.key});
@@ -26,10 +30,12 @@ class _EditInfoState extends State<EditInfo>
 
   // Individual controllers for each field
   final _companyNameController = TextEditingController();
-  final _domainController = TextEditingController();
+  final _domainController =
+      TextEditingController(); // Not used in API update yet but good to keep
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _locationController = TextEditingController();
+  final _cityController = TextEditingController();
 
   File? selectedImage;
   bool _isLoading = false;
@@ -46,6 +52,32 @@ class _EditInfoState extends State<EditInfo>
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
     _animationController.forward();
+
+    // Pre-fill data from EnterpriseProvider, DonnorUserProvider or PrestaProvider
+    final entUser = context.read<EnterpriseProvider>().user;
+    final donUser = context.read<DonnorUserProvider>().user;
+    final prestaUser = context.read<PrestaProvider>().user;
+
+    if (entUser != null) {
+      _companyNameController.text = entUser.name;
+      _emailController.text = entUser.email;
+      _phoneController.text = entUser.phone ?? '';
+      _locationController.text = entUser.adress ?? '';
+      _cityController.text = entUser.city ?? '';
+    } else if (donUser != null) {
+      _companyNameController.text = donUser.name;
+      _emailController.text = donUser.email;
+      _phoneController.text = donUser.phone ?? '';
+      _locationController.text = donUser.adress ?? '';
+      _cityController.text = donUser.city ?? '';
+    } else if (prestaUser != null) {
+      _companyNameController.text = prestaUser.companyName;
+      _emailController.text = prestaUser.email ?? '';
+      _phoneController.text = prestaUser.phoneNumber ?? '';
+      _locationController.text = prestaUser.location;
+      // City is often merged into location in PrestaUserModel
+      _cityController.text = ''; 
+    }
   }
 
   @override
@@ -56,6 +88,7 @@ class _EditInfoState extends State<EditInfo>
     _emailController.dispose();
     _phoneController.dispose();
     _locationController.dispose();
+    _cityController.dispose();
     super.dispose();
   }
 
@@ -147,28 +180,64 @@ class _EditInfoState extends State<EditInfo>
     });
 
     try {
-      // Simulate API call
-      await Future.delayed(const Duration(seconds: 2));
+      final entProvider = context.read<EnterpriseProvider>();
+      final donProvider = context.read<DonnorUserProvider>();
+      final prestaProvider = context.read<PrestaProvider>();
 
-      _showSuccessSnackBar('Informations mises à jour avec succès!');
+      bool success = false;
 
-      // Navigate back or to next screen
-      if (Navigator.canPop(context)) {
-        Navigator.pop(context);
+      // We try the provider that has an active user
+      if (entProvider.user != null) {
+        success = await entProvider.updateProfile(
+          _companyNameController.text.trim(),
+          _phoneController.text.trim(),
+          _locationController.text.trim(),
+          _cityController.text.trim(),
+          selectedImage,
+        );
+      } else if (donProvider.user != null) {
+        success = await donProvider.updateProfile(
+          _companyNameController.text.trim(),
+          _phoneController.text.trim(),
+          _locationController.text.trim(),
+          _cityController.text.trim(),
+          selectedImage,
+        );
+      } else if (prestaProvider.user != null) {
+        success = await prestaProvider.updateProfile(
+          _companyNameController.text.trim(),
+          _phoneController.text.trim(),
+          _locationController.text.trim(),
+          _cityController.text.trim(),
+          selectedImage,
+        );
+      } else {
+        _showErrorSnackBar('Aucun utilisateur connecté trouvé');
+        return;
+      }
+
+      if (success) {
+        _showSuccessSnackBar('Informations mises à jour avec succès!');
+        if (Navigator.canPop(context)) {
+          Navigator.pop(context);
+        }
+      } else {
+        _showErrorSnackBar('Échec de la mise à jour');
       }
     } catch (e) {
       _showErrorSnackBar('Erreur lors de la mise à jour: ${e.toString()}');
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final ConstColors color = ConstColors();
-
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
@@ -232,76 +301,70 @@ class _EditInfoState extends State<EditInfo>
     return Center(
       child: Column(
         children: [
-          GestureDetector(
-            onTap: _isLoading ? null : _showImagePicker,
-            child: Container(
-              width: 120,
-              height: 120,
-              decoration: BoxDecoration(
-                color: color.tertiary,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: _imageError != null ? Colors.red : color.primary,
-                  width: 2,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              GestureDetector(
+                onTap: _isLoading ? null : _showImagePicker,
+                child: Container(
+                  width: 120,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    color: color.tertiary,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: _imageError != null ? Colors.red : color.primary,
+                      width: 2,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
-                ],
+                  child: _isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : selectedImage != null
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(18),
+                          child: Image.file(selectedImage!, fit: BoxFit.cover),
+                        )
+                      : _buildExistingOrPlaceholderImage(color),
+                ),
               ),
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : selectedImage != null
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(18),
-                      child: Image.file(selectedImage!, fit: BoxFit.cover),
-                    )
-                  : Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        HugeIcon(
-                          icon: HugeIcons.strokeRoundedCamera01,
-                          color: color.primary,
-                          size: 32,
-                        ),
-                        const SizedBox(height: 8),
-                        SubTitle(
-                          text: "Ajouter",
-                          fontsize: 12,
-                          color: color.primary,
+              if (selectedImage != null)
+                Positioned(
+                  right: -10,
+                  bottom: -10,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: color.primary,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.2),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
                         ),
                       ],
                     ),
-            ),
-          ),
-          if (selectedImage != null)
-            Positioned(
-              right: 0,
-              bottom: 0,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: color.primary,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.2),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
+                    child: IconButton(
+                      icon: const Icon(
+                        Icons.edit,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                      onPressed: _showImagePicker,
                     ),
-                  ],
+                  ),
                 ),
-                child: IconButton(
-                  icon: const Icon(Icons.edit, color: Colors.white, size: 20),
-                  onPressed: _showImagePicker,
-                ),
-              ),
-            ),
+            ],
+          ),
           const SizedBox(height: 12),
           SubTitle(
-            text: "Logo de l'entreprise",
+            text: "Logo / Photo de profil",
             fontWeight: FontWeight.w600,
             fontsize: 16,
             color: color.secondary,
@@ -318,17 +381,61 @@ class _EditInfoState extends State<EditInfo>
     );
   }
 
+  Widget _buildExistingOrPlaceholderImage(ConstColors color) {
+    final entUser = context.read<EnterpriseProvider>().user;
+    final donUser = context.read<DonnorUserProvider>().user;
+    final prestaUser = context.read<PrestaProvider>().user;
+
+    String? profileUrl;
+    if (entUser != null && entUser.profile != null && entUser.profile!.isNotEmpty) {
+      profileUrl = entUser.profile;
+    } else if (donUser != null && donUser.profile != null && donUser.profile!.isNotEmpty) {
+      profileUrl = donUser.profile;
+    } else if (prestaUser != null && prestaUser.imageUrl.isNotEmpty) {
+      profileUrl = prestaUser.imageUrl.first;
+    }
+
+    if (profileUrl != null) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: Image.network(
+          profileUrl,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            return _buildPlaceholder(color);
+          },
+        ),
+      );
+    }
+    return _buildPlaceholder(color);
+  }
+
+  Widget _buildPlaceholder(ConstColors color) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        HugeIcon(
+          icon: HugeIcons.strokeRoundedCamera01,
+          color: color.primary,
+          size: 32,
+        ),
+        const SizedBox(height: 8),
+        SubTitle(text: "Ajouter", fontsize: 12, color: color.primary),
+      ],
+    );
+  }
+
   Widget _buildFormFields(ConstColors color) {
     return Column(
       children: [
         _buildCustomTextField(
           controller: _companyNameController,
-          label: "Nom de l'entreprise",
-          hint: "Entrez le nom de votre entreprise",
+          label: "Nom / Entreprise",
+          hint: "Entrez votre nom ou celui de l'entreprise",
           icon: HugeIcons.strokeRoundedBuilding01,
           validator: (value) {
             if (value == null || value.trim().isEmpty) {
-              return 'Le nom de l\'entreprise est obligatoire';
+              return 'Le nom est obligatoire';
             }
             if (value.trim().length < 2) {
               return 'Le nom doit contenir au moins 2 caractères';
@@ -338,22 +445,6 @@ class _EditInfoState extends State<EditInfo>
           color: color,
         ),
         const SizedBox(height: 20),
-
-        _buildCustomTextField(
-          controller: _domainController,
-          label: "Domaine d'activité",
-          hint: "Ex: Informatique, Commerce, etc.",
-          icon: HugeIcons.strokeRoundedBriefcase01,
-          validator: (value) {
-            if (value == null || value.trim().isEmpty) {
-              return 'Le domaine d\'activité est obligatoire';
-            }
-            return null;
-          },
-          color: color,
-        ),
-        const SizedBox(height: 20),
-
         _buildCustomTextField(
           controller: _emailController,
           label: "Adresse e-mail",
@@ -386,7 +477,7 @@ class _EditInfoState extends State<EditInfo>
             if (value == null || value.trim().isEmpty) {
               return 'Le numéro de téléphone est obligatoire';
             }
-            if (value.replaceAll(RegExp(r'[^\d]'), '').length < 10) {
+            if (value.replaceAll(RegExp(r'[^\d]'), '').length < 9) {
               return 'Veuillez entrer un numéro valide';
             }
             return null;
@@ -397,15 +488,20 @@ class _EditInfoState extends State<EditInfo>
 
         _buildCustomTextField(
           controller: _locationController,
-          label: "Localisation",
-          hint: "Ville, Pays",
+          label: "Adresse",
+          hint: "Adresse complète",
           icon: HugeIcons.strokeRoundedLocation01,
-          validator: (value) {
-            if (value == null || value.trim().isEmpty) {
-              return 'La localisation est obligatoire';
-            }
-            return null;
-          },
+          validator: (value) => null,
+          color: color,
+        ),
+        const SizedBox(height: 20),
+
+        _buildCustomTextField(
+          controller: _cityController,
+          label: "Ville",
+          hint: "Ville",
+          icon: HugeIcons.strokeRoundedCity01,
+          validator: (value) => null,
           color: color,
         ),
       ],
@@ -434,10 +530,16 @@ class _EditInfoState extends State<EditInfo>
         const SizedBox(height: 8),
         TextFormField(
           controller: controller,
+          textCapitalization: TextCapitalization.sentences,
           keyboardType: keyboardType ?? TextInputType.text,
           textInputAction: TextInputAction.next,
           inputFormatters: inputFormatters,
           validator: validator,
+          style: TextStyle(
+            color: color.primary,
+            fontSize: 14,
+            fontWeight: FontWeight.w400,
+          ),
           decoration: InputDecoration(
             hintText: hint,
             hintStyle: TextStyle(color: Colors.grey[500], fontSize: 14),

@@ -29,6 +29,9 @@ class AuthProvider with ChangeNotifier {
   EnterpriseModel? get enterprise => _enterprise;
 
   bool get isLoading => _isLoading;
+  String? _errorMessage;
+  String? get errorMessage => _errorMessage;
+
   Map<String, dynamic>? _service;
   Map<String, dynamic>? get service => _service;
   List<ServiceModel> _serviceList = [];
@@ -183,9 +186,14 @@ class AuthProvider with ChangeNotifier {
                     userMap['userId'])
                 ?.toString();
 
-        // ✅ Persist user for both AuthProvider and EnterpriseProvider
+        // ✅ Persist user for both AuthProvider and specific Providers
         await prefs.setString('last_user_data', jsonEncode(userMap));
-        await prefs.setString('giver_user_data', jsonEncode(userMap));
+        
+        if (role == 'GIVER') {
+          await prefs.setString('giver_user_data', jsonEncode(userMap));
+        } else {
+          await prefs.setString('searcher_user_data', jsonEncode(userMap));
+        }
 
         _role = role;
         await prefs.setString('role', role ?? '');
@@ -224,7 +232,7 @@ class AuthProvider with ChangeNotifier {
   }
 
   //adding job vancy
-  Future<bool> addVancyJob(AddVancyModel vancy) async {
+  Future<bool> addVancyJob(AddVancyModel vancy, List<File> images) async {
     _isLoading = true;
     notifyListeners();
     print('START CALLING ADDING VANCY');
@@ -232,7 +240,8 @@ class AuthProvider with ChangeNotifier {
     print('DEBUG: AuthProvider.addVancyJob - Role: $_role');
     print('DEBUG: AuthProvider.addVancyJob - UserID: $_userId');
     print('DEBUG: AuthProvider.addVancyJob - EnterpriseID: ${_enterprise?.id}');
-    final response = await apiService.addVancy(vancy, _token);
+    print('DEBUG: AuthProvider.addVancyJob - Images count: ${images.length}');
+    final response = await apiService.addVancy(vancy, images, _token);
     try {
       if (response != null) {
         print('added successfully');
@@ -244,6 +253,18 @@ class AuthProvider with ChangeNotifier {
     _isLoading = false;
     notifyListeners();
     return false;
+  }
+
+  Future<bool> updateJobOffer(String id, AddVancyModel vancy) async {
+    _isLoading = true;
+    notifyListeners();
+    print('START CALLING UPDATE JOB OFFER');
+
+    final success = await apiService.updateJobOffer(id, vancy, _token);
+    
+    _isLoading = false;
+    notifyListeners();
+    return success;
   }
 
   Future<bool> sendCandidature(CandidateModel candidature) async {
@@ -355,15 +376,93 @@ class AuthProvider with ChangeNotifier {
     List<File> images,
   ) async {
     print('START CALLING ADD PROPERTIES');
+    // For property creation, send only the FIRST image
+    final initialImages = images.isNotEmpty ? [images.first] : <File>[];
+
     final response = await apiService.addProperties(
       addProperties,
-      images,
+      initialImages,
       token,
     );
+
     if (response != null) {
-      print('Added successfully');
+      print('Property created successfully with ID: ${response['id']}');
+
+      // If there are more images, add them to the gallery via PATCH
+      if (images.length > 1) {
+        final remainingImages = images.sublist(1);
+        print('Uploading ${remainingImages.length} additional images to gallery...');
+
+        final galleryResponse = await apiService.updateGalleryImage(
+          response['id'].toString(),
+          remainingImages,
+          token,
+        );
+
+        if (galleryResponse != null) {
+          print('Gallery images added successfully');
+        } else {
+          print('WARNING: Failed to add some gallery images');
+          // We still return true because the property was created
+        }
+      }
       return true;
     }
+    return false;
+  }
+
+  Future<bool> deleteProperty(String propertyId) async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      final success = await apiService.deleteProperty(propertyId, _token);
+      _isLoading = false;
+      notifyListeners();
+      return success;
+    } catch (e) {
+      print("Error deleting property: $e");
+    }
+    _isLoading = false;
+    notifyListeners();
+    return false;
+  }
+
+  Future<bool> updateProperty(
+    String propertyId,
+    HouseModel property, {
+    List<File>? newImages,
+  }) async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      final data = property.toUpdateJson();
+      final response = await apiService.updateProperty(
+        propertyId,
+        data,
+        _token,
+      );
+      
+      if (response != null && newImages != null && newImages.isNotEmpty) {
+        print('DEBUG: Property updated, now updating gallery images...');
+        final galleryResult = await apiService.updateGalleryImages(
+          propertyId,
+          newImages,
+          _token,
+        );
+        if (!galleryResult) {
+          print('WARNING: Gallery update failed');
+          // We still consider the property update success, but maybe warn user?
+        }
+      }
+      
+      _isLoading = false;
+      notifyListeners();
+      return response != null;
+    } catch (e) {
+      print("Error updating property: $e");
+    }
+    _isLoading = false;
+    notifyListeners();
     return false;
   }
 
@@ -421,5 +520,65 @@ class AuthProvider with ChangeNotifier {
       return true;
     }
     return false;
+  }
+
+  Future<bool> sendOtp(String email) async {
+    _isLoading = true;
+    _errorMessage = null; // Reset error message
+    notifyListeners();
+    try {
+      final response = await apiService.sendOtpByMail(email);
+      _isLoading = false;
+      if (response != null && response['error'] == true) {
+        _errorMessage = response['message']; // Capture error message from API
+        notifyListeners();
+        return false;
+      }
+      notifyListeners();
+      return response != null; // Return true if response is not null and no error
+    } catch (e) {
+      _isLoading = false;
+      _errorMessage = e.toString(); // Capture exception message
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> verifyOtp(String email, String otp) async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      final response = await apiService.verifyOtp(email, otp);
+      _isLoading = false;
+      notifyListeners();
+      return response != null && response['error'] != true;
+    } catch (e) {
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> resetPassword(
+    String email,
+    String password,
+    String confirmPassword,
+  ) async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      final response = await apiService.createNewPassword(
+        email,
+        password,
+        confirmPassword,
+      );
+      _isLoading = false;
+      notifyListeners();
+      return response != null && response['error'] != true;
+    } catch (e) {
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
   }
 }

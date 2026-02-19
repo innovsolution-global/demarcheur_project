@@ -54,7 +54,7 @@ class ImmoHeader extends StatelessWidget {
           color: color.primary,
           image: DecorationImage(
             fit: BoxFit.cover,
-            image: AssetImage("assets/backround.png"),
+            image: AssetImage("assets/background.png"),
           ),
         ),
       ),

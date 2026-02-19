@@ -1,3 +1,4 @@
+import 'package:demarcheur_app/apps/demandeurs/main_screens/add_vacancy_page.dart';
 import 'package:demarcheur_app/consts/color.dart';
 import 'package:demarcheur_app/models/add_vancy_model.dart';
 import 'package:demarcheur_app/providers/compa_profile_provider.dart';
@@ -67,11 +68,10 @@ class _AnnounceListState extends State<AnnounceList>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      
       backgroundColor: const Color(0xFFFBFBFB),
       body: NestedScrollView(
         headerSliverBuilder: (context, innerBoxIsScrolled) => [
-          Header(auto: false),
+          Header(auto: true),
         ],
         body: Consumer<CompaProfileProvider>(
           builder: (context, provider, child) {
@@ -82,7 +82,7 @@ class _AnnounceListState extends State<AnnounceList>
             final enterpriseProvider = context.watch<EnterpriseProvider>();
             final currentUser = enterpriseProvider.user;
 
-            print("DEBUG: AnnounceList - UserId: ${currentUser?.id}");
+
 
             // Filter vacancies by companyId
             final myVacancies = provider.vacancies.where((vacancy) {
@@ -123,152 +123,375 @@ class _AnnounceListState extends State<AnnounceList>
   }
 
   Widget _buildVacancyCard(AddVancyModel vacancy) {
-    return GestureDetector(
-      onTap: () => _showVacancyDetails(vacancy),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: [
-            BoxShadow(
-              color: colors.primary.withValues(alpha: 0.05),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
-            ),
-          ],
-          border: Border.all(color: colors.primary.withValues(alpha: 0.02)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          BoxShadow(
+            color: colors.secondary.withOpacity(0.06),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+          ),
+        ],
+        border: Border.all(color: colors.primary.withOpacity(0.05)),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(28),
+        child: InkWell(
+          onTap: () => _showVacancyDetails(vacancy),
+          borderRadius: BorderRadius.circular(28),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (vacancy.companyImage != null &&
-                    vacancy.companyImage!.isNotEmpty)
-                  Container(
-                    width: 50,
-                    height: 50,
-                    margin: const EdgeInsets.only(right: 12),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      image: DecorationImage(
-                        image: NetworkImage(vacancy.companyImage!),
-                        fit: BoxFit.cover,
-                      ),
-                      color: Colors.grey[200],
-                    ),
-                  ),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(
-                            child: Text(
-                              vacancy.title,
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
-                                color: colors.secondary,
-                                letterSpacing: -0.5,
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  vacancy.title,
+                                  style: TextStyle(
+                                    fontSize: 19,
+                                    fontWeight: FontWeight.w900,
+                                    color: colors.secondary,
+                                    letterSpacing: -0.5,
+                                  ),
+                                ),
                               ),
-                            ),
+                              _buildManagementMenu(vacancy),
+                            ],
                           ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 5,
-                            ),
-                            decoration: BoxDecoration(
-                              color: colors.primary.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(
-                              _displayJobType(vacancy.typeJobe),
-                              style: TextStyle(
-                                color: colors.primary,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              Text(
+                                vacancy.companyName ?? "Entreprise",
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: colors.secondary.withOpacity(0.5),
+                                ),
                               ),
-                            ),
+                              const SizedBox(width: 8),
+                              Container(
+                                width: 4,
+                                height: 4,
+                                decoration: BoxDecoration(
+                                  color: colors.secondary.withOpacity(0.2),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                _displayJobType(vacancy.typeJobe),
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: colors.primary,
+                                ),
+                              ),
+                            ],
                           ),
                         ],
-                      ),
-                      if (vacancy.companyName != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4.0),
-                          child: Text(
-                            vacancy.companyName!,
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              color: colors.secondary.withOpacity(0.6),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                _buildInfoBadge(
-                  HugeIcons.strokeRoundedLocation01,
-                  vacancy.city.trim().isNotEmpty
-                      ? vacancy.city
-                      : 'Non spécifié',
-                ),
-                const SizedBox(width: 12),
-                _buildInfoBadge(
-                  HugeIcons.strokeRoundedMoney03,
-                  "${vacancy.salary} GNF",
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      Icons.calendar_month_outlined,
-                      size: 14,
-                      color: colors.secondary.withOpacity(0.4),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      "Expire le: ${vacancy.deadline}",
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: colors.secondary.withOpacity(0.5),
-                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ],
                 ),
-                if (vacancy.createdAt != null)
-                  Text(
-                    "Publié le: ${vacancy.createdAt!.split('T')[0]}",
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: colors.secondary.withOpacity(0.5),
-                      fontWeight: FontWeight.w500,
-                    ),
+                const SizedBox(height: 20),
+                // Location and Salary Row
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _buildRefinedBadge(
+                        HugeIcons.strokeRoundedLocation01,
+                        vacancy.city.trim().isNotEmpty
+                            ? vacancy.city
+                            : 'Ville non spécifiée',
+                      ),
+                      const SizedBox(width: 12),
+                      _buildRefinedBadge(
+                        HugeIcons.strokeRoundedMoney03,
+                        "${vacancy.salary} GNF",
+                        isHighlight: true,
+                      ),
+                    ],
                   ),
+                ),
+                const SizedBox(height: 20),
+                // Footer
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.access_time_rounded,
+                          size: 14,
+                          color: colors.secondary.withOpacity(0.4),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          "Expire le ${vacancy.deadline}",
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: colors.secondary.withOpacity(0.5),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (vacancy.createdAt != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          "Publié le ${vacancy.createdAt!.split('T')[0]}",
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: colors.secondary.withOpacity(0.6),
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ],
             ),
-          ],
+          ),
         ),
       ),
     );
+  }
+
+  Widget _buildRefinedBadge(
+    dynamic icon,
+    String label, {
+    bool isHighlight = false,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: isHighlight
+            ? colors.primary.withOpacity(0.06)
+            : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isHighlight
+              ? colors.primary.withOpacity(0.1)
+              : Colors.transparent,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          HugeIcon(
+            icon: icon,
+            color: isHighlight
+                ? colors.primary
+                : colors.secondary.withOpacity(0.4),
+            size: 14,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: isHighlight
+                  ? colors.primary
+                  : colors.secondary.withOpacity(0.7),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildManagementMenu(AddVancyModel vacancy) {
+    return PopupMenuButton<String>(
+      padding: EdgeInsets.zero,
+      offset: const Offset(0, 40),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      elevation: 8,
+      shadowColor: colors.secondary.withOpacity(0.15),
+      color: Colors.white,
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: colors.bgSubmit.withOpacity(0.5),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(
+          Icons.more_horiz_rounded,
+          color: colors.secondary,
+          size: 20,
+        ),
+      ),
+      onSelected: (value) async {
+        if (value == 'edit') {
+          _handleEdit(vacancy);
+        } else if (value == 'delete') {
+          _handleDelete(vacancy);
+        }
+      },
+      itemBuilder: (context) => [
+        PopupMenuItem(
+          value: 'edit',
+          height: 48,
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: colors.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: HugeIcon(
+                  icon: HugeIcons.strokeRoundedEdit02,
+                  size: 18,
+                  color: colors.primary,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                "Modifier",
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: colors.secondary,
+                  fontSize: 15,
+                ),
+              ),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'delete',
+          height: 48,
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.redAccent.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: HugeIcon(
+                  icon: HugeIcons.strokeRoundedDelete02,
+                  size: 18,
+                  color: Colors.redAccent,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                "Supprimer",
+                style: TextStyle(
+                  color: Colors.redAccent,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 15,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _handleEdit(AddVancyModel vacancy) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddVacancyPage(vacancyToEdit: vacancy),
+      ),
+    ).then((_) {
+      // Refresh list after returning from edit page
+      final token = context.read<AuthProvider>().token;
+      context.read<CompaProfileProvider>().loadVancies(token);
+    });
+  }
+
+  Future<void> _handleDelete(AddVancyModel vacancy) async {
+    print("DEBUG: Requesting deletion for Job ID: ${vacancy.id}");
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: const Text("Supprimer l'offre ?"),
+        content: Text(
+          "Êtes-vous sûr de vouloir supprimer l'annonce \"${vacancy.title}\" ? Cette action est irréversible.",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(
+              "Annuler",
+              style: TextStyle(color: colors.secondary.withOpacity(0.5)),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              elevation: 0,
+            ),
+            child: const Text("Supprimer"),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true && mounted) {
+      final token = context.read<AuthProvider>().token;
+      final result = await context.read<CompaProfileProvider>().deleteJobOffer(
+        vacancy.id!,
+        token,
+      );
+
+      if (mounted) {
+        String message;
+        bool isSuccess = false;
+
+        if (result == true) {
+          message = "Offre supprimée";
+          isSuccess = true;
+        } else if (result == 'FOREIGN_KEY_VIOLATION') {
+          message =
+              "Impossible de supprimer : des candidats ont postulé à cette offre.";
+        } else {
+          message = "Erreur lors de la suppression";
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: isSuccess ? colors.primary : Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildInfoBadge(List<List<dynamic>> icon, String label) {

@@ -68,7 +68,7 @@ class ApplicationProvider extends ChangeNotifier {
         results = candidates.map((c) {
           final applicantName = c.applicant?.name ?? 'Candidat inconnu';
           final applicantPhoto =
-              c.applicant?.photo ?? 'https://placehold.co/100x100';
+              c.applicant?.photo ?? 'https://placehold.co/100x100.png';
           return ApplicationModel(
             id: c.id ?? '',
             companyName:
@@ -86,8 +86,8 @@ class ApplicationProvider extends ChangeNotifier {
         print(
           '[ApplicationProvider] Role $role detected. Fetching my applications...',
         );
-        final data = await ApiService().getUserApplications(
-          token,
+        final data = await ApiService().getUserJobApplications(
+          token: token,
           userId: userId,
         );
         results = data.map((json) => ApplicationModel.fromJson(json)).toList();

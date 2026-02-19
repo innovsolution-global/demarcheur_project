@@ -2,6 +2,7 @@ import 'package:demarcheur_app/apps/demandeurs/main_screens/dem_onboarding_page.
 import 'package:demarcheur_app/apps/donneurs/main_screens/dashboard_page.dart';
 import 'package:demarcheur_app/apps/immo/immo_dashboard.dart';
 import 'package:demarcheur_app/apps/prestataires/presta_dashboard.dart';
+import 'package:demarcheur_app/auths/donneurs/forgot_password_page.dart';
 import 'package:provider/provider.dart';
 import 'package:demarcheur_app/consts/color.dart';
 import 'package:demarcheur_app/screens/decision_page.dart';
@@ -195,6 +196,7 @@ class _LoginPageState extends State<LoginPage> {
                 color: color.bg,
                 child: Column(
                   children: [
+                    SizedBox(height: 25),
                     Padding(
                       padding: const EdgeInsets.all(10.0),
                       child: Form(
@@ -307,6 +309,15 @@ class _LoginPageState extends State<LoginPage> {
                                   ),
                                   SizedBox(height: 16),
                                   GestureDetector(
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              const ForgotPasswordPage(),
+                                        ),
+                                      );
+                                    },
                                     child: SubTitle(
                                       text: "Mot de passe oublie?",
                                       fontWeight: FontWeight.bold,
@@ -359,61 +370,63 @@ class _LoginPageState extends State<LoginPage> {
                         ],
                       ),
                     ),
-                    SubTitle(
-                      text: "Ou",
-                      //fontWeight: FontWeight.bold,
-                      fontsize: 16,
-                    ),
-                    SubTitle(
-                      text: "Connectez-vous avec",
-                      //fontWeight: FontWeight.bold,
-                      fontsize: 16,
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(10.0),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Container(
-                            width: 135,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: color.tertiary),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Image.asset("assets/google.png"),
-                                SizedBox(width: 5),
-                                SubTitle(text: "Google", fontsize: 16),
-                              ],
-                            ),
-                          ),
+                    SizedBox(height: 20),
+                    // SubTitle(
+                    //   text: "Ou",
+                    //   //fontWeight: FontWeight.bold,
+                    //   fontsize: 16,
+                    // ),
+                    // SubTitle(
+                    //   text: "Connectez-vous avec",
+                    //   //fontWeight: FontWeight.bold,
+                    //   fontsize: 16,
+                    // ),
+                    // Padding(
+                    //   padding: const EdgeInsets.all(10.0),
+                    //   child: Row(
+                    //     mainAxisAlignment: MainAxisAlignment.center,
+                    //     children: [
+                    //       Container(
+                    //         width: 135,
+                    //         height: 40,
+                    //         decoration: BoxDecoration(
+                    //           borderRadius: BorderRadius.circular(16),
+                    //           border: Border.all(color: color.tertiary),
+                    //         ),
+                    //         child: Row(
+                    //           mainAxisAlignment: MainAxisAlignment.center,
+                    //           children: [
+                    //             Image.asset("assets/google.png"),
+                    //             SizedBox(width: 5),
+                    //             SubTitle(text: "Google", fontsize: 16),
+                    //           ],
+                    //         ),
+                    //       ),
 
-                          SizedBox(width: 10),
-                          Container(
-                            width: 135,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: color.tertiary),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Image.asset("assets/facebook.png"),
-                                SizedBox(width: 5),
-                                SubTitle(text: "Facebook", fontsize: 16),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    SizedBox(height: 10),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                    //       SizedBox(width: 10),
+                    //       Container(
+                    //         width: 135,
+                    //         height: 40,
+                    //         decoration: BoxDecoration(
+                    //           borderRadius: BorderRadius.circular(16),
+                    //           border: Border.all(color: color.tertiary),
+                    //         ),
+                    //         child: Row(
+                    //           mainAxisAlignment: MainAxisAlignment.center,
+                    //           children: [
+                    //             Image.asset("assets/facebook.png"),
+                    //             SizedBox(width: 5),
+                    //             SubTitle(text: "Facebook", fontsize: 16),
+                    //           ],
+                    //         ),
+                    //       ),
+                    //     ],
+                    //   ),
+                    // ),
+                    // SizedBox(height: 10),
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         SubTitle(
                           text: "Vous n'avez pas un compte?",

@@ -14,7 +14,8 @@ import 'package:demarcheur_app/services/auth_provider.dart';
 import 'package:provider/provider.dart';
 
 class ImmoPostPage extends StatefulWidget {
-  const ImmoPostPage({super.key});
+  final HouseModel? propertyToEdit;
+  const ImmoPostPage({super.key, this.propertyToEdit});
 
   @override
   State<ImmoPostPage> createState() => _ImmoPostPageState();
@@ -52,6 +53,7 @@ class _ImmoPostPageState extends State<ImmoPostPage>
   String? selectedFurnishing;
   String? selectedEnergyRating;
   List<File> selectedImages = [];
+  List<String> existingImageUrls = [];
   List<String> selectedFeatures = [];
   bool hasGarden = false;
   int currentPage = 0;
@@ -122,9 +124,48 @@ class _ImmoPostPageState extends State<ImmoPostPage>
     );
     _animationController.forward();
     debugPrint("DEBUG: ImmoPostPage.initState - calling loadPropertyTypes");
+    if (widget.propertyToEdit != null) {
+      _initializeEditMode();
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<AuthProvider>().loadPropertyTypes();
     });
+  }
+
+  void _initializeEditMode() {
+    final p = widget.propertyToEdit!;
+    _titleController.text = p.title ?? '';
+    _descriptionController.text = p.description ?? '';
+    _priceController.text = (p.price ?? p.rent ?? 0).toString();
+    _areaController.text = p.area ?? '';
+    _addressController.text = p.location ?? '';
+    _districtController.text = p.district ?? '';
+    _cityController.text = p.city ?? '';
+    _bedroomsController.text = (p.rooms ?? 0).toString();
+    _livingRoomsController.text = (p.livingRooms ?? 0).toString();
+    _bathroomsController.text = (p.kitchen ?? 0).toString();
+    _garageController.text = (p.garage ?? 0).toString();
+    _kitchenController.text = (p.kitchen ?? 0).toString();
+    _storeController.text = (p.store ?? 0).toString();
+    _otherDescriptionController.text = p.otherDescription ?? '';
+    _advantageController.text = p.advantage ?? '';
+
+    // Safety check for dropdown values
+    selectedPropertyType = (p.countType != null && p.countType!.isNotEmpty)
+        ? p.countType
+        : null;
+    selectedTransactionType = (p.category != null && p.category!.isNotEmpty)
+        ? p.category
+        : null;
+    selectedCondition = (p.condition != null && p.condition!.isNotEmpty)
+        ? p.condition
+        : null;
+    hasGarden = p.garden ?? false;
+
+    // Load existing images
+    if (p.imageUrl.isNotEmpty) {
+      existingImageUrls = List.from(p.imageUrl);
+    }
   }
 
   @override
@@ -151,10 +192,6 @@ class _ImmoPostPageState extends State<ImmoPostPage>
     super.dispose();
   }
 
-  final bool _isLoading = false;
-
-  void _submitingPost() async {}
-
   Future<void> _pickImages() async {
     try {
       final List<XFile> images = await _picker.pickMultiImage(
@@ -162,12 +199,12 @@ class _ImmoPostPageState extends State<ImmoPostPage>
         imageQuality: 80,
       );
 
-      if (images.isNotEmpty && selectedImages.length + images.length <= 10) {
+      if (images.isNotEmpty && selectedImages.length + images.length <= 15) {
         setState(() {
           selectedImages.addAll(images.map((image) => File(image.path)));
         });
-      } else if (selectedImages.length + images.length > 10) {
-        _showSnackBar('Maximum 10 images autorisées', isError: true);
+      } else if (selectedImages.length + images.length > 15) {
+        _showSnackBar('Maximum 15 images autorisées', isError: true);
       }
     } catch (e) {
       _showSnackBar('Erreur lors de la sélection des images', isError: true);
@@ -182,12 +219,12 @@ class _ImmoPostPageState extends State<ImmoPostPage>
         imageQuality: 80,
       );
 
-      if (image != null && selectedImages.length < 10) {
+      if (image != null && selectedImages.length < 15) {
         setState(() {
           selectedImages.add(File(image.path));
         });
-      } else if (selectedImages.length >= 10) {
-        _showSnackBar('Maximum 10 images autorisées', isError: true);
+      } else if (selectedImages.length >= 15) {
+        _showSnackBar('Maximum 15 images autorisées', isError: true);
       }
     } catch (e) {
       _showSnackBar('Erreur lors de la prise de photo', isError: true);
@@ -200,11 +237,17 @@ class _ImmoPostPageState extends State<ImmoPostPage>
     });
   }
 
+  void _removeExistingImage(int index) {
+    setState(() {
+      existingImageUrls.removeAt(index);
+    });
+  }
+
   void _showSnackBar(String message, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: isError ? Colors.redAccent : ConstColors().primary,
+        backgroundColor: isError ? Colors.redAccent : Colors.green,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
@@ -244,8 +287,7 @@ class _ImmoPostPageState extends State<ImmoPostPage>
             selectedTransactionType != null;
       case 1:
         return _priceController.text.isNotEmpty &&
-            _areaController.text.isNotEmpty &&
-            _addressController.text.isNotEmpty;
+            _areaController.text.isNotEmpty;
       case 2:
         return selectedImages.isNotEmpty;
       default:
@@ -263,25 +305,11 @@ class _ImmoPostPageState extends State<ImmoPostPage>
       isSubmitting = true;
     });
 
-    // Simulate API call
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
       if (authProvider.propertyTypes.isEmpty) {
-        debugPrint(
-          "DEBUG: _submitForm - propertyTypes empty, attempting to load...",
-        );
         await authProvider.loadPropertyTypes();
-      }
-
-      debugPrint(
-        "DEBUG: _submitForm - selectedPropertyType: $selectedPropertyType",
-      );
-      debugPrint(
-        "DEBUG: _submitForm - Total propertyTypes in provider: ${authProvider.propertyTypes.length}",
-      );
-      for (var pt in authProvider.propertyTypes) {
-        debugPrint("DEBUG: PT ID: ${pt.id}, Name: ${pt.tyPePropertyName}");
       }
 
       final matchedType = authProvider.propertyTypes.firstWhere(
@@ -290,7 +318,6 @@ class _ImmoPostPageState extends State<ImmoPostPage>
             selectedPropertyType?.trim().toLowerCase(),
         orElse: () => TypeProperties(tyPePropertyName: '', typeEnum: ''),
       );
-      debugPrint("DEBUG: _submitForm - Matched ID: ${matchedType.id}");
 
       if (matchedType.id == null) {
         _showSnackBar('Type de propriété invalide', isError: true);
@@ -299,6 +326,7 @@ class _ImmoPostPageState extends State<ImmoPostPage>
       }
 
       final house = HouseModel(
+        id: widget.propertyToEdit?.id,
         ownerId: authProvider.userId,
         companyId: authProvider.userId,
         companyName: _titleController.text,
@@ -312,7 +340,7 @@ class _ImmoPostPageState extends State<ImmoPostPage>
         city: _cityController.text.isNotEmpty
             ? _cityController.text
             : _addressController.text,
-        location: _addressController.text,
+        location: _cityController.text,
         type: matchedType.id,
         typePropertId: matchedType.id,
         statusProperty: 'Disponible',
@@ -331,10 +359,19 @@ class _ImmoPostPageState extends State<ImmoPostPage>
         piscine: selectedFeatures.contains('Piscine') ? 1 : 0,
       );
 
-      final result = await authProvider.addPropertiesForCompany(
-        house,
-        selectedImages,
-      );
+      bool result;
+      if (widget.propertyToEdit != null) {
+        result = await authProvider.updateProperty(
+          widget.propertyToEdit!.id!,
+          house,
+          newImages: selectedImages,
+        );
+      } else {
+        result = await authProvider.addPropertiesForCompany(
+          house,
+          selectedImages,
+        );
+      }
 
       if (mounted) {
         setState(() {
@@ -342,10 +379,19 @@ class _ImmoPostPageState extends State<ImmoPostPage>
         });
 
         if (result) {
-          _showSnackBar('Annonce publiée avec succès!');
+          _showSnackBar(
+            widget.propertyToEdit != null
+                ? 'Annonce mise à jour avec succès!'
+                : 'Annonce publiée avec succès!',
+          );
           Navigator.pop(context);
         } else {
-          _showSnackBar('Erreur lors de la publication', isError: true);
+          _showSnackBar(
+            widget.propertyToEdit != null
+                ? 'Erreur lors de la mise à jour'
+                : 'Erreur lors de la publication',
+            isError: true,
+          );
         }
       }
     } catch (e) {
@@ -403,7 +449,9 @@ class _ImmoPostPageState extends State<ImmoPostPage>
       child: Column(
         children: [
           TitleWidget(
-            text: "Publier une annonce",
+            text: widget.propertyToEdit != null
+                ? "Modifier l'annonce"
+                : "Publier une annonce",
             fontSize: 28,
             color: ConstColors().secondary,
           ),
@@ -426,7 +474,6 @@ class _ImmoPostPageState extends State<ImmoPostPage>
       child: Row(
         children: List.generate(3, (index) {
           final isActive = index <= currentPage;
-          // final isCompleted = index < currentPage;
 
           return Expanded(
             child: Container(
@@ -482,7 +529,6 @@ class _ImmoPostPageState extends State<ImmoPostPage>
             _CustomTextField(
               controller: _titleController,
               label: "Titre de l'annonce *",
-              icon: HugeIcons.strokeRoundedHome01,
               validator: (value) =>
                   value?.isEmpty == true ? 'Titre requis' : null,
             ),
@@ -490,7 +536,6 @@ class _ImmoPostPageState extends State<ImmoPostPage>
             _CustomTextField(
               controller: _descriptionController,
               label: "Description *",
-              icon: HugeIcons.strokeRoundedFileEdit,
               maxLines: 4,
               validator: (value) =>
                   value?.isEmpty == true ? 'Description requise' : null,
@@ -501,7 +546,6 @@ class _ImmoPostPageState extends State<ImmoPostPage>
                 return _CustomDropdown(
                   value: selectedPropertyType,
                   label: "Type de bien *",
-                  icon: HugeIcons.strokeRoundedBuilding01,
                   items: authProvider.propertyTypes
                       .map((e) => e.tyPePropertyName)
                       .toList(),
@@ -514,7 +558,6 @@ class _ImmoPostPageState extends State<ImmoPostPage>
             _CustomDropdown(
               value: selectedTransactionType,
               label: "Type de transaction *",
-              icon: HugeIcons.strokeRoundedExchange01,
               items: transactionTypes,
               onChanged: (value) =>
                   setState(() => selectedTransactionType = value),
@@ -546,7 +589,6 @@ class _ImmoPostPageState extends State<ImmoPostPage>
                   child: _CustomTextField(
                     controller: _priceController,
                     label: "Prix *",
-                    icon: HugeIcons.strokeRoundedMoney03,
                     keyboardType: TextInputType.number,
                     suffix: selectedTransactionType == 'Location'
                         ? '/mois'
@@ -560,7 +602,6 @@ class _ImmoPostPageState extends State<ImmoPostPage>
                   child: _CustomTextField(
                     controller: _areaController,
                     label: "Surface (m²) *",
-                    icon: HugeIcons.strokeRoundedSquare,
                     keyboardType: TextInputType.number,
                     validator: (value) =>
                         value?.isEmpty == true ? 'Surface requise' : null,
@@ -569,21 +610,12 @@ class _ImmoPostPageState extends State<ImmoPostPage>
               ],
             ),
             const SizedBox(height: 16),
-            _CustomTextField(
-              controller: _addressController,
-              label: "Adresse *",
-              icon: HugeIcons.strokeRoundedLocation01,
-              validator: (value) =>
-                  value?.isEmpty == true ? 'Adresse requise' : null,
-            ),
-            const SizedBox(height: 16),
             Row(
               children: [
                 Expanded(
                   child: _CustomTextField(
                     controller: _bedroomsController,
                     label: "Chambres",
-                    icon: HugeIcons.strokeRoundedBed,
                     keyboardType: TextInputType.number,
                   ),
                 ),
@@ -592,7 +624,6 @@ class _ImmoPostPageState extends State<ImmoPostPage>
                   child: _CustomTextField(
                     controller: _livingRoomsController,
                     label: "Salons",
-                    icon: HugeIcons.strokeRoundedLiveStreaming01,
                     keyboardType: TextInputType.number,
                   ),
                 ),
@@ -605,7 +636,6 @@ class _ImmoPostPageState extends State<ImmoPostPage>
                   child: _CustomTextField(
                     controller: _kitchenController,
                     label: "Cuisines",
-                    icon: HugeIcons.strokeRoundedKitchenUtensils,
                     keyboardType: TextInputType.number,
                   ),
                 ),
@@ -614,7 +644,6 @@ class _ImmoPostPageState extends State<ImmoPostPage>
                   child: _CustomTextField(
                     controller: _bathroomsController,
                     label: "Douches",
-                    icon: HugeIcons.strokeRoundedBathtub01,
                     keyboardType: TextInputType.number,
                   ),
                 ),
@@ -627,7 +656,6 @@ class _ImmoPostPageState extends State<ImmoPostPage>
                   child: _CustomTextField(
                     controller: _garageController,
                     label: "Garages",
-                    icon: HugeIcons.strokeRoundedCar01,
                     keyboardType: TextInputType.number,
                   ),
                 ),
@@ -636,7 +664,6 @@ class _ImmoPostPageState extends State<ImmoPostPage>
                   child: _CustomTextField(
                     controller: _storeController,
                     label: "Magasins",
-                    icon: HugeIcons.strokeRoundedArchive01,
                     keyboardType: TextInputType.number,
                   ),
                 ),
@@ -649,7 +676,6 @@ class _ImmoPostPageState extends State<ImmoPostPage>
                   child: _CustomTextField(
                     controller: _districtController,
                     label: "Quartier *",
-                    icon: HugeIcons.strokeRoundedLocation01,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -657,7 +683,6 @@ class _ImmoPostPageState extends State<ImmoPostPage>
                   child: _CustomTextField(
                     controller: _cityController,
                     label: "Ville *",
-                    icon: HugeIcons.strokeRoundedLocation01,
                   ),
                 ),
               ],
@@ -665,32 +690,19 @@ class _ImmoPostPageState extends State<ImmoPostPage>
             const SizedBox(height: 16),
             _CustomTextField(
               controller: _advantageController,
-              label: "Avantages / Caractéristiques",
-              icon: HugeIcons.strokeRoundedStar,
+              label: "Conditions",
             ),
             const SizedBox(height: 16),
             _CustomTextField(
               controller: _otherDescriptionController,
               label: "Autres descriptions",
-              icon: HugeIcons.strokeRoundedNote01,
               maxLines: 2,
             ),
-            const SizedBox(height: 16),
-            CheckboxListTile(
-              title: Text(
-                "Présence d'un jardin",
-                style: TextStyle(color: ConstColors().secondary),
-              ),
-              value: hasGarden,
-              onChanged: (value) => setState(() => hasGarden = value ?? false),
-              activeColor: ConstColors().primary,
-              contentPadding: EdgeInsets.zero,
-            ),
+
             const SizedBox(height: 16),
             _CustomDropdown(
               value: selectedCondition,
               label: "État du bien",
-              icon: HugeIcons.strokeRoundedCheckmarkSquare02,
               items: conditions,
               onChanged: (value) => setState(() => selectedCondition = value),
             ),
@@ -722,7 +734,6 @@ class _ImmoPostPageState extends State<ImmoPostPage>
             _CustomDropdown(
               value: selectedEnergyRating,
               label: "Classe énergétique",
-              icon: HugeIcons.strokeRoundedLeaf01,
               items: energyRatings,
               onChanged: (value) =>
                   setState(() => selectedEnergyRating = value),
@@ -743,7 +754,7 @@ class _ImmoPostPageState extends State<ImmoPostPage>
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             SubTitle(
-              text: "Photos (${selectedImages.length}/10) *",
+              text: "Photos (${selectedImages.length}/15) *",
               fontsize: 18,
               fontWeight: FontWeight.w600,
             ),
@@ -768,79 +779,118 @@ class _ImmoPostPageState extends State<ImmoPostPage>
           ],
         ),
         const SizedBox(height: 12),
-        if (selectedImages.isEmpty)
-          GestureDetector(
-            onTap: _pickImages,
-            child: Container(
-              height: 120,
-              decoration: BoxDecoration(
-                color: colors.tertiary.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: colors.primary.withOpacity(0.3),
-                  style: BorderStyle.solid,
-                ),
+        if (selectedImages.isEmpty && existingImageUrls.isEmpty)
+          Container(
+            height: 150,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: colors.bgSubmit,
+              borderRadius: BorderRadius.circular(15),
+              border: Border.all(
+                color: colors.tertiary.withOpacity(0.3),
+                style: BorderStyle.solid,
               ),
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    HugeIcon(
-                      icon: HugeIcons.strokeRoundedImageAdd01,
-                      color: colors.primary,
-                      size: 32,
-                    ),
-                    const SizedBox(height: 8),
-                    SubTitle(text: "Ajouter des photos", color: colors.primary),
-                  ],
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                HugeIcon(
+                  icon: HugeIcons.strokeRoundedImage02,
+                  color: colors.tertiary,
+                  size: 40,
                 ),
-              ),
+                const SizedBox(height: 8),
+                Text(
+                  "Aucune photo sélectionnée",
+                  style: TextStyle(color: colors.tertiary),
+                ),
+              ],
             ),
           )
         else
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              crossAxisSpacing: 8,
-              mainAxisSpacing: 8,
-            ),
-            itemCount: selectedImages.length,
-            itemBuilder: (context, index) {
-              return Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.file(
-                      selectedImages[index],
-                      fit: BoxFit.cover,
-                      width: double.infinity,
-                      height: double.infinity,
-                    ),
-                  ),
-                  Positioned(
-                    top: 4,
-                    right: 4,
-                    child: GestureDetector(
-                      onTap: () => _removeImage(index),
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: const BoxDecoration(
-                          color: Colors.red,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.close,
-                          color: Colors.white,
-                          size: 16,
-                        ),
+          SizedBox(
+            height: 150,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              children: [
+                // Existing Images
+                ...List.generate(existingImageUrls.length, (index) {
+                  return Container(
+                    width: 120,
+                    margin: const EdgeInsets.only(right: 12),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(15),
+                      image: DecorationImage(
+                        image: NetworkImage(existingImageUrls[index]),
+                        fit: BoxFit.cover,
                       ),
                     ),
-                  ),
-                ],
-              );
-            },
+                    child: Stack(
+                      children: [
+                        Positioned(
+                          right: 4,
+                          top: 4,
+                          child: GestureDetector(
+                            onTap: () => _removeExistingImage(index),
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: const BoxDecoration(
+                                color: Colors
+                                    .orange, // Different color for distinction
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.close,
+                                color: Colors.white,
+                                size: 16,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+
+                // New Selected Images
+                ...List.generate(selectedImages.length, (index) {
+                  return Container(
+                    width: 120,
+                    margin: const EdgeInsets.only(right: 12),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(15),
+                      image: DecorationImage(
+                        image: FileImage(selectedImages[index]),
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                    child: Stack(
+                      children: [
+                        Positioned(
+                          right: 4,
+                          top: 4,
+                          child: GestureDetector(
+                            onTap: () => _removeImage(index),
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: const BoxDecoration(
+                                color: Colors.red,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.close,
+                                color: Colors.white,
+                                size: 16,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ],
+            ),
           ),
       ],
     );
@@ -850,8 +900,8 @@ class _ImmoPostPageState extends State<ImmoPostPage>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SubTitle(
-          text: "Caractéristiques",
+        const SubTitle(
+          text: "Équipements et services",
           fontsize: 18,
           fontWeight: FontWeight.w600,
         ),
@@ -861,42 +911,23 @@ class _ImmoPostPageState extends State<ImmoPostPage>
           runSpacing: 8,
           children: availableFeatures.map((feature) {
             final isSelected = selectedFeatures.contains(feature);
-            return GestureDetector(
-              onTap: () {
+            return FilterChip(
+              label: Text(feature),
+              selected: isSelected,
+              onSelected: (selected) {
                 setState(() {
-                  if (isSelected) {
-                    selectedFeatures.remove(feature);
-                  } else {
+                  if (selected) {
                     selectedFeatures.add(feature);
+                  } else {
+                    selectedFeatures.remove(feature);
                   }
                 });
               },
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? ConstColors().primary
-                      : ConstColors().tertiary.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: isSelected
-                        ? ConstColors().primary
-                        : ConstColors().tertiary.withOpacity(0.3),
-                  ),
-                ),
-                child: Text(
-                  feature,
-                  style: TextStyle(
-                    color: isSelected ? Colors.white : ConstColors().secondary,
-                    fontSize: 14,
-                    fontWeight: isSelected
-                        ? FontWeight.w500
-                        : FontWeight.normal,
-                  ),
-                ),
+              selectedColor: ConstColors().primary.withOpacity(0.2),
+              checkmarkColor: ConstColors().primary,
+              labelStyle: TextStyle(
+                color: isSelected ? ConstColors().primary : Colors.grey[700],
+                fontSize: 12,
               ),
             );
           }).toList(),
@@ -906,8 +937,10 @@ class _ImmoPostPageState extends State<ImmoPostPage>
   }
 
   Widget _buildNavigationButtons() {
+    final colors = ConstColors();
+
     return Padding(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(20.0),
       child: Row(
         children: [
           if (currentPage > 0)
@@ -915,62 +948,44 @@ class _ImmoPostPageState extends State<ImmoPostPage>
               child: OutlinedButton(
                 onPressed: _previousPage,
                 style: OutlinedButton.styleFrom(
-                  side: BorderSide(color: ConstColors().primary),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  side: BorderSide(color: colors.primary),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
                 child: Text(
                   "Précédent",
-                  style: TextStyle(
-                    color: ConstColors().primary,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(color: colors.primary),
                 ),
               ),
             ),
           if (currentPage > 0) const SizedBox(width: 12),
           Expanded(
             child: ElevatedButton(
-              onPressed: () {
-                if (currentPage < 2) {
-                  if (_validateCurrentPage()) {
-                    _nextPage();
-                  } else {
-                    _showSnackBar(
-                      'Veuillez remplir tous les champs requis',
-                      isError: true,
-                    );
-                  }
-                } else {
-                  _submitForm();
-                }
-              },
+              onPressed: currentPage < 2 ? _nextPage : _submitForm,
               style: ElevatedButton.styleFrom(
-                backgroundColor: ConstColors().primary,
-                foregroundColor: Colors.white,
-                elevation: 0,
+                backgroundColor: colors.primary,
+                padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
-                padding: const EdgeInsets.symmetric(vertical: 16),
+                elevation: 0,
               ),
-              child: isSubmitting && currentPage == 2
+              child: isSubmitting
                   ? const SizedBox(
                       height: 20,
                       width: 20,
                       child: CircularProgressIndicator(
+                        color: Colors.white,
                         strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                       ),
                     )
                   : Text(
                       currentPage < 2 ? "Suivant" : "Publier",
                       style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
             ),
@@ -984,20 +999,18 @@ class _ImmoPostPageState extends State<ImmoPostPage>
 class _CustomTextField extends StatelessWidget {
   final TextEditingController controller;
   final String label;
-  final dynamic icon;
-  final TextInputType? keyboardType;
-  final String? Function(String?)? validator;
   final int maxLines;
+  final TextInputType keyboardType;
   final String? suffix;
+  final String? Function(String?)? validator;
 
   const _CustomTextField({
     required this.controller,
     required this.label,
-    required this.icon,
-    this.keyboardType,
-    this.validator,
     this.maxLines = 1,
+    this.keyboardType = TextInputType.text,
     this.suffix,
+    this.validator,
   });
 
   @override
@@ -1006,19 +1019,22 @@ class _CustomTextField extends StatelessWidget {
 
     return TextFormField(
       controller: controller,
-      keyboardType: keyboardType ?? TextInputType.text,
-      validator: validator,
       maxLines: maxLines,
+      keyboardType: keyboardType,
+      validator: validator,
       style: TextStyle(fontSize: 16, color: colors.secondary),
+      textCapitalization: TextCapitalization.sentences,
       decoration: InputDecoration(
         labelText: label,
-        suffixText: suffix,
         labelStyle: TextStyle(color: colors.primary, fontSize: 16),
-        suffixStyle: TextStyle(color: colors.primary, fontSize: 14),
-        // prefixIcon: HugeIcon(icon: icon, color: colors.primary, size: 20),
+        suffixText: suffix,
         filled: true,
         fillColor: colors.bgSubmit,
         border: OutlineInputBorder(
+          borderSide: BorderSide.none,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        enabledBorder: OutlineInputBorder(
           borderSide: BorderSide.none,
           borderRadius: BorderRadius.circular(12),
         ),
@@ -1046,14 +1062,12 @@ class _CustomTextField extends StatelessWidget {
 class _CustomDropdown extends StatelessWidget {
   final String? value;
   final String label;
-  final dynamic icon;
   final List<String> items;
   final void Function(String?) onChanged;
 
   const _CustomDropdown({
     required this.value,
     required this.label,
-    required this.icon,
     required this.items,
     required this.onChanged,
   });
@@ -1062,14 +1076,17 @@ class _CustomDropdown extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = ConstColors();
 
+    // Safety check to avoid DropdownButton assertion errors
+    final safeValue = (value != null && items.contains(value)) ? value : null;
+
     return DropdownButtonFormField<String>(
-      initialValue: value,
+      value: safeValue,
+      dropdownColor: colors.bg,
       onChanged: onChanged,
       style: TextStyle(fontSize: 16, color: colors.secondary),
       decoration: InputDecoration(
         labelText: label,
         labelStyle: TextStyle(color: colors.primary, fontSize: 16),
-        //prefixIcon: HugeIcon(icon: icon, color: colors.primary, size: 20),
         filled: true,
         fillColor: colors.bgSubmit,
         border: OutlineInputBorder(
