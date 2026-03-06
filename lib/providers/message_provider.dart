@@ -94,4 +94,10 @@ class MessageProvider with ChangeNotifier {
     _isloading = false;
     notifyListeners();
   }
+
+  void clear() {
+    _message = [];
+    _isloading = false;
+    notifyListeners();
+  }
 }

@@ -1020,7 +1020,9 @@ class _CustomTextField extends StatelessWidget {
     return TextFormField(
       controller: controller,
       maxLines: maxLines,
-      keyboardType: keyboardType,
+      keyboardType: (keyboardType == TextInputType.text && maxLines > 1)
+          ? TextInputType.multiline
+          : keyboardType,
       validator: validator,
       style: TextStyle(fontSize: 16, color: colors.secondary),
       textCapitalization: TextCapitalization.sentences,

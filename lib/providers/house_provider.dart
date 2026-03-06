@@ -199,5 +199,14 @@ class HouseProvider extends ChangeNotifier {
     }
     return false;
   }
+
+  void clear() {
+    _user = null;
+    _allhouses = [];
+    _housefiltered = [];
+    _viewAll = false;
+    _isLoading = false;
+    notifyListeners();
+  }
 }
 

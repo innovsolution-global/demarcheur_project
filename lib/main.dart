@@ -34,6 +34,8 @@ import 'package:demarcheur_app/services/socket_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(const MyApp());
@@ -104,6 +106,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         builder: (context, settings, child) {
           return MaterialApp(
             title: 'Demarcheur App',
+            navigatorKey: navigatorKey,
             debugShowCheckedModeBanner: false,
             initialRoute: "/",
             locale: settings.locale,

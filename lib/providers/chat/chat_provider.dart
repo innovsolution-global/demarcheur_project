@@ -494,4 +494,8 @@ class ChatProvider extends ChangeNotifier {
       print('DEBUG: ChatProvider - Error loading messages from cache: $e');
     }
   }
+
+  void clear() {
+    clearMessages();
+  }
 }

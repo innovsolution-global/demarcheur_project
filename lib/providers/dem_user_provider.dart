@@ -102,7 +102,12 @@ class DemUserProvider extends ChangeNotifier {
           );
 
           // Merge with cached data to preserve fields that might be missing from API
-          if (_user != null) {
+          // CRITICAL: Only merge if IDs AND emails match to prevent data leakage between sessions
+          final bool isSameUser = _user != null && 
+                                 (_user!.id == freshUser.id || freshUser.id == null) &&
+                                 (_user!.email == freshUser.email || freshUser.email == null);
+
+          if (isSameUser) {
             _user = DemUserModel(
               id: freshUser.id ?? _user!.id,
               companyName: freshUser.companyName.isNotEmpty
@@ -126,12 +131,9 @@ class DemUserProvider extends ChangeNotifier {
               isVerified: freshUser.isVerified,
             );
             debugPrint('DEBUG DEM: Merged fresh profile with cached data');
-            debugPrint(
-              'DEBUG DEM: Final phone: ${_user!.phoneNumber}, location: ${_user!.location}',
-            );
           } else {
             _user = freshUser;
-            debugPrint('DEBUG DEM: Using fresh profile (no cache)');
+            debugPrint('DEBUG DEM: Cache mismatch (IDs or Emails differ), taking fresh profile.');
           }
 
           await saveUser();
@@ -162,10 +164,21 @@ class DemUserProvider extends ChangeNotifier {
   // ------------------------------
   //  TOGGLE ISVERIFIED
   // ------------------------------
+  // ------------------------------
+  //  TOGGLE ISVERIFIED
+  // ------------------------------
   Future<void> toggleIsVerified() async {
     if (_user == null) return;
     _user = _user!.copyWith(isVerified: !_user!.isVerified);
     await saveUser();
+    notifyListeners();
+  }
+
+  // ------------------------------
+  //  CLEAR DATA (FOR LOGOUT)
+  // ------------------------------
+  void clear() {
+    _user = null;
     notifyListeners();
   }
 }

@@ -165,4 +165,12 @@ class DemJobProvider extends ChangeNotifier {
     _filteredJobs = _allJobs;
     notifyListeners();
   }
+
+  void clear() {
+    _allJobs = [];
+    _filteredJobs = [];
+    _isLoading = false;
+    notifyListeners();
+  }
 }
+

@@ -17,6 +17,9 @@ class EnterpriseModel {
   bool isVerified;
   String? specialite;
   String? domaine;
+  String? description;
+  String? website;
+  String? link_linkdin;
 
   EnterpriseModel({
     this.id,
@@ -34,6 +37,9 @@ class EnterpriseModel {
     this.isVerified = false,
     this.specialite,
     this.domaine,
+    this.description,
+    this.website,
+    this.link_linkdin,
   });
 
   factory EnterpriseModel.fromJson(Map<String, dynamic> json) {
@@ -80,6 +86,9 @@ class EnterpriseModel {
       isVerified: json['isVerified'] ?? false,
       specialite: (json['specialite'] ?? json['speciality'] ?? json['category'])?.toString(),
       domaine: (json['domaine'] ?? json['domain'])?.toString(),
+      description: (json['description'] ?? json['about'])?.toString(),
+      website: json['website']?.toString(),
+      link_linkdin: (json['link_linkdin'] ?? json['linkedin'] ?? json['linkedin_url'])?.toString(),
     );
   }
 
@@ -99,6 +108,9 @@ class EnterpriseModel {
     bool? isVerified,
     String? specialite,
     String? domaine,
+    String? description,
+    String? website,
+    String? link_linkdin,
   }) {
     return EnterpriseModel(
       id: id ?? this.id,
@@ -116,29 +128,48 @@ class EnterpriseModel {
       isVerified: isVerified ?? this.isVerified,
       specialite: specialite ?? this.specialite,
       domaine: domaine ?? this.domaine,
+      description: description ?? this.description,
+      website: website ?? this.website,
+      link_linkdin: link_linkdin ?? this.link_linkdin,
     );
   }
 
-  /// Merges another model into this one, keeping existing values if new ones are null or empty
   EnterpriseModel mergeFrom(EnterpriseModel other) {
     print("DEBUG: EnterpriseModel - Merging existing data with fresh data from API");
     print("DEBUG: EnterpriseModel - Current name: '$name', Fresh name from API: '${other.name}'");
+    
+    // For editable fields, we TRUST the local state if it's already populated.
+    // This prevents stale API responses from reverting recent user changes.
+    final mergedName = (name.trim().isNotEmpty) ? name : other.name.trim();
+    final mergedPhone = (phone != null && phone!.trim().isNotEmpty) ? phone!.trim() : (other.phone?.trim() ?? '');
+    final mergedEmail = (email.trim().isNotEmpty) ? email : other.email.trim();
+    final mergedAdress = (adress != null && adress!.trim().isNotEmpty) ? adress!.trim() : (other.adress?.trim() ?? '');
+    final mergedCity = (city != null && city!.trim().isNotEmpty) ? city!.trim() : (other.city?.trim() ?? '');
+    
+    // For server-managed fields, we take the fresh API data
+    final mergedProfile = (other.profile != null && other.profile!.isNotEmpty && !other.profile!.contains('null')) ? other.profile : profile;
+
+    print("DEBUG: EnterpriseModel - Merge Result -> Name: '$mergedName', Phone: '$mergedPhone', City: '$mergedCity'");
+
     return EnterpriseModel(
       id: (other.id != null && other.id!.isNotEmpty) ? other.id : id,
-      name: (other.name.trim().isNotEmpty) ? other.name.trim() : name,
-      phone: (other.phone != null && other.phone!.trim().isNotEmpty) ? other.phone!.trim() : phone,
-      email: (other.email.trim().isNotEmpty) ? other.email.trim() : email,
+      name: mergedName,
+      phone: mergedPhone,
+      email: mergedEmail,
       password: (other.password != null && other.password!.isNotEmpty) ? other.password : password,
-      adress: (other.adress != null && other.adress!.trim().isNotEmpty) ? other.adress!.trim() : adress,
-      city: (other.city != null && other.city!.trim().isNotEmpty) ? other.city!.trim() : city,
+      adress: mergedAdress,
+      city: mergedCity,
       serviceId: (other.serviceId != null && other.serviceId!.isNotEmpty) ? other.serviceId : serviceId,
-      profile: (other.profile != null && other.profile!.isNotEmpty) ? other.profile : profile,
+      profile: mergedProfile,
       image: other.image ?? image,
       role: (other.role != null && other.role!.isNotEmpty) ? other.role : role,
       rate: (other.rate != null && other.rate! > 0) ? other.rate : rate,
       isVerified: other.isVerified,
       specialite: (other.specialite != null && other.specialite!.isNotEmpty) ? other.specialite : specialite,
       domaine: (other.domaine != null && other.domaine!.isNotEmpty) ? other.domaine : domaine,
+      description: (other.description != null && other.description!.isNotEmpty) ? other.description : description,
+      website: (other.website != null && other.website!.isNotEmpty) ? other.website : website,
+      link_linkdin: (other.link_linkdin != null && other.link_linkdin!.isNotEmpty) ? other.link_linkdin : link_linkdin,
     );
   }
 
@@ -148,6 +179,10 @@ class EnterpriseModel {
     "username": name,
     "nom": name,
     "nom_entreprise": name,
+    "name_organization": name,
+    "nameOrganization": name,
+    "companyName": name,
+    "company_name": name,
     "phone": phone,
     "telephone": phone,
     "phoneNumber": phone,
@@ -157,11 +192,18 @@ class EnterpriseModel {
     "adresse": adress,
     "city": city,
     "ville": city,
+    "location": adress,
     "profile": profile,
     "logo": profile,
     "image": profile,
+    "photo": profile,
     "specialite": specialite,
     "domaine": domaine,
+    "description": description,
+    "website": website,
+    "link_linkdin": link_linkdin,
+    "serviceId": serviceId,
+    "password": password,
   };
 
   Map<String, dynamic> toJson() => {
@@ -190,6 +232,9 @@ class EnterpriseModel {
     "photo": profile,
     "specialite": specialite,
     "domaine": domaine,
+    "description": description,
+    "website": website,
+    "link_linkdin": link_linkdin,
   };
 }
 

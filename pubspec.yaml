@@ -63,6 +63,7 @@ dependencies:
   socket_io_client:
   google_fonts: ^8.0.0
   flutter_native_splash: ^2.4.7
+  intl_phone_field: ^3.2.0
 
 
   

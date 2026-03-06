@@ -25,16 +25,19 @@ class SocketService {
     print('DEBUG: SocketService - Connecting to $socketUrl');
 
     socket = IO.io(socketUrl, IO.OptionBuilder()
-      .setTransports(['websocket', 'polling']) 
+      .setTransports(['websocket']) // Force websocket to avoid polling timeouts
+      .disableAutoConnect() // We manually connect after setup
       .setAuth({'token': token})
       .setExtraHeaders({
         if (token != null) 'Authorization': 'Bearer $token',
       })
-      .enableAutoConnect()
-      .setTimeout(20000) // Increase timeout to 20s
+      .setTimeout(10000) // Moderate timeout
       .build());
 
     print('DEBUG: SocketService - Initializing listeners');
+    
+    // Connect manually
+    socket!.connect();
 
     socket!.onConnect((_) {
       print('DEBUG: SocketService - CONNECTED EVENT');

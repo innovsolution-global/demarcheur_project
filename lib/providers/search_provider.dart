@@ -176,4 +176,13 @@ class SearchProvider extends ChangeNotifier {
     _viewAll = false;
     notifyListeners();
   }
+
+  void clear() {
+    _allJobs = [];
+    _filteredJobs = [];
+    _viewAll = false;
+    _isLoading = false;
+    notifyListeners();
+  }
 }
+

@@ -3,6 +3,7 @@ import 'package:demarcheur_app/models/application_model.dart';
 import 'package:demarcheur_app/providers/application_provider.dart';
 import 'package:demarcheur_app/services/auth_provider.dart';
 import 'package:demarcheur_app/widgets/header_page.dart';
+import 'package:demarcheur_app/utils/status_translator.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:hugeicons/hugeicons.dart';
@@ -126,7 +127,7 @@ class _ApplicationPageState extends State<ApplicationPage> {
       final selectedCategory = categories[_selectedIndex];
       filteredApps = allApps
           .where(
-            (app) => app.status.toLowerCase() == selectedCategory.toLowerCase(),
+            (app) => StatusTranslator.translate(app.status).toLowerCase() == selectedCategory.toLowerCase(),
           )
           .toList();
     }
@@ -315,7 +316,7 @@ class _ApplicationPageState extends State<ApplicationPage> {
                   ),
                   child: Center(
                     child: Text(
-                      app.status,
+                      StatusTranslator.translate(app.status),
                       style: TextStyle(
                         color: statusColor,
                         fontWeight: FontWeight.bold,

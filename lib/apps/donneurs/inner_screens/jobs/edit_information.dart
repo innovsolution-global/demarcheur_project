@@ -294,6 +294,7 @@ class _EditInformationState extends State<EditInformation> {
                       label: "Téléphone",
                       icon: HugeIcons.strokeRoundedCall02,
                       keyboardType: TextInputType.phone,
+                      readOnly: true,
                     ),
                     const SizedBox(height: 16),
                     _buildTextField(
@@ -354,6 +355,7 @@ class _EditInformationState extends State<EditInformation> {
     required TextEditingController controller,
     required String label,
     required dynamic icon,
+    bool readOnly = false,
     TextInputType keyboardType = TextInputType.text,
     String? Function(String?)? validator,
   }) {
@@ -372,9 +374,13 @@ class _EditInformationState extends State<EditInformation> {
       ),
       child: TextFormField(
         controller: controller,
+        readOnly: readOnly,
         keyboardType: keyboardType,
         validator: validator,
-        style: TextStyle(color: colors.secondary, fontWeight: FontWeight.w500),
+        style: TextStyle(
+          color: readOnly ? Colors.grey[600] : colors.secondary,
+          fontWeight: FontWeight.w500,
+        ),
         decoration: InputDecoration(
           labelText: label,
           labelStyle: TextStyle(

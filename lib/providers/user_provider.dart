@@ -5,15 +5,19 @@ import 'package:flutter/material.dart';
 
 class UserProvider extends ChangeNotifier {
   bool _hasFetchedCandidates = false;
-  List<UserModel> _allusers  =[];
-   List<UserModel> get allusers => _allusers;
-  bool  _isLoading = false;
+  bool _hasFetchError = false;
+  List<UserModel> _allusers = [];
+  List<UserModel> get allusers => _allusers;
+  bool _isLoading = false;
   bool get isLoading => _isLoading;
   bool get hasFetchedCandidates => _hasFetchedCandidates;
+  /// True si le dernier fetch a échoué (ex: 401 sans refresh token)
+  bool get hasFetchError => _hasFetchError;
 
   void clearCandidates() {
     _allusers = [];
     _hasFetchedCandidates = false;
+    _hasFetchError = false;
     notifyListeners();
   }
 
@@ -54,74 +58,54 @@ class UserProvider extends ChangeNotifier {
           "DEBUG: UserProvider - Fetched ${candidates.length} candidates from API",
         );
 
-        // Enrich candidates with full profile data
+        // Enrich candidates with full profile data concurrently
         List<UserModel> enrichedUsers = [];
+        Set<String> seenUserIds = {};
 
-        for (var cand in candidates) {
+        // Prepare futures for profile fetching
+        final profileFutures = candidates.map((cand) async {
+          final userId = cand.applicant?.id ?? cand.appliquantId;
+          if (userId == null || seenUserIds.contains(userId)) {
+            print("DEBUG: UserProvider - Skipping duplicate/null applicant: $userId");
+            return null;
+          }
+          seenUserIds.add(userId);
+
           if (cand.applicant != null) {
-            // We have basic user info, now fetch full profile
-            final userId = cand.applicant!.id;
+            final applicantId = cand.applicant!.id;
             print(
-              "DEBUG: UserProvider - Applicant ID: $userId (name: ${cand.applicant!.name})",
+              "DEBUG: UserProvider - Applicant ID: $applicantId (name: ${cand.applicant!.name})",
             );
-            if (userId != null && userId.isNotEmpty) {
+            if (applicantId != null && applicantId.isNotEmpty) {
               print(
-                "DEBUG: UserProvider - Fetching full profile for user: $userId",
+                "DEBUG: UserProvider - Fetching full profile for user: $applicantId",
               );
               final fullProfile = await ApiService().getUserProfile(
-                userId,
+                applicantId,
                 token,
               );
 
               if (fullProfile != null) {
-                // Convert DonneurModel to UserModel with candidate status
                 print(
                   "DEBUG: UserProvider - Full profile data: name=${fullProfile.name}, email=${fullProfile.email}, profile=${fullProfile.profile}",
                 );
-
-                enrichedUsers.add(
-                  UserModel(
-                    id: fullProfile.id,
-                    name: fullProfile.name,
-                    speciality: 'N/A',
-                    exp: fullProfile.phone ?? 'N/A',
-                    postDate: cand.createdAt ?? "",
-                    location: fullProfile.city ??
-                        fullProfile.adress ??
-                        cand.applicant!.location,
-                    photo: fullProfile.profile ?? cand.applicant!.photo,
-                    gender: 'N/A',
-                    status: cand.status ?? 'En cours',
-                    email: fullProfile.email ?? 'Non renseigné',
-                    candidatureId: cand.id,
-                  ),
-                );
-                print(
-                  "DEBUG: UserProvider - Added user with photo: ${fullProfile.profile ?? 'default'}",
+                return UserModel(
+                  id: fullProfile.id,
+                  name: fullProfile.name,
+                  speciality: 'N/A',
+                  exp: fullProfile.phone ?? 'N/A',
+                  postDate: cand.createdAt ?? "",
+                  location: fullProfile.city ??
+                      fullProfile.adress ??
+                      cand.applicant!.location,
+                  photo: fullProfile.profile ?? cand.applicant!.photo,
+                  gender: 'N/A',
+                  status: cand.status ?? 'En cours',
+                  email: fullProfile.email ?? 'Non renseigné',
+                  candidatureId: cand.id,
                 );
               } else {
-                // Fallback to basic info if profile fetch fails
-                enrichedUsers.add(
-                  UserModel(
-                    id: cand.applicant!.id,
-                    name: cand.applicant!.name,
-                    speciality: cand.applicant!.speciality,
-                    exp: cand.applicant!.phone ?? cand.applicant!.exp,
-                    postDate: cand.createdAt ?? "",
-                    location: cand.applicant!.location,
-                    photo: cand.applicant!.photo,
-                    gender: cand.applicant!.gender,
-                    status: cand.status ?? 'En cours',
-                    email: cand.applicant!.email,
-                    phone: cand.applicant!.phone,
-                    document: cand.cvUrl,
-                    candidatureId: cand.id,
-                  ),
-                );
-              }
-            } else {
-              enrichedUsers.add(
-                UserModel(
+                return UserModel(
                   id: cand.applicant!.id,
                   name: cand.applicant!.name,
                   speciality: cand.applicant!.speciality,
@@ -135,40 +119,73 @@ class UserProvider extends ChangeNotifier {
                   phone: cand.applicant!.phone,
                   document: cand.cvUrl,
                   candidatureId: cand.id,
-                ),
+                );
+              }
+            } else {
+              return UserModel(
+                id: cand.applicant!.id,
+                name: cand.applicant!.name,
+                speciality: cand.applicant!.speciality,
+                exp: cand.applicant!.phone ?? cand.applicant!.exp,
+                postDate: cand.createdAt ?? "",
+                location: cand.applicant!.location,
+                photo: cand.applicant!.photo,
+                gender: cand.applicant!.gender,
+                status: cand.status ?? 'En cours',
+                email: cand.applicant!.email,
+                phone: cand.applicant!.phone,
+                document: cand.cvUrl,
+                candidatureId: cand.id,
               );
             }
           } else {
-            // Fallback if applicant is still null (shouldn't happen now)
             print("WARNING: Candidate ${cand.id} has null applicant data!");
-            enrichedUsers.add(
-              UserModel(
-                id: cand.appliquantId,
-                name: "Candidat Inconnu",
-                speciality: "N/A",
-                exp: "N/A",
-                postDate: cand.createdAt ?? "",
-                location: "N/A",
-                photo:
-                    "https://www.pngitem.com/pimgs/m/146-1468479_my-profile-icon-blank-profile-picture-circle-hd.png",
-                gender: "N/A",
-                status: cand.status ?? "En cours",
-                candidatureId: cand.id,
-              ),
+            return UserModel(
+              id: cand.appliquantId,
+              name: "Candidat Inconnu",
+              speciality: "N/A",
+              exp: "N/A",
+              postDate: cand.createdAt ?? "",
+              location: "N/A",
+              photo:
+                  "https://www.pngitem.com/pimgs/m/146-1468479_my-profile-icon-blank-profile-picture-circle-hd.png",
+              gender: "N/A",
+              status: cand.status ?? "En cours",
+              candidatureId: cand.id,
             );
           }
-        }
+        });
+
+        // Await all futures concurrently
+        final resolvedProfiles = await Future.wait(profileFutures);
+        
+        // Filter out nulls (skipped duplicates)
+        enrichedUsers = resolvedProfiles.whereType<UserModel>().toList();
 
         _allusers = enrichedUsers;
       } else {
         print("DEBUG: UserProvider - candidates list is NULL");
       }
+    } on SessionExpiredException catch (e) {
+      print('UserProvider.loadCandidates - SESSION EXPIRED: $e');
+      _hasFetchError = true;
+      // We could add a specific flag for session expired if needed
     } catch (e) {
       print('UserProvider.loadCandidates error: $e');
+      _hasFetchError = true;
     }
 
     _isLoading = false;
     _hasFetchedCandidates = true;
     notifyListeners();
   }
+
+   void clear() {
+     _allusers = [];
+     _isLoading = false;
+     _hasFetchedCandidates = false;
+     _hasFetchError = false;
+     notifyListeners();
+   }
 }
+

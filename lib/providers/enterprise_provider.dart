@@ -48,9 +48,16 @@ class EnterpriseProvider extends ChangeNotifier {
           print("DEBUG: EnterpriseProvider - Fetching fresh GIVER profile...");
           final freshUser = await ApiService().giverProfile(tokenStr);
           if (freshUser != null) {
-            if (_user != null) {
+            // CRITICAL: Only merge if IDs and emails match to prevent data leakage between sessions
+            final bool isSameUser = _user != null && 
+                                   (_user!.id == freshUser.id || freshUser.id == null) &&
+                                   (_user!.email == freshUser.email || freshUser.email == null);
+            
+            if (isSameUser) {
+              print("DEBUG: EnterpriseProvider - Merging fresh profile with cached data.");
               _user = _user!.mergeFrom(freshUser);
             } else {
+              print("DEBUG: EnterpriseProvider - Cache mismatch (IDs or Emails differ), taking fresh profile.");
               _user = freshUser;
             }
             final encodedUser = jsonEncode(_user!.toJson());
@@ -63,6 +70,9 @@ class EnterpriseProvider extends ChangeNotifier {
           }
         }
       }
+    } on SessionExpiredException catch (e) {
+      print('EnterpriseProvider.loadUser - SESSION EXPIRED: $e');
+      // Global redirect is handled in ApiService
     } catch (e) {
       print('Error in loadUser (EnterpriseProvider): $e');
     }
@@ -78,8 +88,11 @@ class EnterpriseProvider extends ChangeNotifier {
     String? phone,
     String? address,
     String? city,
-    File? image, // Optional image
-  ) async {
+    File? image, {
+    String? description,
+    String? website,
+    String? link_linkdin,
+  }) async {
     if (_user == null) return false;
 
     _isLoading = true;
@@ -93,6 +106,9 @@ class EnterpriseProvider extends ChangeNotifier {
         adress: address,
         city: city,
         image: image,
+        description: description,
+        website: website,
+        link_linkdin: link_linkdin,
       );
 
       final result = await ApiService().updateEnterpriseProfile(
@@ -103,8 +119,20 @@ class EnterpriseProvider extends ChangeNotifier {
       if (result != null) {
         print("DEBUG: updateProfile (EnterpriseProvider) - Success");
 
-        // Sync and Load fresh data
-        await loadUser();
+        // IMPORTANT: Update local state immediately so UI doesn't revert while waiting for fresh GIVER fetch
+        _user = updatedUser;
+        
+        // Persist local update to cache immediately
+        final prefs = await SharedPreferences.getInstance();
+        final encodedUser = jsonEncode(_user!.toJson());
+        await prefs.setString('giver_user_data', encodedUser);
+        await prefs.setString('last_user_data', encodedUser);
+
+        // Still reload in background to get potential profile image URL updates from backend
+        // We add a small delay to give the backend time to propagate changes across caches
+        Future.delayed(const Duration(seconds: 2), () {
+           if (_user?.id != null) loadUser();
+        });
 
         _isLoading = false;
         notifyListeners();
@@ -138,6 +166,15 @@ class EnterpriseProvider extends ChangeNotifier {
     await prefs.setString('last_user_data', encodedUser);
 
     _isLoading = false;
+    notifyListeners();
+  }
+
+  // ------------------------------
+  //  CLEAR DATA (FOR LOGOUT)
+  // ------------------------------
+  void clear() {
+    _user = null;
+    _token = null;
     notifyListeners();
   }
 }

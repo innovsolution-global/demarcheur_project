@@ -17,8 +17,14 @@ class CompaProfileProvider extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
 
-    _vacancies = await ApiService().getMyVacancies(token);
-    _filterVancy = List.from(_vacancies); // Populate filter list
+    try {
+      _vacancies = await ApiService().getMyVacancies(token);
+      _filterVancy = List.from(_vacancies); // Populate filter list
+    } on SessionExpiredException catch (e) {
+      print('[CompaProfileProvider] SESSION EXPIRED: $e');
+    } catch (e) {
+      print('Error in loadVancies: $e');
+    }
 
     _isLoading = false;
     notifyListeners();
@@ -115,6 +121,13 @@ class CompaProfileProvider extends ChangeNotifier {
 
   void clearSearch() {
     _filterVancy = List.from(_vacancies);
+    notifyListeners();
+  }
+
+  void clear() {
+    _vacancies = [];
+    _filterVancy = [];
+    _isLoading = false;
     notifyListeners();
   }
 }

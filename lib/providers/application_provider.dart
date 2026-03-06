@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../models/application_model.dart';
 import '../services/api_service.dart';
+import '../utils/status_translator.dart';
 
 class ApplicationProvider extends ChangeNotifier {
   List<ApplicationModel> _allapplication = [];
@@ -22,12 +23,12 @@ class ApplicationProvider extends ChangeNotifier {
 
   // Categories computed from _allapplication
   List<String> get categories {
-    final uniqueCategories = _allapplication
-        .map((app) => app.status.trim())
+    final uniqueCategoriesLabels = _allapplication
+        .map((app) => StatusTranslator.translate(app.status))
         .toSet()
         .toList();
-    uniqueCategories.sort();
-    final result = ['Tout', ...uniqueCategories];
+    uniqueCategoriesLabels.sort();
+    final result = ['Tout', ...uniqueCategoriesLabels];
     debugPrint('[ApplicationProvider] categories -> $result');
     return result;
   }
@@ -100,6 +101,10 @@ class ApplicationProvider extends ChangeNotifier {
       print(
         '[ApplicationProvider] loaded ${_allapplication.length} items from API',
       );
+    } on SessionExpiredException catch (e) {
+      print('[ApplicationProvider] SESSION EXPIRED: $e');
+      _isLoading = false;
+      notifyListeners();
     } catch (ex, st) {
       print('[ApplicationProvider] loadApplication ERROR: $ex\n$st');
       _isLoading = false;
@@ -124,6 +129,15 @@ class ApplicationProvider extends ChangeNotifier {
           )
           .toList();
     }
+    notifyListeners();
+  }
+
+  void clear() {
+    _allapplication = [];
+    _allApp = [];
+    _filteredUsers = [];
+    _isLoading = false;
+    _searchQuery = '';
     notifyListeners();
   }
 }

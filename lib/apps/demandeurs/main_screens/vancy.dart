@@ -668,9 +668,11 @@ class _VancyState extends State<Vancy> with TickerProviderStateMixin {
     final enterpriseProvider = context.watch<EnterpriseProvider>();
     final userProvider = context.watch<UserProvider>();
 
-    // Safety fallback: if userProvider has not fetched data yet and we have enterprise ID, trigger load
+    // Safety fallback: if userProvider has not fetched data yet and we have enterprise ID, trigger load.
+    // hasFetchError guard prevents re-triggering indefinitely after a 401 with no refresh token.
     if (!userProvider.isLoading &&
         !userProvider.hasFetchedCandidates &&
+        !userProvider.hasFetchError &&
         enterpriseProvider.user?.id != null &&
         enterpriseProvider.token != null) {
       print(

@@ -10,7 +10,7 @@ class DonnorUserProvider extends ChangeNotifier {
   DonneurModel? _user;
   bool _isLoading = false;
   String? _token;
-  
+
   String? get token => _token;
   DonneurModel? get user => _user;
   bool get isLoading => _isLoading;
@@ -26,7 +26,7 @@ class DonnorUserProvider extends ChangeNotifier {
 
       // Load cached user from searcher_user_data first, then fallback to last_user_data
       String? userJson = prefs.getString('searcher_user_data');
-      
+
       // Fallback to last_user_data if searcher_user_data doesn't exist
       userJson ??= prefs.getString('last_user_data');
 
@@ -57,16 +57,21 @@ class DonnorUserProvider extends ChangeNotifier {
       final tokenStr = await storage.getToken() ?? prefs.getString('token');
       if (tokenStr != null) {
         _token = tokenStr;
-        
+
         final userRole = prefs.getString('user_role');
         print("DEBUG: DonnorUserProvider - User role: $userRole");
-        
+
         if (userRole == 'SEARCHER') {
           print("DEBUG: DonnorUserProvider - Fetching SEARCHER profile...");
           // Try searcherProfile first (dedicated endpoint)
           final freshUser = await ApiService().searcherProfile(tokenStr);
           if (freshUser != null) {
-            if (_user != null) {
+            // CRITICAL: Only merge if IDs and emails match to prevent data leakage between sessions
+            final bool isSameUser = _user != null && 
+                                   (_user!.id == freshUser.id || freshUser.id == null) &&
+                                   (_user!.email == freshUser.email || freshUser.email == null);
+            
+            if (isSameUser) {
               _user = _user!.mergeFrom(freshUser);
             } else {
               _user = freshUser;
@@ -76,19 +81,27 @@ class DonnorUserProvider extends ChangeNotifier {
             // Also sync generic keys if needed
             await prefs.setString('last_user_data', encodedUser);
             if (_user?.id != null) await prefs.setString('userId', _user!.id!);
-            debugPrint("DEBUG: DonnorUserProvider - Fresh profile merged for ${_user?.name}");
+            debugPrint(
+              "DEBUG: DonnorUserProvider - Fresh profile merged for ${_user?.name}",
+            );
             notifyListeners();
           } else {
-             // Fallback to getUserProfile by ID if dedicated fails
-             final targetId = prefs.getString('userId') ?? _user?.id;
-             if (targetId != null) {
-                final fallbackUser = await ApiService().getUserProfile(targetId, tokenStr);
-                if (fallbackUser != null) {
-                  _user = fallbackUser;
-                  await prefs.setString('searcher_user_data', jsonEncode(_user!.toJson()));
-                  notifyListeners();
-                }
-             }
+            // Fallback to getUserProfile by ID if dedicated fails
+            final targetId = prefs.getString('userId') ?? _user?.id;
+            if (targetId != null) {
+              final fallbackUser = await ApiService().getUserProfile(
+                targetId,
+                tokenStr,
+              );
+              if (fallbackUser != null) {
+                _user = fallbackUser;
+                await prefs.setString(
+                  'searcher_user_data',
+                  jsonEncode(_user!.toJson()),
+                );
+                notifyListeners();
+              }
+            }
           }
         }
       }
@@ -107,8 +120,12 @@ class DonnorUserProvider extends ChangeNotifier {
     String? phone,
     String? address,
     String? city,
-    File? image,
-  ) async {
+    File? image, {
+    String? description,
+    String? website,
+    String? link_linkdin,
+    String? serviceId,
+  }) async {
     if (_user == null) return false;
 
     _isLoading = true;
@@ -116,14 +133,15 @@ class DonnorUserProvider extends ChangeNotifier {
 
     try {
       // Local update for immediate UI feedback
-      final updatedUser = DonneurModel(
-        id: _user!.id,
+      final updatedUser = _user!.copyWith(
         name: name,
-        email: _user!.email,
         phone: phone,
         adress: address,
         city: city,
-        profile: _user!.profile, // placeholder, will refresh from API
+        description: description,
+        website: website,
+        link_linkdin: link_linkdin,
+        serviceId: serviceId,
       );
 
       final result = await ApiService().updateDonneurProfile(
@@ -134,8 +152,19 @@ class DonnorUserProvider extends ChangeNotifier {
       if (result != null) {
         print("DEBUG: updateProfile (Donnor) - Success Body: $result");
 
-        // Sync and Load fresh data
-        await loadUser(); 
+        // IMPORTANT: Update local state immediately so UI doesn't revert while waiting for fresh profile fetch
+        _user = updatedUser;
+
+        // Persist local update to cache immediately
+        final prefs = await SharedPreferences.getInstance();
+        final encodedUser = jsonEncode(_user!.toJson());
+        await prefs.setString('searcher_user_data', encodedUser);
+        await prefs.setString('last_user_data', encodedUser);
+
+        // Sync and Load fresh data in background with a delay for propagation
+        Future.delayed(const Duration(seconds: 2), () {
+          if (_user?.id != null) loadUser();
+        });
 
         _isLoading = false;
         notifyListeners();
@@ -167,8 +196,13 @@ class DonnorUserProvider extends ChangeNotifier {
     final encodedUser = jsonEncode(_user!.toJson());
     await prefs.setString('searcher_user_data', encodedUser);
     await prefs.setString('last_user_data', encodedUser);
-    
+
     _isLoading = false;
+    notifyListeners();
+  }
+
+  void clear() {
+    _user = null;
     notifyListeners();
   }
 }

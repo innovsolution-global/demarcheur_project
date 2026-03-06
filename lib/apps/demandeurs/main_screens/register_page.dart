@@ -10,6 +10,7 @@ import 'package:demarcheur_app/widgets/title_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:intl_phone_field/intl_phone_field.dart';
 import 'package:provider/provider.dart';
 
 class RegisterPage extends StatefulWidget {
@@ -411,7 +412,7 @@ class _RegisterPage extends State<RegisterPage>
             textCapitalization: TextCapitalization.sentences,
             controller: _companyNameController,
             label: "Nom de l'entreprise",
-            icon: HugeIcons.strokeRoundedBuilding01,
+            icon: Icons.business_outlined,
             validator: (value) => _validateRequired(value, "Le nom"),
           ),
           const SizedBox(height: 20),
@@ -457,27 +458,27 @@ class _RegisterPage extends State<RegisterPage>
               labelStyle: TextStyle(color: color.primary, fontSize: 16),
               // prefixIcon: HugeIcon(icon: icon, color: color.primary, size: 10),
               filled: true,
-              fillColor: color.bgSubmit,
+              fillColor: color.bgSubmit ?? Colors.grey.shade100,
               border: OutlineInputBorder(
                 borderSide: BorderSide.none,
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(20),
               ),
               focusedBorder: OutlineInputBorder(
                 borderSide: BorderSide(color: color.primary, width: 2),
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(20),
               ),
               errorBorder: OutlineInputBorder(
                 borderSide: const BorderSide(color: Colors.red, width: 2),
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(20),
               ),
               focusedErrorBorder: OutlineInputBorder(
                 borderSide: const BorderSide(color: Colors.red, width: 2),
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(20),
               ),
-              // contentPadding: const EdgeInsets.symmetric(
-              //   horizontal: 16,
-              //   vertical: 16,
-              // ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 20,
+              ),
             ),
           ),
           const SizedBox(height: 20),
@@ -487,20 +488,37 @@ class _RegisterPage extends State<RegisterPage>
 
             controller: _emailController,
             label: "Adresse e-mail",
-            icon: HugeIcons.strokeRoundedMail01,
+            icon: Icons.email_outlined,
             keyboardType: TextInputType.emailAddress,
             validator: _validateEmail,
           ),
           const SizedBox(height: 20),
-          _CustomTextField(
-            isPassword: false,
-            textCapitalization: TextCapitalization.none,
-
+          IntlPhoneField(
             controller: _phoneController,
-            label: "Numéro de téléphone",
-            icon: HugeIcons.strokeRoundedAiPhone01,
             keyboardType: TextInputType.phone,
-            validator: _validatePhone,
+            disableLengthCheck: true, // Custom validation applied if necessary
+            initialCountryCode: 'GN',
+            style: TextStyle(fontSize: 18, color: color.secondary, fontWeight: FontWeight.w500),
+            decoration: InputDecoration(
+              hintText: "Numéro de téléphone",
+              hintStyle: TextStyle(color: color.secondary.withOpacity(0.5), fontSize: 16),
+              filled: true,
+              fillColor: color.bgSubmit ?? Colors.grey.shade100,
+              contentPadding: const EdgeInsets.symmetric(vertical: 20),
+              border: OutlineInputBorder(
+                borderSide: BorderSide.none,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: color.primary, width: 2),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              errorStyle: TextStyle(color: Colors.red),
+              errorBorder: OutlineInputBorder(
+                borderSide: const BorderSide(color: Colors.red),
+                borderRadius: BorderRadius.circular(20),
+              ),
+            ),
           ),
           const SizedBox(height: 20),
           _CustomTextField(
@@ -508,7 +526,7 @@ class _RegisterPage extends State<RegisterPage>
             textCapitalization: TextCapitalization.sentences,
             controller: _locationController,
             label: "Adresse",
-            icon: HugeIcons.strokeRoundedLocation01,
+            icon: Icons.location_on_outlined,
             validator: (value) => _validateRequired(value, "L'adresse"),
             textInputAction: TextInputAction.next,
           ),
@@ -518,7 +536,7 @@ class _RegisterPage extends State<RegisterPage>
             textCapitalization: TextCapitalization.none,
             controller: _passwordController,
             label: "Mot de passe",
-            icon: HugeIcons.strokeRoundedLocation01,
+            icon: Icons.lock_outline,
             validator: (value) => _validateRequired(value, "Mot de passe"),
             textInputAction: TextInputAction.done,
           ),
@@ -578,7 +596,7 @@ class _CustomTextField extends StatefulWidget {
     required this.label,
     required this.icon,
     required this.textCapitalization,
-    required this.isPassword,
+    this.isPassword = false,
     this.keyboardType,
     this.validator,
     this.textInputAction,
@@ -589,7 +607,8 @@ class _CustomTextField extends StatefulWidget {
 }
 
 class _CustomTextFieldState extends State<_CustomTextField> {
-  bool obscuredText = false;
+  bool obscuredText = true;
+
   @override
   Widget build(BuildContext context) {
     final color = ConstColors();
@@ -599,46 +618,45 @@ class _CustomTextFieldState extends State<_CustomTextField> {
       keyboardType: widget.keyboardType ?? TextInputType.text,
       textInputAction: widget.textInputAction ?? TextInputAction.next,
       textCapitalization: widget.textCapitalization,
-      obscureText: widget.isPassword,
       validator: widget.validator,
-      style: TextStyle(fontSize: 16, color: color.secondary),
+      obscureText: widget.isPassword ? obscuredText : false,
+      style: TextStyle(fontSize: 18, color: color.secondary, fontWeight: FontWeight.w500),
       decoration: InputDecoration(
-        labelText: widget.label,
-        labelStyle: TextStyle(color: color.primary, fontSize: 16),
-        // prefixIcon: HugeIcon(icon: icon, color: color.primary, size: 10),
+        hintText: widget.label,
+        hintStyle: TextStyle(color: color.secondary.withOpacity(0.5), fontSize: 16),
+        prefixIcon: Icon(widget.icon, color: color.primary),
         suffixIcon: widget.isPassword
             ? IconButton(
+                icon: Icon(
+                  obscuredText ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                  color: color.primary,
+                ),
                 onPressed: () {
                   setState(() {
                     obscuredText = !obscuredText;
                   });
                 },
-                icon: obscuredText
-                    ? Icon(Icons.visibility_off, color: color.secondary)
-                    : Icon(Icons.visibility, color: color.secondary),
               )
             : null,
         filled: true,
-        fillColor: color.bgSubmit,
+        fillColor: color.bgSubmit ?? Colors.grey.shade100,
+        contentPadding: const EdgeInsets.symmetric(vertical: 20),
         border: OutlineInputBorder(
           borderSide: BorderSide.none,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
         ),
         focusedBorder: OutlineInputBorder(
           borderSide: BorderSide(color: color.primary, width: 2),
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
         ),
+        errorStyle: TextStyle(color: Colors.red),
         errorBorder: OutlineInputBorder(
-          borderSide: const BorderSide(color: Colors.red, width: 2),
-          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: Colors.red),
+          borderRadius: BorderRadius.circular(20),
         ),
         focusedErrorBorder: OutlineInputBorder(
           borderSide: const BorderSide(color: Colors.red, width: 2),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 16,
+          borderRadius: BorderRadius.circular(20),
         ),
       ),
     );

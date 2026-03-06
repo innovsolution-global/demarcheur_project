@@ -356,7 +356,9 @@ class _PostVancyState extends State<PostVancy> {
           const SizedBox(height: 8),
           TextFormField(
             controller: controller,
-            keyboardType: keyboardType,
+            keyboardType: keyboardType == TextInputType.text && maxLines > 1
+                ? TextInputType.multiline
+                : keyboardType,
             maxLines: maxLines,
             inputFormatters: inputFormatters,
             textCapitalization: maxLines == 1

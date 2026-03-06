@@ -575,7 +575,9 @@ class _AddVacancyPageState extends State<AddVacancyPage>
       child: TextField(
         controller: controller,
         maxLines: maxLines,
-        keyboardType: keyboardType,
+        keyboardType: keyboardType == TextInputType.text && maxLines > 1
+            ? TextInputType.multiline
+            : keyboardType,
         readOnly: readOnly,
         onTap: onTap,
         textCapitalization: TextCapitalization.sentences,

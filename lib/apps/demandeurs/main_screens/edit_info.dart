@@ -4,6 +4,7 @@ import 'package:demarcheur_app/consts/color.dart';
 import 'package:demarcheur_app/providers/donnor_user_provider.dart';
 import 'package:demarcheur_app/providers/enterprise_provider.dart';
 import 'package:demarcheur_app/providers/presta/presta_provider.dart';
+import 'package:demarcheur_app/providers/dem_user_provider.dart';
 import 'package:demarcheur_app/widgets/btn.dart';
 import 'package:demarcheur_app/widgets/header_page.dart';
 import 'package:demarcheur_app/widgets/sub_title.dart';
@@ -34,8 +35,11 @@ class _EditInfoState extends State<EditInfo>
       TextEditingController(); // Not used in API update yet but good to keep
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
-  final _locationController = TextEditingController();
   final _cityController = TextEditingController();
+  final _descriptionController = TextEditingController();
+  final _websiteController = TextEditingController();
+  final _linkedinController = TextEditingController();
+  final _locationController = TextEditingController();
 
   File? selectedImage;
   bool _isLoading = false;
@@ -53,30 +57,52 @@ class _EditInfoState extends State<EditInfo>
     );
     _animationController.forward();
 
-    // Pre-fill data from EnterpriseProvider, DonnorUserProvider or PrestaProvider
+    // Pre-fill data from various providers
+    _prefillData();
+  }
+
+  void _prefillData() {
     final entUser = context.read<EnterpriseProvider>().user;
     final donUser = context.read<DonnorUserProvider>().user;
     final prestaUser = context.read<PrestaProvider>().user;
+    final demUser = context.read<DemUserProvider>().user;
 
-    if (entUser != null) {
+    if (demUser != null) {
+      _companyNameController.text = demUser.companyName;
+      _emailController.text = demUser.email;
+      _phoneController.text = demUser.phoneNumber;
+      _locationController.text = demUser.location;
+      // City is often inside location for DemUserModel
+      _cityController.text = demUser.location;
+    } else if (entUser != null) {
       _companyNameController.text = entUser.name;
       _emailController.text = entUser.email;
       _phoneController.text = entUser.phone ?? '';
       _locationController.text = entUser.adress ?? '';
       _cityController.text = entUser.city ?? '';
+      _descriptionController.text = entUser.description ?? '';
+      _websiteController.text = entUser.website ?? '';
+      _linkedinController.text = entUser.link_linkdin ?? '';
     } else if (donUser != null) {
       _companyNameController.text = donUser.name;
       _emailController.text = donUser.email;
       _phoneController.text = donUser.phone ?? '';
       _locationController.text = donUser.adress ?? '';
       _cityController.text = donUser.city ?? '';
+      _descriptionController.text = donUser.description ?? '';
+      _websiteController.text = donUser.website ?? '';
+      _linkedinController.text = donUser.link_linkdin ?? '';
     } else if (prestaUser != null) {
       _companyNameController.text = prestaUser.companyName;
       _emailController.text = prestaUser.email ?? '';
       _phoneController.text = prestaUser.phoneNumber ?? '';
       _locationController.text = prestaUser.location;
-      // City is often merged into location in PrestaUserModel
-      _cityController.text = ''; 
+      _cityController.text = '';
+      _descriptionController.text =
+          prestaUser.about; // about maps to description
+      _websiteController.text =
+          ''; // PrestaModel doesn't have it explicitly yet
+      _linkedinController.text = '';
     }
   }
 
@@ -89,6 +115,9 @@ class _EditInfoState extends State<EditInfo>
     _phoneController.dispose();
     _locationController.dispose();
     _cityController.dispose();
+    _descriptionController.dispose();
+    _websiteController.dispose();
+    _linkedinController.dispose();
     super.dispose();
   }
 
@@ -186,30 +215,69 @@ class _EditInfoState extends State<EditInfo>
 
       bool success = false;
 
+      // Helper: resolve phone safely — preserve country code if user didn't change it
+      // If the phone field starts with '+', it's already international. If not,
+      // check if the existing stored phone starts with '+' and the digits match,
+      // meaning the user didn't change it, so use the stored version.
+      String _resolvePhone(String enteredPhone, String? storedPhone) {
+        final cleaned = enteredPhone.trim();
+        if (cleaned.startsWith('+')) return cleaned; // already international
+        // If stored phone includes this number at the end, use stored phone
+        if (storedPhone != null &&
+            storedPhone.startsWith('+') &&
+            storedPhone.endsWith(
+              cleaned.replaceAll(RegExp(r'\s+|-|\(|\)'), ''),
+            )) {
+          return storedPhone; // keep the original stored format
+        }
+        return cleaned; // fallback: return what user typed
+      }
+
       // We try the provider that has an active user
       if (entProvider.user != null) {
+        final resolvedPhone = _resolvePhone(
+          _phoneController.text,
+          entProvider.user?.phone,
+        );
         success = await entProvider.updateProfile(
           _companyNameController.text.trim(),
-          _phoneController.text.trim(),
+          resolvedPhone,
           _locationController.text.trim(),
           _cityController.text.trim(),
           selectedImage,
+          description: _descriptionController.text.trim(),
+          website: _websiteController.text.trim(),
+          link_linkdin: _linkedinController.text.trim(),
         );
       } else if (donProvider.user != null) {
+        final resolvedPhone = _resolvePhone(
+          _phoneController.text,
+          donProvider.user?.phone,
+        );
         success = await donProvider.updateProfile(
           _companyNameController.text.trim(),
-          _phoneController.text.trim(),
+          resolvedPhone,
           _locationController.text.trim(),
           _cityController.text.trim(),
           selectedImage,
+          description: _descriptionController.text.trim(),
+          website: _websiteController.text.trim(),
+          link_linkdin: _linkedinController.text.trim(),
         );
       } else if (prestaProvider.user != null) {
+        final resolvedPhone = _resolvePhone(
+          _phoneController.text,
+          prestaProvider.user?.phoneNumber,
+        );
         success = await prestaProvider.updateProfile(
           _companyNameController.text.trim(),
-          _phoneController.text.trim(),
+          resolvedPhone,
           _locationController.text.trim(),
           _cityController.text.trim(),
           selectedImage,
+          description: _descriptionController.text.trim(),
+          website: _websiteController.text.trim(),
+          link_linkdin: _linkedinController.text.trim(),
         );
       } else {
         _showErrorSnackBar('Aucun utilisateur connecté trouvé');
@@ -238,6 +306,70 @@ class _EditInfoState extends State<EditInfo>
   @override
   Widget build(BuildContext context) {
     final ConstColors color = ConstColors();
+
+    // Re-check for profile data (reactive fallback for cache mismatch)
+    final entUser = context.watch<EnterpriseProvider>().user;
+    final donUser = context.watch<DonnorUserProvider>().user;
+    final prestaUser = context.watch<PrestaProvider>().user;
+    final demUser = context.watch<DemUserProvider>().user;
+
+    // Determine the "source of truth" user
+    final authUser =
+        demUser ??
+        (entUser as dynamic) ??
+        (donUser as dynamic) ??
+        (prestaUser as dynamic);
+
+    if (authUser != null && !_isLoading) {
+      final currentEmail = _emailController.text.trim();
+      final actualEmail =
+          (demUser?.email ??
+                  entUser?.email ??
+                  donUser?.email ??
+                  prestaUser?.email ??
+                  '')
+              .trim();
+
+      // If controllers are empty OR the email mismatches (stale cache), update them
+      if (currentEmail.isEmpty ||
+          (actualEmail.isNotEmpty && currentEmail != actualEmail)) {
+        debugPrint(
+          'DEBUG: EditInfo - Identity mismatch or empty controllers detected. Updating fields to $actualEmail',
+        );
+
+        if (demUser != null) {
+          _companyNameController.text = demUser.companyName;
+          _emailController.text = demUser.email;
+          _phoneController.text = demUser.phoneNumber;
+          _locationController.text = demUser.location;
+        } else if (entUser != null) {
+          _companyNameController.text = entUser.name;
+          _emailController.text = entUser.email;
+          _phoneController.text = entUser.phone ?? '';
+          _locationController.text = entUser.adress ?? '';
+          _cityController.text = entUser.city ?? '';
+          _descriptionController.text = entUser.description ?? '';
+          _websiteController.text = entUser.website ?? '';
+          _linkedinController.text = entUser.link_linkdin ?? '';
+        } else if (donUser != null) {
+          _companyNameController.text = donUser.name;
+          _emailController.text = donUser.email;
+          _phoneController.text = donUser.phone ?? '';
+          _locationController.text = donUser.adress ?? '';
+          _cityController.text = donUser.city ?? '';
+          _descriptionController.text = donUser.description ?? '';
+          _websiteController.text = donUser.website ?? '';
+          _linkedinController.text = donUser.link_linkdin ?? '';
+        } else if (prestaUser != null) {
+          _companyNameController.text = prestaUser.companyName;
+          _emailController.text = prestaUser.email ?? '';
+          _phoneController.text = prestaUser.phoneNumber ?? '';
+          _locationController.text = prestaUser.location;
+          _descriptionController.text = prestaUser.about;
+        }
+      }
+    }
+
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
@@ -387,9 +519,13 @@ class _EditInfoState extends State<EditInfo>
     final prestaUser = context.read<PrestaProvider>().user;
 
     String? profileUrl;
-    if (entUser != null && entUser.profile != null && entUser.profile!.isNotEmpty) {
+    if (entUser != null &&
+        entUser.profile != null &&
+        entUser.profile!.isNotEmpty) {
       profileUrl = entUser.profile;
-    } else if (donUser != null && donUser.profile != null && donUser.profile!.isNotEmpty) {
+    } else if (donUser != null &&
+        donUser.profile != null &&
+        donUser.profile!.isNotEmpty) {
       profileUrl = donUser.profile;
     } else if (prestaUser != null && prestaUser.imageUrl.isNotEmpty) {
       profileUrl = prestaUser.imageUrl.first;
@@ -451,6 +587,7 @@ class _EditInfoState extends State<EditInfo>
           hint: "exemple@email.com",
           icon: HugeIcons.strokeRoundedMail01,
           keyboardType: TextInputType.emailAddress,
+          readOnly: true,
           validator: (value) {
             if (value == null || value.trim().isEmpty) {
               return 'L\'adresse e-mail est obligatoire';
@@ -467,9 +604,10 @@ class _EditInfoState extends State<EditInfo>
         _buildCustomTextField(
           controller: _phoneController,
           label: "Numéro de téléphone",
-          hint: "+33 6 12 34 56 78",
+          hint: "+224 625 12 34 56 78",
           icon: HugeIcons.strokeRoundedCall,
           keyboardType: TextInputType.phone,
+          readOnly: true,
           inputFormatters: [
             FilteringTextInputFormatter.allow(RegExp(r'[0-9+\-\s\(\)]')),
           ],
@@ -504,6 +642,36 @@ class _EditInfoState extends State<EditInfo>
           validator: (value) => null,
           color: color,
         ),
+        const SizedBox(height: 20),
+        _buildCustomTextField(
+          controller: _descriptionController,
+          label: "Description / À propos",
+          hint: "Parlez-nous de vous ou de votre entreprise",
+          icon: HugeIcons.strokeRoundedInformationCircle,
+          maxLines: 4,
+          validator: (value) => null,
+          color: color,
+        ),
+        const SizedBox(height: 20),
+        _buildCustomTextField(
+          controller: _websiteController,
+          label: "Site Web",
+          hint: "https://votre-site.com",
+          icon: HugeIcons.strokeRoundedGlobal,
+          keyboardType: TextInputType.url,
+          validator: (value) => null,
+          color: color,
+        ),
+        const SizedBox(height: 20),
+        _buildCustomTextField(
+          controller: _linkedinController,
+          label: "Lien LinkedIn",
+          hint: "https://linkedin.com/in/votre-profil",
+          icon: HugeIcons.strokeRoundedLinkedin01,
+          keyboardType: TextInputType.url,
+          validator: (value) => null,
+          color: color,
+        ),
       ],
     );
   }
@@ -515,6 +683,8 @@ class _EditInfoState extends State<EditInfo>
     required List<List<dynamic>> icon,
     required String? Function(String?) validator,
     required ConstColors color,
+    int maxLines = 1,
+    bool readOnly = false,
     TextInputType? keyboardType,
     List<TextInputFormatter>? inputFormatters,
   }) {
@@ -530,13 +700,19 @@ class _EditInfoState extends State<EditInfo>
         const SizedBox(height: 8),
         TextFormField(
           controller: controller,
+          readOnly: readOnly,
           textCapitalization: TextCapitalization.sentences,
-          keyboardType: keyboardType ?? TextInputType.text,
-          textInputAction: TextInputAction.next,
+          keyboardType:
+              keyboardType ??
+              (maxLines > 1 ? TextInputType.multiline : TextInputType.text),
+          maxLines: maxLines,
+          textInputAction: readOnly
+              ? TextInputAction.next
+              : (maxLines > 1 ? TextInputAction.newline : TextInputAction.next),
           inputFormatters: inputFormatters,
           validator: validator,
           style: TextStyle(
-            color: color.primary,
+            color: readOnly ? Colors.grey[600] : color.primary,
             fontSize: 14,
             fontWeight: FontWeight.w400,
           ),
@@ -586,7 +762,7 @@ class _EditInfoState extends State<EditInfo>
           ? Container(
               height: 50,
               decoration: BoxDecoration(
-                color: color.primary.withOpacity(0.7),
+                color: color.primary.withValues(alpha: 0.7),
                 borderRadius: BorderRadius.circular(25),
               ),
               child: const Center(

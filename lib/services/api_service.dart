@@ -18,6 +18,14 @@ import 'package:http_parser/http_parser.dart';
 import 'package:mime/mime.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:demarcheur_app/main.dart';
+
+class SessionExpiredException implements Exception {
+  final String message;
+  SessionExpiredException([this.message = 'Session expired']);
+  @override
+  String toString() => 'SessionExpiredException: $message';
+}
 
 class ApiService {
   final StorageService _storage = StorageService();
@@ -246,6 +254,7 @@ class ApiService {
         return data;
       } else {
         print('Authentification failed: ${response.statusCode}');
+        print('Response body: ${response.body}');
       }
     } catch (e) {
       rethrow;
@@ -371,13 +380,15 @@ class ApiService {
     });
   }
 
+  static int _workingProfileEndpointIndex = 0;
+
   // Get user profile by userId
   Future<DonneurModel?> getUserProfile(
     String userId,
     String? ignoreToken,
   ) async {
     return await _authenticatedRequest<DonneurModel?>((token) async {
-      final endpoints = [
+      final baseEndpoints = [
         '$baseUrl/auth/searcher/$userId',
         '$baseUrl/users/$userId',
         '$baseUrl/auth/user/$userId',
@@ -388,7 +399,15 @@ class ApiService {
         '$baseUrl/auth/donneur/$userId',
       ];
 
-      for (final url in endpoints) {
+      // Reorder endpoints to put the known working one first
+      final endpoints = List<String>.from(baseEndpoints);
+      if (_workingProfileEndpointIndex > 0 && _workingProfileEndpointIndex < endpoints.length) {
+        final workingUrl = endpoints.removeAt(_workingProfileEndpointIndex);
+        endpoints.insert(0, workingUrl);
+      }
+
+      for (int i = 0; i < endpoints.length; i++) {
+        final url = endpoints[i];
         try {
           final response = await http.get(
             Uri.parse(url),
@@ -398,6 +417,9 @@ class ApiService {
             },
           );
           if (response.statusCode == 200) {
+            // Found a working endpoint, cache its original index
+            _workingProfileEndpointIndex = baseEndpoints.indexOf(url);
+            
             final body = jsonDecode(response.body);
             if (body is Map<String, dynamic>) {
               if (body['data'] != null) {
@@ -1713,89 +1735,69 @@ class ApiService {
     File? image, // Optional image
   ]) async {
     return _authenticatedRequest<Map<String, dynamic>?>((token) async {
-      // List of potential update endpoints to try if one fails to persist
-      // Actually, we'll stick to the one that gives 200 first, but we'll try to find the "richest" one
-      final endpoints = [
-        Uri.parse('$baseUrl/auth/update-profile/${request.id}'),
-        Uri.parse('$baseUrl/auth/update-profile-giver/${request.id}'),
-        Uri.parse('$baseUrl/auth/update-giver/${request.id}'),
-      ];
+      final url = Uri.parse('$baseUrl/auth/update/${request.id}/profile');
+      final data = request.toUpdateJson();
 
-      Map<String, dynamic>? lastResult;
+      if (image == null) {
+        // Use standard JSON request if no new image
+        print('DEBUG: updateEnterpriseProfile - Sending JSON update');
+        final response = await http.patch(
+          url,
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: jsonEncode(data),
+        );
 
-      for (final url in endpoints) {
-        print('DEBUG: updateEnterpriseProfile - Trying URL: $url');
-
+        print('DEBUG: updateEnterpriseProfile - Status: ${response.statusCode}');
+        if (response.statusCode == 200 || response.statusCode == 201) {
+          return jsonDecode(response.body);
+        } else if (response.statusCode == 401) {
+          throw '401';
+        } else {
+          print('DEBUG: updateEnterpriseProfile - Failed: ${response.body}');
+          return null;
+        }
+      } else {
+        // Use MultipartRequest if image is provided
+        print('DEBUG: updateEnterpriseProfile - Sending Multipart update');
         final req = http.MultipartRequest('PATCH', url);
         req.headers.addAll({
           'Authorization': 'Bearer $token',
           'Accept': 'application/json',
         });
 
-        // Add text fields (all variants from toUpdateJson)
-        final fields = request.toUpdateJson();
-        fields.forEach((key, value) {
-          if (value != null) {
-            req.fields[key] = value.toString();
-          }
+        // Add text fields
+        data.forEach((key, value) {
+          if (value != null) req.fields[key] = value.toString();
         });
 
-        // Log fields once per request
-        print(
-          'DEBUG: updateEnterpriseProfile - Sending fields: ${req.fields.keys.toList()}',
-        );
-
-        File? imageToSend = image;
-
-        // MANDATORY IMAGE: Backend requirement. Download current if no new one provided.
-        if (imageToSend == null &&
-            request.profile != null &&
-            request.profile!.isNotEmpty) {
-          print(
-            'DEBUG: updateEnterpriseProfile - No new image, downloading existing for re-upload: ${request.profile}',
-          );
-          imageToSend = await _downloadFile(
-            request.profile!,
-            'temp_current_profile_${DateTime.now().millisecondsSinceEpoch}.jpg',
-          );
-        }
-
-        if (imageToSend != null) {
-          final mimeType = lookupMimeType(imageToSend.path);
-          final contentType = mimeType != null
-              ? MediaType.parse(mimeType)
-              : MediaType('image', 'jpeg');
-          req.files.add(
-            await http.MultipartFile.fromPath(
-              'image',
-              imageToSend.path,
-              contentType: contentType,
-            ),
-          );
-        }
+        final mimeType = lookupMimeType(image.path);
+        final contentType = mimeType != null 
+            ? MediaType.parse(mimeType) 
+            : MediaType('image', 'jpeg');
+        
+        req.files.add(await http.MultipartFile.fromPath(
+          'image', 
+          image.path, 
+          contentType: contentType,
+        ));
 
         final streamedResponse = await req.send();
         final response = await http.Response.fromStream(streamedResponse);
 
-        print(
-          'DEBUG: updateEnterpriseProfile - Status for $url: ${response.statusCode}',
-        );
+        print('DEBUG: updateEnterpriseProfile - Status: ${response.statusCode}');
         if (response.statusCode == 200 || response.statusCode == 201) {
-          final result = jsonDecode(response.body);
-          print(
-            'DEBUG: updateEnterpriseProfile - Success Body for $url: $result',
-          );
-          lastResult = result;
-          break;
+          return jsonDecode(response.body);
         } else if (response.statusCode == 401) {
           throw '401';
         } else {
-          print(
-            'DEBUG: updateEnterpriseProfile - Failed for $url: ${response.body}',
-          );
+          print('DEBUG: updateEnterpriseProfile - Failed: ${response.body}');
+          return null;
         }
       }
-      return lastResult;
     });
   }
 
@@ -1804,63 +1806,68 @@ class ApiService {
     File? image,
   ]) async {
     return _authenticatedRequest<Map<String, dynamic>?>((token) async {
-      final req = http.MultipartRequest(
-        'PATCH',
-        Uri.parse('$baseUrl/auth/update-profile/${request.id}'),
-      );
+      final url = Uri.parse('$baseUrl/auth/update/${request.id}/profile');
+      final data = request.toUpdateJson();
 
-      req.headers.addAll({
-        'Authorization': 'Bearer $token',
-        'Accept': 'application/json',
-      });
-
-      final jsonMap = request.toJson();
-      jsonMap.forEach((key, value) {
-        if (value != null) {
-          req.fields[key] = value.toString();
-        }
-      });
-
-      File? imageToSend = image;
-
-      if (imageToSend == null &&
-          request.profile != null &&
-          request.profile!.isNotEmpty) {
-        final receivedFile = await _downloadFile(
-          request.profile!,
-          'temp_donneur_${DateTime.now().millisecondsSinceEpoch}.jpg',
+      if (image == null) {
+        // JSON update
+        print('DEBUG: updateDonneurProfile - Sending JSON update');
+        final response = await http.patch(
+          url,
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: jsonEncode(data),
         );
-        if (receivedFile != null) {
-          imageToSend = receivedFile;
-        }
-      }
 
-      if (imageToSend != null) {
-        final mimeType = lookupMimeType(imageToSend.path);
-        final contentType = mimeType != null
-            ? MediaType.parse(mimeType)
+        print('DEBUG: updateDonneurProfile - Status: ${response.statusCode}');
+        if (response.statusCode == 200 || response.statusCode == 201) {
+          return jsonDecode(response.body);
+        } else if (response.statusCode == 401) {
+          throw '401';
+        } else {
+          print('DEBUG: updateDonneurProfile - Failed: ${response.body}');
+          return null;
+        }
+      } else {
+        // Multipart update
+        print('DEBUG: updateDonneurProfile - Sending Multipart update');
+        final req = http.MultipartRequest('PATCH', url);
+        req.headers.addAll({
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        });
+
+        data.forEach((key, value) {
+          if (value != null) req.fields[key] = value.toString();
+        });
+
+        final mimeType = lookupMimeType(image.path);
+        final contentType = mimeType != null 
+            ? MediaType.parse(mimeType) 
             : MediaType('image', 'jpeg');
 
-        req.files.add(
-          await http.MultipartFile.fromPath(
-            'image',
-            imageToSend.path,
-            contentType: contentType,
-          ),
-        );
-      }
+        req.files.add(await http.MultipartFile.fromPath(
+          'image', 
+          image.path, 
+          contentType: contentType,
+        ));
 
-      final streamedResponse = await req.send();
-      final response = await http.Response.fromStream(streamedResponse);
+        final streamedResponse = await req.send();
+        final response = await http.Response.fromStream(streamedResponse);
 
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
-      } else if (response.statusCode == 401) {
-        throw '401';
-      } else {
-        print('Update Donneur Profile (Multipart) failed: ${response.body}');
+        print('DEBUG: updateDonneurProfile - Status: ${response.statusCode}');
+        if (response.statusCode == 200 || response.statusCode == 201) {
+          return jsonDecode(response.body);
+        } else if (response.statusCode == 401) {
+          throw '401';
+        } else {
+          print('DEBUG: updateDonneurProfile - Failed: ${response.body}');
+          return null;
+        }
       }
-      return null;
     });
   }
 
@@ -2039,11 +2046,19 @@ class ApiService {
           return await _authenticatedRequest(request, depth + 1);
         } else {
           print('Token refresh failed. Directing to login state.');
+          
+          // Use the global navigator key to redirect to login
+          // We use Future.microtask to ensure we don't navigate during a build phase
+          Future.microtask(() {
+            navigatorKey.currentState?.pushNamedAndRemoveUntil('/intro_onboarding', (route) => false);
+          });
+
+          throw SessionExpiredException('Refresh token flow failed');
         }
       } else {
         print('Authenticated request error: $e');
+        rethrow;
       }
     }
-    return null;
   }
 }

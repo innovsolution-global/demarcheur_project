@@ -53,4 +53,9 @@ class ImmoChatProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  void clear() {
+    _conversations.clear();
+    notifyListeners();
+  }
 }

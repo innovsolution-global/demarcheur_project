@@ -11,10 +11,30 @@ import 'package:demarcheur_app/models/services/service_model.dart';
 import 'package:demarcheur_app/models/type_properties.dart';
 import 'package:demarcheur_app/services/api_service.dart';
 import 'package:demarcheur_app/services/config.dart';
+import 'package:demarcheur_app/services/socket_service.dart';
 import 'package:demarcheur_app/services/storage_service.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
+import 'package:provider/provider.dart';
+
+// Import providers for logout reset
+import 'package:demarcheur_app/providers/enterprise_provider.dart';
+import 'package:demarcheur_app/providers/donnor_user_provider.dart';
+import 'package:demarcheur_app/providers/presta/presta_provider.dart';
+import 'package:demarcheur_app/providers/user_provider.dart';
+import 'package:demarcheur_app/providers/application_provider.dart';
+import 'package:demarcheur_app/providers/compa_profile_provider.dart';
+import 'package:demarcheur_app/providers/search_provider.dart';
+import 'package:demarcheur_app/providers/dem_job_provider.dart';
+import 'package:demarcheur_app/providers/dem_user_provider.dart';
+import 'package:demarcheur_app/providers/message_provider.dart';
+import 'package:demarcheur_app/providers/domain_pref_provider.dart';
+import 'package:demarcheur_app/providers/house_provider.dart';
+import 'package:demarcheur_app/providers/chat/chat_provider.dart';
+import 'package:demarcheur_app/providers/immo/immo_chat_provider.dart';
+import 'package:demarcheur_app/providers/job_provider.dart';
+import 'package:demarcheur_app/providers/candidature_provider.dart';
 
 class AuthProvider with ChangeNotifier {
   final apiService = ApiService();
@@ -151,16 +171,26 @@ class AuthProvider with ChangeNotifier {
 
       final prefs = await SharedPreferences.getInstance();
 
-      // 1. Save token
+      // 1. Save access token
       final token = response['token'];
       if (token != null) {
         _token = token;
         final StorageService storage = StorageService();
         await storage.saveToken(token);
-        await prefs.setString(
-          'token',
-          token,
-        ); // Keep for compat if needed, but primary is storage.saveToken
+        await prefs.setString('token', token);
+      }
+
+      // 1b. Save refresh token (required for silent token renewal on 401)
+      final refreshTokenString =
+          response['refreshToken']?.toString() ??
+          response['refresh_token']?.toString();
+      debugPrint(
+        'DEBUG: AuthProvider.authentification - refreshToken présent: ${refreshTokenString != null}',
+      );
+      if (refreshTokenString != null) {
+        final StorageService storage = StorageService();
+        await storage.saveRefreshToken(refreshTokenString);
+        await prefs.setString('refreshToken', refreshTokenString);
       }
 
       // 2. Handle connected user
@@ -188,7 +218,7 @@ class AuthProvider with ChangeNotifier {
 
         // ✅ Persist user for both AuthProvider and specific Providers
         await prefs.setString('last_user_data', jsonEncode(userMap));
-        
+
         if (role == 'GIVER') {
           await prefs.setString('giver_user_data', jsonEncode(userMap));
         } else {
@@ -202,6 +232,11 @@ class AuthProvider with ChangeNotifier {
         // ✅ Store user_id explicitly for easier loading
         if (_userId != null) {
           await prefs.setString('user_id', _userId!);
+          // Connect socket explicitly upon successful login
+          print(
+            'DEBUG: AuthProvider.authentification - Connecting SocketService',
+          );
+          SocketService().connect(token, _userId!);
         }
 
         notifyListeners();
@@ -218,14 +253,55 @@ class AuthProvider with ChangeNotifier {
   }
 
   Future<void> logout(BuildContext context) async {
+    // 1. Reset all in-memory providers to prevent data leakage
+    try {
+      Provider.of<EnterpriseProvider>(context, listen: false).clear();
+      Provider.of<DonnorUserProvider>(context, listen: false).clear();
+      Provider.of<PrestaProvider>(context, listen: false).clear();
+      Provider.of<UserProvider>(context, listen: false).clear();
+      Provider.of<ApplicationProvider>(context, listen: false).clear();
+      Provider.of<CompaProfileProvider>(context, listen: false).clear();
+      Provider.of<SearchProvider>(context, listen: false).clear();
+      Provider.of<DemJobProvider>(context, listen: false).clear();
+      Provider.of<DemUserProvider>(context, listen: false).clear();
+      Provider.of<CandidatureProvider>(context, listen: false).clear();
+      Provider.of<MessageProvider>(context, listen: false).clear();
+      Provider.of<DomainPrefProvider>(context, listen: false).clear();
+      Provider.of<HouseProvider>(context, listen: false).clear();
+      Provider.of<ChatProvider>(context, listen: false).clear();
+      Provider.of<ImmoChatProvider>(context, listen: false).clear();
+    } catch (e) {
+      debugPrint("DEBUG: AuthProvider.logout - Error resetting providers: $e");
+    }
+
+    // 2. Clear persisted data
     final prefs = await SharedPreferences.getInstance();
-    await prefs.clear(); // Clear SharedPreferences (tokens, user data, etc.)
+
+    // Explicitly remove critical user data keys as a fail-safe
+    await prefs.remove('token');
+    await prefs.remove('refreshToken');
+    await prefs.remove('role');
+    await prefs.remove('user_role');
+    await prefs.remove('user_id');
+    await prefs.remove('userId');
+    await prefs.remove('demUser');
+    await prefs.remove('giver_user_data');
+    await prefs.remove('searcher_user_data');
+    await prefs.remove('last_user_data');
+
+    await prefs.clear(); // Nuclear option: clear everything else
     await StorageService().clearAll(); // Clear secure storage
+
+    // 3. Reset self
     _token = null;
     _role = null;
+    _enterprise = null;
+    _userData = null;
+    _userId = null;
+
     notifyListeners();
 
-    // Navigate back to login
+    // 4. Navigate back to login
     Navigator.of(
       context,
     ).pushNamedAndRemoveUntil('/intro_onboarding', (route) => false);
@@ -261,7 +337,7 @@ class AuthProvider with ChangeNotifier {
     print('START CALLING UPDATE JOB OFFER');
 
     final success = await apiService.updateJobOffer(id, vancy, _token);
-    
+
     _isLoading = false;
     notifyListeners();
     return success;
@@ -391,7 +467,9 @@ class AuthProvider with ChangeNotifier {
       // If there are more images, add them to the gallery via PATCH
       if (images.length > 1) {
         final remainingImages = images.sublist(1);
-        print('Uploading ${remainingImages.length} additional images to gallery...');
+        print(
+          'Uploading ${remainingImages.length} additional images to gallery...',
+        );
 
         final galleryResponse = await apiService.updateGalleryImage(
           response['id'].toString(),
@@ -441,7 +519,7 @@ class AuthProvider with ChangeNotifier {
         data,
         _token,
       );
-      
+
       if (response != null && newImages != null && newImages.isNotEmpty) {
         print('DEBUG: Property updated, now updating gallery images...');
         final galleryResult = await apiService.updateGalleryImages(
@@ -454,7 +532,7 @@ class AuthProvider with ChangeNotifier {
           // We still consider the property update success, but maybe warn user?
         }
       }
-      
+
       _isLoading = false;
       notifyListeners();
       return response != null;
@@ -535,7 +613,8 @@ class AuthProvider with ChangeNotifier {
         return false;
       }
       notifyListeners();
-      return response != null; // Return true if response is not null and no error
+      return response !=
+          null; // Return true if response is not null and no error
     } catch (e) {
       _isLoading = false;
       _errorMessage = e.toString(); // Capture exception message

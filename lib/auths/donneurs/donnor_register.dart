@@ -10,6 +10,7 @@ import 'package:demarcheur_app/widgets/title_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:intl_phone_field/intl_phone_field.dart';
 
 class DonnorRegister extends StatefulWidget {
   const DonnorRegister({super.key});
@@ -32,6 +33,7 @@ class _DonnorRegister extends State<DonnorRegister>
   final _locationController = TextEditingController();
   final _passwordController = TextEditingController();
   final _cityController = TextEditingController();
+  String _completePhone = ''; // Full phone with country code e.g. +224623581928
 
   File? selectedImage;
   bool isLoading = false;
@@ -168,7 +170,9 @@ class _DonnorRegister extends State<DonnorRegister>
     //  await Future.delayed(const Duration(seconds: 2));
     final donneur = DonneurModel(
       name: _companyNameController.text,
-      phone: _phoneController.text,
+      phone: _completePhone.isNotEmpty
+          ? _completePhone
+          : _phoneController.text.replaceAll(RegExp(r'\s+|-|\(|\)'), ''),
       email: _emailController.text,
       password: _passwordController.text,
       adress: _locationController.text,
@@ -387,6 +391,7 @@ class _DonnorRegister extends State<DonnorRegister>
   }
 
   Widget _buildFormFields() {
+    final color = ConstColors();
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20.0),
       child: Column(
@@ -395,45 +400,56 @@ class _DonnorRegister extends State<DonnorRegister>
             textCapitalization: TextCapitalization.sentences,
             controller: _companyNameController,
             label: "Nom complet",
-            icon: HugeIcons.strokeRoundedBuilding01,
+            icon: Icons.person_outline,
             validator: (value) => _validateRequired(value, "Le nom"),
           ),
           const SizedBox(height: 20),
-          // _CustomTextField(
-          //   controller: _domainController,
-          //   textCapitalization: TextCapitalization.sentences,
-          //   label: "Domaine d'activité",
-          //   icon: HugeIcons.strokeRoundedBriefcase01,
-          //   validator: (value) =>
-          //       _validateRequired(value, "Le domaine d'activité"),
-          // ),
-          // const SizedBox(height: 20),
           _CustomTextField(
             textCapitalization: TextCapitalization.none,
-
             controller: _emailController,
             label: "Adresse e-mail",
-            icon: HugeIcons.strokeRoundedMail01,
+            icon: Icons.email_outlined,
             keyboardType: TextInputType.emailAddress,
             validator: _validateEmail,
           ),
           const SizedBox(height: 20),
-          _CustomTextField(
-            textCapitalization: TextCapitalization.none,
-
+          IntlPhoneField(
             controller: _phoneController,
-            label: "Numéro de téléphone",
-            icon: HugeIcons.strokeRoundedAiPhone01,
             keyboardType: TextInputType.phone,
-            validator: _validatePhone,
+            disableLengthCheck: true,
+            initialCountryCode: 'GN',
+            onChanged: (phone) {
+              _completePhone = phone.completeNumber;
+            },
+            style: TextStyle(fontSize: 18, color: color.secondary, fontWeight: FontWeight.w500),
+            decoration: InputDecoration(
+              hintText: "Numéro de téléphone",
+              hintStyle: TextStyle(color: color.secondary.withOpacity(0.5), fontSize: 16),
+              filled: true,
+              fillColor: color.bgSubmit ?? Colors.grey.shade100,
+              contentPadding: const EdgeInsets.symmetric(vertical: 20),
+              border: OutlineInputBorder(
+                borderSide: BorderSide.none,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: color.primary, width: 2),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              errorStyle: TextStyle(color: Colors.red),
+              errorBorder: OutlineInputBorder(
+                borderSide: const BorderSide(color: Colors.red),
+                borderRadius: BorderRadius.circular(20),
+              ),
+            ),
           ),
           const SizedBox(height: 20),
           _CustomTextField(
             textCapitalization: TextCapitalization.sentences,
             controller: _locationController,
-            label: "Addresse",
-            icon: HugeIcons.strokeRoundedLocation01,
-            validator: (value) => _validateRequired(value, "L'addresse"),
+            label: "Adresse",
+            icon: Icons.location_on_outlined,
+            validator: (value) => _validateRequired(value, "L'adresse"),
             textInputAction: TextInputAction.next,
           ),
           const SizedBox(height: 20),
@@ -441,7 +457,7 @@ class _DonnorRegister extends State<DonnorRegister>
             textCapitalization: TextCapitalization.sentences,
             controller: _cityController,
             label: "Ville",
-            icon: HugeIcons.strokeRoundedLocation01,
+            icon: Icons.location_city_outlined,
             validator: (value) => _validateRequired(value, "La ville"),
             textInputAction: TextInputAction.next,
           ),
@@ -450,7 +466,8 @@ class _DonnorRegister extends State<DonnorRegister>
             textCapitalization: TextCapitalization.none,
             controller: _passwordController,
             label: "Mot de passe",
-            icon: HugeIcons.strokeRoundedLocation01,
+            icon: Icons.lock_outline,
+            isPassword: true,
             validator: (value) => _validateRequired(value, "Mot de passe"),
             textInputAction: TextInputAction.done,
           ),
@@ -495,7 +512,7 @@ class _DonnorRegister extends State<DonnorRegister>
   }
 }
 
-class _CustomTextField extends StatelessWidget {
+class _CustomTextField extends StatefulWidget {
   final TextEditingController controller;
   final String label;
   final dynamic icon;
@@ -503,54 +520,74 @@ class _CustomTextField extends StatelessWidget {
   final String? Function(String?)? validator;
   final TextInputAction? textInputAction;
   final TextCapitalization textCapitalization;
+  final bool isPassword;
 
   const _CustomTextField({
     required this.controller,
     required this.label,
     required this.icon,
     required this.textCapitalization,
-
+    this.isPassword = false,
     this.keyboardType,
     this.validator,
     this.textInputAction,
   });
 
   @override
+  State<_CustomTextField> createState() => _CustomTextFieldState();
+}
+
+class _CustomTextFieldState extends State<_CustomTextField> {
+  bool obscuredText = true;
+
+  @override
   Widget build(BuildContext context) {
     final color = ConstColors();
 
     return TextFormField(
-      controller: controller,
-      keyboardType: keyboardType ?? TextInputType.text,
-      textInputAction: textInputAction ?? TextInputAction.next,
-      textCapitalization: textCapitalization,
-      validator: validator,
-      style: TextStyle(fontSize: 16, color: color.secondary),
+      controller: widget.controller,
+      keyboardType: widget.keyboardType ?? TextInputType.text,
+      textInputAction: widget.textInputAction ?? TextInputAction.next,
+      textCapitalization: widget.textCapitalization,
+      validator: widget.validator,
+      obscureText: widget.isPassword ? obscuredText : false,
+      style: TextStyle(fontSize: 18, color: color.secondary, fontWeight: FontWeight.w500),
       decoration: InputDecoration(
-        labelText: label,
-        labelStyle: TextStyle(color: color.primary, fontSize: 16),
-        // prefixIcon: HugeIcon(icon: icon, color: color.primary, size: 10),
+        hintText: widget.label,
+        hintStyle: TextStyle(color: color.secondary.withOpacity(0.5), fontSize: 16),
+        prefixIcon: Icon(widget.icon, color: color.primary),
+        suffixIcon: widget.isPassword
+            ? IconButton(
+                icon: Icon(
+                  obscuredText ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                  color: color.primary,
+                ),
+                onPressed: () {
+                  setState(() {
+                    obscuredText = !obscuredText;
+                  });
+                },
+              )
+            : null,
         filled: true,
-        fillColor: color.bgSubmit,
+        fillColor: color.bgSubmit ?? Colors.grey.shade100,
+        contentPadding: const EdgeInsets.symmetric(vertical: 20),
         border: OutlineInputBorder(
           borderSide: BorderSide.none,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
         ),
         focusedBorder: OutlineInputBorder(
           borderSide: BorderSide(color: color.primary, width: 2),
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
         ),
+        errorStyle: TextStyle(color: Colors.red),
         errorBorder: OutlineInputBorder(
-          borderSide: const BorderSide(color: Colors.red, width: 2),
-          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: Colors.red),
+          borderRadius: BorderRadius.circular(20),
         ),
         focusedErrorBorder: OutlineInputBorder(
           borderSide: const BorderSide(color: Colors.red, width: 2),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 16,
+          borderRadius: BorderRadius.circular(20),
         ),
       ),
     );

@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:intl_phone_field/intl_phone_field.dart';
 
 class PrestataireRegisterPage extends StatefulWidget {
   const PrestataireRegisterPage({super.key});
@@ -273,99 +274,73 @@ class _PrestataireRegisterPageState extends State<PrestataireRegisterPage> {
 
                                   SizedBox(height: 16),
 
-                                  TextFormField(
-                                    controller: passwordController,
-                                    keyboardType: TextInputType.text,
+                                  _CustomTextField(
+                                    controller: TextEditingController(), // Replace with proper controller later if needed
+                                    label: "Votre nom complet",
+                                    icon: Icons.person_outline,
+                                    textCapitalization: TextCapitalization.words,
                                     textInputAction: TextInputAction.next,
+                                  ),
+                                  const SizedBox(height: 20),
+                                  _CustomTextField(
+                                    controller: TextEditingController(),
+                                    label: "Votre domaine d'activité",
+                                    icon: Icons.work_outline,
+                                    textCapitalization: TextCapitalization.sentences,
+                                    textInputAction: TextInputAction.next,
+                                  ),
+                                  const SizedBox(height: 20),
+                                  _CustomTextField(
+                                    controller: emailController,
+                                    label: "Votre adresse e-mail",
+                                    icon: Icons.email_outlined,
+                                    keyboardType: TextInputType.emailAddress,
+                                    textCapitalization: TextCapitalization.none,
+                                    textInputAction: TextInputAction.next,
+                                  ),
+                                  const SizedBox(height: 20),
+                                  IntlPhoneField(
+                                    keyboardType: TextInputType.phone,
+                                    disableLengthCheck: true,
+                                    initialCountryCode: 'GN',
+                                    style: TextStyle(fontSize: 18, color: color.secondary, fontWeight: FontWeight.w500),
                                     decoration: InputDecoration(
-                                      hint: SubTitle(
-                                        text: "Votre nom complet",
-                                        fontWeight: FontWeight.w500,
-                                        fontsize: 16,
-                                      ),
-                                      fillColor: color.bgSubmit,
+                                      hintText: "Votre numéro de téléphone",
+                                      hintStyle: TextStyle(color: color.secondary.withOpacity(0.5), fontSize: 16),
                                       filled: true,
+                                      fillColor: color.bgSubmit ?? Colors.grey.shade100,
+                                      contentPadding: const EdgeInsets.symmetric(vertical: 20),
                                       border: OutlineInputBorder(
                                         borderSide: BorderSide.none,
-                                        borderRadius: BorderRadius.circular(16),
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderSide: BorderSide(color: color.primary, width: 2),
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      errorStyle: TextStyle(color: Colors.red),
+                                      errorBorder: OutlineInputBorder(
+                                        borderSide: const BorderSide(color: Colors.red),
+                                        borderRadius: BorderRadius.circular(20),
                                       ),
                                     ),
                                   ),
-                                  SizedBox(height: 16),
-                                  TextFormField(
-                                    controller: passwordController,
-                                    keyboardType: TextInputType.text,
+                                  const SizedBox(height: 20),
+                                  _CustomTextField(
+                                    controller: TextEditingController(),
+                                    label: "Votre localisation",
+                                    icon: Icons.location_on_outlined,
+                                    textCapitalization: TextCapitalization.words,
                                     textInputAction: TextInputAction.next,
-                                    decoration: InputDecoration(
-                                      hint: SubTitle(
-                                        text: "Votre domaine d'activite",
-                                        fontsize: 16,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                      fillColor: color.bgSubmit,
-                                      filled: true,
-                                      border: OutlineInputBorder(
-                                        borderSide: BorderSide.none,
-                                        borderRadius: BorderRadius.circular(16),
-                                      ),
-                                    ),
                                   ),
-                                  SizedBox(height: 16),
-                                  TextFormField(
+                                  const SizedBox(height: 20),
+                                  _CustomTextField(
                                     controller: passwordController,
-                                    keyboardType: TextInputType.text,
-                                    textInputAction: TextInputAction.next,
-                                    decoration: InputDecoration(
-                                      hint: SubTitle(
-                                        text: "Votre adresse e-mail",
-                                        fontWeight: FontWeight.w500,
-                                        fontsize: 16,
-                                      ),
-                                      fillColor: color.bgSubmit,
-                                      filled: true,
-                                      border: OutlineInputBorder(
-                                        borderSide: BorderSide.none,
-                                        borderRadius: BorderRadius.circular(16),
-                                      ),
-                                    ),
-                                  ),
-                                  SizedBox(height: 16),
-                                  TextFormField(
-                                    controller: passwordController,
-                                    keyboardType: TextInputType.number,
-                                    textInputAction: TextInputAction.next,
-                                    decoration: InputDecoration(
-                                      hint: SubTitle(
-                                        text: "Votre numero de telephone",
-                                        fontWeight: FontWeight.w500,
-                                        fontsize: 16,
-                                      ),
-                                      fillColor: color.bgSubmit,
-                                      filled: true,
-                                      border: OutlineInputBorder(
-                                        borderSide: BorderSide.none,
-                                        borderRadius: BorderRadius.circular(16),
-                                      ),
-                                    ),
-                                  ),
-                                  SizedBox(height: 16),
-                                  TextFormField(
-                                    controller: passwordController,
-                                    keyboardType: TextInputType.text,
+                                    label: "Mot de passe",
+                                    icon: Icons.lock_outline,
+                                    isPassword: true,
+                                    textCapitalization: TextCapitalization.none,
                                     textInputAction: TextInputAction.done,
-                                    decoration: InputDecoration(
-                                      hint: SubTitle(
-                                        text: "Votre localisation",
-                                        fontsize: 16,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                      fillColor: color.bgSubmit,
-                                      filled: true,
-                                      border: OutlineInputBorder(
-                                        borderSide: BorderSide.none,
-                                        borderRadius: BorderRadius.circular(16),
-                                      ),
-                                    ),
                                   ),
                                   SizedBox(height: 16),
                                 ],
@@ -391,6 +366,88 @@ class _PrestataireRegisterPageState extends State<PrestataireRegisterPage> {
                 ],
               ),
             ),
+    );
+  }
+}
+
+class _CustomTextField extends StatefulWidget {
+  final TextEditingController controller;
+  final String label;
+  final dynamic icon;
+  final TextInputType? keyboardType;
+  final String? Function(String?)? validator;
+  final TextInputAction? textInputAction;
+  final TextCapitalization textCapitalization;
+  final bool isPassword;
+
+  const _CustomTextField({
+    required this.controller,
+    required this.label,
+    required this.icon,
+    required this.textCapitalization,
+    this.isPassword = false,
+    this.keyboardType,
+    this.validator,
+    this.textInputAction,
+  });
+
+  @override
+  State<_CustomTextField> createState() => _CustomTextFieldState();
+}
+
+class _CustomTextFieldState extends State<_CustomTextField> {
+  bool obscuredText = true;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = ConstColors();
+
+    return TextFormField(
+      controller: widget.controller,
+      keyboardType: widget.keyboardType ?? TextInputType.text,
+      textInputAction: widget.textInputAction ?? TextInputAction.next,
+      textCapitalization: widget.textCapitalization,
+      validator: widget.validator,
+      obscureText: widget.isPassword ? obscuredText : false,
+      style: TextStyle(fontSize: 18, color: color.secondary, fontWeight: FontWeight.w500),
+      decoration: InputDecoration(
+        hintText: widget.label,
+        hintStyle: TextStyle(color: color.secondary.withOpacity(0.5), fontSize: 16),
+        prefixIcon: Icon(widget.icon, color: color.primary),
+        suffixIcon: widget.isPassword
+            ? IconButton(
+                icon: Icon(
+                  obscuredText ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                  color: color.primary,
+                ),
+                onPressed: () {
+                  setState(() {
+                    obscuredText = !obscuredText;
+                  });
+                },
+              )
+            : null,
+        filled: true,
+        fillColor: color.bgSubmit ?? Colors.grey.shade100,
+        contentPadding: const EdgeInsets.symmetric(vertical: 20),
+        border: OutlineInputBorder(
+          borderSide: BorderSide.none,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: color.primary, width: 2),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        errorStyle: TextStyle(color: Colors.red),
+        errorBorder: OutlineInputBorder(
+          borderSide: const BorderSide(color: Colors.red),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderSide: const BorderSide(color: Colors.red, width: 2),
+          borderRadius: BorderRadius.circular(20),
+        ),
+      ),
     );
   }
 }

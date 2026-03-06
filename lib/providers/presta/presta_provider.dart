@@ -60,9 +60,16 @@ class PrestaProvider extends ChangeNotifier {
         );
 
         if (freshEnterprise != null) {
-          if (enterprise != null) {
+          // CRITICAL: Only merge if IDs and emails match to prevent data leakage between sessions
+          final bool isSameUser = enterprise != null && 
+                                 (enterprise.id == freshEnterprise.id || freshEnterprise.id == null) &&
+                                 (enterprise.email == freshEnterprise.email || freshEnterprise.email == null);
+          
+          if (isSameUser) {
+            debugPrint('DEBUG PRESTA: Merging fresh profile with cached data.');
             enterprise = enterprise.mergeFrom(freshEnterprise);
           } else {
+            debugPrint('DEBUG PRESTA: Cache mismatch (IDs or Emails differ), taking fresh profile.');
             enterprise = freshEnterprise;
           }
           // Save updated data
@@ -93,6 +100,9 @@ class PrestaProvider extends ChangeNotifier {
       } else {
         debugPrint('DEBUG PRESTA: Token is NULL, cannot load profile');
       }
+    } on SessionExpiredException catch (e) {
+      debugPrint('PrestaProvider.loadUser - SESSION EXPIRED: $e');
+      // Global redirect is handled in ApiService
     } catch (e) {
       debugPrint('Error loading SERVICE profile: $e');
     } finally {
@@ -107,8 +117,11 @@ class PrestaProvider extends ChangeNotifier {
     String? phone,
     String? address,
     String? city,
-    File? image,
-  ) async {
+    File? image, {
+    String? description,
+    String? website,
+    String? link_linkdin,
+  }) async {
     if (_user == null) return false;
 
     _isLoading = true;
@@ -126,6 +139,9 @@ class PrestaProvider extends ChangeNotifier {
         profile: _user!.imageUrl.isNotEmpty ? _user!.imageUrl.first : null,
         specialite: _user!.categorie,
         domaine: _user!.about,
+        description: description,
+        website: website,
+        link_linkdin: link_linkdin,
       );
 
       final result = await _apiService.updateEnterpriseProfile(
@@ -135,8 +151,33 @@ class PrestaProvider extends ChangeNotifier {
 
       if (result != null) {
         debugPrint("DEBUG: updateProfile (PrestaProvider) - Success");
-        // Reload to get fresh data and update local _user
-        await loadUser();
+
+        // Sync local _user immediately
+        _user = PrestaUserModel(
+          id: enterpriseToUpdate.id,
+          companyName: enterpriseToUpdate.name,
+          imageUrl: enterpriseToUpdate.profile != null ? [enterpriseToUpdate.profile!] : [],
+          location: enterpriseToUpdate.adress ?? enterpriseToUpdate.city ?? '',
+          status: _user!.status, // Keep existing status
+          categorie: _user!.categorie,
+          about: _user!.about,
+          salary: _user!.salary,
+          email: enterpriseToUpdate.email,
+          phoneNumber: enterpriseToUpdate.phone ?? '',
+          rate: _user!.rate,
+        );
+
+        // Persist to cache
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('last_user_data', jsonEncode(enterpriseToUpdate.toJson()));
+
+        // Reload in background after a delay for cache propagation
+        Future.delayed(const Duration(seconds: 2), () {
+           loadUser();
+        });
+        
+        _isLoading = false;
+        notifyListeners();
         return true;
       }
     } catch (e) {
@@ -271,4 +312,10 @@ class PrestaProvider extends ChangeNotifier {
     _filteredJobs = _allJobs;
     notifyListeners();
   }
+
+  void clear() {
+    _user = null;
+    notifyListeners();
+  }
 }
+

@@ -39,6 +39,12 @@ class CandidatureProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void clear() {
+    _applicants = [];
+    _errorMessage = null;
+    notifyListeners();
+  }
+
   Future<CandidateModel?> fetchCandidatureDetail(
     String candidatureId,
     String? token,

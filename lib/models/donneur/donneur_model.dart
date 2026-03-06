@@ -15,6 +15,10 @@ class DonneurModel {
   String? nameOrganization;
   double? rate;
   bool isVerified;
+  String? description;
+  String? website;
+  String? link_linkdin;
+  String? serviceId;
 
   DonneurModel({
     this.id,
@@ -29,6 +33,10 @@ class DonneurModel {
     this.nameOrganization,
     this.rate = 0.0,
     this.isVerified = false,
+    this.description,
+    this.website,
+    this.link_linkdin,
+    this.serviceId,
   });
 
   factory DonneurModel.fromJson(Map<String, dynamic> json) {
@@ -79,6 +87,10 @@ class DonneurModel {
       nameOrganization: json['name_organization']?.toString() ?? json['nameOrganization']?.toString(),
       rate: (json['rate'] ?? 0.0).toDouble(),
       isVerified: json['isVerified'] ?? false,
+      description: (json['description'] ?? json['about'])?.toString(),
+      website: json['website']?.toString(),
+      link_linkdin: (json['link_linkdin'] ?? json['linkedin'] ?? json['linkedin_url'])?.toString(),
+      serviceId: (json['serviceId'] ?? json['service_id'])?.toString(),
     );
   }
 
@@ -95,6 +107,10 @@ class DonneurModel {
     String? nameOrganization,
     double? rate,
     bool? isVerified,
+    String? description,
+    String? website,
+    String? link_linkdin,
+    String? serviceId,
   }) {
     return DonneurModel(
       id: id ?? this.id,
@@ -109,28 +125,81 @@ class DonneurModel {
       nameOrganization: nameOrganization ?? this.nameOrganization,
       rate: rate ?? this.rate,
       isVerified: isVerified ?? this.isVerified,
+      description: description ?? this.description,
+      website: website ?? this.website,
+      link_linkdin: link_linkdin ?? this.link_linkdin,
+      serviceId: serviceId ?? this.serviceId,
     );
   }
 
-  /// Merges another model into this one, keeping existing values if new ones are null or empty
   DonneurModel mergeFrom(DonneurModel other) {
     print("DEBUG: DonneurModel - Merging existing data with fresh data from API");
+    print("DEBUG: DonneurModel - Current name: '$name', Fresh name from API: '${other.name}'");
+
+    // For editable fields, we TRUST the local state if it's already populated.
+    final mergedName = (name.trim().isNotEmpty) ? name : other.name.trim();
+    final mergedPhone = (phone != null && phone!.trim().isNotEmpty) ? phone!.trim() : (other.phone?.trim() ?? '');
+    final mergedEmail = (email.trim().isNotEmpty) ? email : other.email.trim();
+    final mergedAdress = (adress != null && adress!.trim().isNotEmpty) ? adress!.trim() : (other.adress?.trim() ?? '');
+    final mergedCity = (city != null && city!.trim().isNotEmpty) ? city!.trim() : (other.city?.trim() ?? '');
+    
+    // For server-managed fields, we take the fresh API data
+    final mergedProfile = (other.profile != null && other.profile!.isNotEmpty && !other.profile!.contains('null')) ? other.profile : profile;
+
+    print("DEBUG: DonneurModel - Merge Result -> Name: '$mergedName', Phone: '$mergedPhone', City: '$mergedCity'");
+
     return DonneurModel(
       id: (other.id != null && other.id!.isNotEmpty) ? other.id : id,
-      name: (other.name.trim().isNotEmpty) ? other.name.trim() : name,
-      phone: (other.phone != null && other.phone!.trim().isNotEmpty) ? other.phone!.trim() : phone,
-      email: (other.email.trim().isNotEmpty) ? other.email.trim() : email,
+      name: mergedName,
+      phone: mergedPhone,
+      email: mergedEmail,
       password: (other.password != null && other.password!.isNotEmpty) ? other.password : password,
-      adress: (other.adress != null && other.adress!.trim().isNotEmpty) ? other.adress!.trim() : adress,
-      city: (other.city != null && other.city!.trim().isNotEmpty) ? other.city!.trim() : city,
-      profile: (other.profile != null && other.profile!.isNotEmpty) ? other.profile : profile,
+      adress: mergedAdress,
+      city: mergedCity,
+      profile: mergedProfile,
       image: other.image ?? image,
       nameOrganization: (other.nameOrganization != null && other.nameOrganization!.isNotEmpty) ? other.nameOrganization : nameOrganization,
       rate: (other.rate != null && other.rate! > 0) ? other.rate : rate,
       isVerified: other.isVerified,
+      description: (other.description != null && other.description!.isNotEmpty) ? other.description : description,
+      website: (other.website != null && other.website!.isNotEmpty) ? other.website : website,
+      link_linkdin: (other.link_linkdin != null && other.link_linkdin!.isNotEmpty) ? other.link_linkdin : link_linkdin,
+      serviceId: (other.serviceId != null && other.serviceId!.isNotEmpty) ? other.serviceId : serviceId,
     );
   }
 
+  Map<String, dynamic> toUpdateJson() => {
+    "name": name,
+    "fullName": name,
+    "username": name,
+    "nom": name,
+    "nom_entreprise": name,
+    "name_organization": name,
+    "nameOrganization": name,
+    "companyName": name,
+    "company_name": name,
+    "phone": phone,
+    "phoneNumber": phone,
+    "telephone": phone,
+    "phone_number": phone,
+    "email": email,
+    "adress": adress,
+    "address": adress,
+    "adresse": adress,
+    "city": city,
+    "ville": city,
+    "location": adress,
+    "profile": profile,
+    "logo": profile,
+    "image": profile,
+    "photo": profile,
+    "description": description,
+    "website": website,
+    "link_linkdin": link_linkdin,
+    "serviceId": serviceId,
+    "password": password,
+    "name_organization": nameOrganization,
+  };
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -154,5 +223,9 @@ class DonneurModel {
     "name_organization": nameOrganization,
     "rate": rate,
     "isVerified": isVerified,
+    "description": description,
+    "website": website,
+    "link_linkdin": link_linkdin,
+    "serviceId": serviceId,
   };
 }
